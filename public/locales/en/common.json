@@ -1120,5 +1120,19 @@
       "songs": "Songs",
       "time":  "Time",
       "artists": "Artists"
+    },
+    "kobeweather": {
+        "loading": "Loading...",
+        "today": "Today",
+        "feelsLike": "Feels like",
+        "humidity": "Humidity",
+        "pressure": "Pressure",
+        "visibility": "Visibility",
+        "cloud": "Cloud",
+        "rainChance": "Rain chance",
+        "snowChance": "Snow chance",
+        "min": "Min",
+        "max": "Max",
+        "now": "Now"
     }
 }

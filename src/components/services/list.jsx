@@ -9,7 +9,7 @@ export default function List({ groupName, services, layout, useEqualHeights, hea
       className={classNames(
         layout?.style === "row" ? `grid ${columnMap[layout?.columns]} gap-x-2` : "flex flex-col",
         header ? "mt-3" : "",
-        "services-list",
+        "services-list min-w-0",
       )}
     >
       {services.map((service) => (

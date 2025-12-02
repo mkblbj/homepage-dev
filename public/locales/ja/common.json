@@ -1119,5 +1119,19 @@
         "songs": "Songs",
         "time": "Time",
         "artists": "Artists"
+    },
+    "kobeweather": {
+        "loading": "読み込み中...",
+        "today": "今日",
+        "feelsLike": "体感",
+        "humidity": "湿度",
+        "pressure": "気圧",
+        "visibility": "視程",
+        "cloud": "雲量",
+        "rainChance": "降水確率",
+        "snowChance": "降雪確率",
+        "min": "最低",
+        "max": "最高",
+        "now": "現在"
     }
 }

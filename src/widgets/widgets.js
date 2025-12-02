@@ -55,6 +55,7 @@ import jellyseerr from "./jellyseerr/widget";
 import jellystat from "./jellystat/widget";
 import karakeep from "./karakeep/widget";
 import kavita from "./kavita/widget";
+import kobeweather from "./kobeweather/widget";
 import komga from "./komga/widget";
 import komodo from "./komodo/widget";
 import kopia from "./kopia/widget";
@@ -129,6 +130,7 @@ import transmission from "./transmission/widget";
 import trilium from "./trilium/widget";
 import truenas from "./truenas/widget";
 import tubearchivist from "./tubearchivist/widget";
+import uoattendance from "./uoattendance/widget";
 import unifi from "./unifi/widget";
 import unmanic from "./unmanic/widget";
 import unraid from "./unraid/widget";
@@ -141,6 +143,7 @@ import watchtower from "./watchtower/widget";
 import wgeasy from "./wgeasy/widget";
 import whatsupdocker from "./whatsupdocker/widget";
 import xteve from "./xteve/widget";
+import yahoorss from "./yahoorss/widget";
 import yourspotify from "./yourspotify/widget";
 import zabbix from "./zabbix/widget";
 
@@ -204,6 +207,7 @@ const widgets = {
   jellyseerr,
   jellystat,
   kavita,
+  kobeweather,
   komga,
   komodo,
   kopia,
@@ -279,6 +283,7 @@ const widgets = {
   trilium,
   tubearchivist,
   truenas,
+  uoattendance,
   unifi,
   unifi_console: unifi,
   unmanic,
@@ -292,6 +297,7 @@ const widgets = {
   wgeasy,
   whatsupdocker,
   xteve,
+  yahoorss,
   yourspotify,
   zabbix,
 };
