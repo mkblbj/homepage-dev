@@ -746,5 +746,14 @@
         "physicalRelease": "Physical release",
         "inCinemas": "In cinemas",
         "digitalRelease": "Digital release"
+    },
+    "memo": {
+        "loading": "加载中...",
+        "empty": "暂无便签",
+        "addNote": "添加便签",
+        "placeholder": "写点什么...",
+        "justNow": "刚刚",
+        "minutesAgo": "{{count}}分钟前",
+        "hoursAgo": "{{count}}小时前"
     }
 }

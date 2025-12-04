@@ -1121,6 +1121,15 @@
       "time":  "Time",
       "artists": "Artists"
     },
+    "memo": {
+        "loading": "Loading...",
+        "empty": "No notes yet",
+        "addNote": "Add Note",
+        "placeholder": "Write something...",
+        "justNow": "Just now",
+        "minutesAgo": "{{count}}m ago",
+        "hoursAgo": "{{count}}h ago"
+    },
     "kobeweather": {
         "loading": "Loading...",
         "today": "Today",

@@ -74,6 +74,7 @@ const components = {
   mailcow: dynamic(() => import("./mailcow/component")),
   mastodon: dynamic(() => import("./mastodon/component")),
   mealie: dynamic(() => import("./mealie/component")),
+  memo: dynamic(() => import("./memo/component")),
   medusa: dynamic(() => import("./medusa/component")),
   minecraft: dynamic(() => import("./minecraft/component")),
   miniflux: dynamic(() => import("./miniflux/component")),

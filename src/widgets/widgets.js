@@ -65,6 +65,7 @@ import lubelogger from "./lubelogger/widget";
 import mailcow from "./mailcow/widget";
 import mastodon from "./mastodon/widget";
 import mealie from "./mealie/widget";
+import memo from "./memo/widget";
 import medusa from "./medusa/widget";
 import mikrotik from "./mikrotik/widget";
 import minecraft from "./minecraft/widget";
@@ -217,6 +218,7 @@ const widgets = {
   mailcow,
   mastodon,
   mealie,
+  memo,
   medusa,
   minecraft,
   miniflux,
