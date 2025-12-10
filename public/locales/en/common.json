@@ -1128,7 +1128,10 @@
         "placeholder": "Write something...",
         "justNow": "Just now",
         "minutesAgo": "{{count}}m ago",
-        "hoursAgo": "{{count}}h ago"
+        "hoursAgo": "{{count}}h ago",
+        "unreadCount": "{{count}} unread",
+        "markRead": "Mark as read",
+        "markUnread": "Mark as unread"
     },
     "kobeweather": {
         "loading": "Loading...",

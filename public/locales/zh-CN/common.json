@@ -754,7 +754,10 @@
         "placeholder": "写点什么...",
         "justNow": "刚刚",
         "minutesAgo": "{{count}}分钟前",
-        "hoursAgo": "{{count}}小时前"
+        "hoursAgo": "{{count}}小时前",
+        "unreadCount": "{{count}}条未读",
+        "markRead": "标记已读",
+        "markUnread": "标记未读"
     },
     "uoprinters": {
         "loading": "加载中...",

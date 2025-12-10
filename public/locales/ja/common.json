@@ -1127,7 +1127,10 @@
         "placeholder": "何か書いてください...",
         "justNow": "たった今",
         "minutesAgo": "{{count}}分前",
-        "hoursAgo": "{{count}}時間前"
+        "hoursAgo": "{{count}}時間前",
+        "unreadCount": "{{count}}件未読",
+        "markRead": "既読にする",
+        "markUnread": "未読にする"
     },
     "kobeweather": {
         "loading": "読み込み中...",

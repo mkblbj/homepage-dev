@@ -8,6 +8,7 @@ import { SWRConfig } from "swr";
 import { ColorProvider } from "utils/contexts/color";
 import { SettingsProvider } from "utils/contexts/settings";
 import { TabProvider } from "utils/contexts/tab";
+import { TabBadgeProvider } from "utils/contexts/tab-badge";
 import { ThemeProvider } from "utils/contexts/theme";
 
 import nextI18nextConfig from "../../next-i18next.config";
@@ -85,7 +86,9 @@ function MyApp({ Component, pageProps }) {
         <ThemeProvider>
           <SettingsProvider>
             <TabProvider>
-              <Component {...pageProps} />
+              <TabBadgeProvider>
+                <Component {...pageProps} />
+              </TabBadgeProvider>
             </TabProvider>
           </SettingsProvider>
         </ThemeProvider>

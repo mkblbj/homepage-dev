@@ -48,6 +48,7 @@ export default async function handler(req, res) {
         content: content.trim(),
         createdAt: Date.now(),
         updatedAt: Date.now(),
+        readBy: [], // 已读用户列表
       };
 
       data.notes.push(note);
@@ -71,9 +72,42 @@ export default async function handler(req, res) {
 
       data.notes[noteIndex].content = content.trim();
       data.notes[noteIndex].updatedAt = Date.now();
+      // 内容更新后，重置已读状态（可选）
+      data.notes[noteIndex].readBy = [];
       writeMemos(data);
 
       return res.status(200).json(data.notes[noteIndex]);
+    }
+
+    case "PATCH": {
+      // 标记已读/未读
+      const { id, viewerId, action } = req.body;
+      if (!id || !viewerId) {
+        return res.status(400).json({ error: "ID and viewerId are required" });
+      }
+
+      const data = readMemos();
+      const noteIndex = data.notes.findIndex((n) => n.id === id);
+
+      if (noteIndex === -1) {
+        return res.status(404).json({ error: "Note not found" });
+      }
+
+      const note = data.notes[noteIndex];
+      if (!note.readBy) note.readBy = [];
+
+      if (action === "unread") {
+        // 标记未读
+        note.readBy = note.readBy.filter((v) => v !== viewerId);
+      } else {
+        // 标记已读
+        if (!note.readBy.includes(viewerId)) {
+          note.readBy.push(viewerId);
+        }
+      }
+
+      writeMemos(data);
+      return res.status(200).json(note);
     }
 
     case "DELETE": {
@@ -96,8 +130,7 @@ export default async function handler(req, res) {
     }
 
     default:
-      res.setHeader("Allow", ["GET", "POST", "PUT", "DELETE"]);
+      res.setHeader("Allow", ["GET", "POST", "PUT", "PATCH", "DELETE"]);
       return res.status(405).end(`Method ${method} Not Allowed`);
   }
 }
-

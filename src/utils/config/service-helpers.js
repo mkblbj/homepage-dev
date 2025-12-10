@@ -424,6 +424,11 @@ export function cleanServiceGroups(groups) {
 
           // grafana
           alerts,
+
+          // memo
+          tab,
+          maxNotes,
+          showTimestamp,
         } = widgetData;
 
         let fieldsList = fields;
@@ -656,6 +661,11 @@ export function cleanServiceGroups(groups) {
           if (interval !== undefined) {
             widget.interval = interval;
           }
+        }
+        if (type === "memo") {
+          if (tab) widget.tab = tab;
+          if (maxNotes !== undefined) widget.maxNotes = maxNotes;
+          if (showTimestamp !== undefined) widget.showTimestamp = showTimestamp;
         }
         return widget;
       });
