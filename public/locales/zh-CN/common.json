@@ -755,5 +755,9 @@
         "justNow": "刚刚",
         "minutesAgo": "{{count}}分钟前",
         "hoursAgo": "{{count}}小时前"
+    },
+    "uoprinters": {
+        "loading": "加载中...",
+        "noPrinters": "暂无打印机"
     }
 }

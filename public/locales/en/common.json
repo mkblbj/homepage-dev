@@ -1143,5 +1143,9 @@
         "min": "Min",
         "max": "Max",
         "now": "Now"
+    },
+    "uoprinters": {
+        "loading": "Loading...",
+        "noPrinters": "No printers"
     }
 }

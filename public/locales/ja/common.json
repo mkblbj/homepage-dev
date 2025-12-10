@@ -1142,5 +1142,9 @@
         "min": "最低",
         "max": "最高",
         "now": "現在"
+    },
+    "uoprinters": {
+        "loading": "読み込み中...",
+        "noPrinters": "プリンターなし"
     }
 }
