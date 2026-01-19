@@ -92,27 +92,26 @@ export default function Component({ service }) {
           </button>
         </div>
 
-        {/* Departments */}
+        {/* Departments - Side by Side */}
         {groupedEmployees.length === 0 ? (
           <div className="text-xs text-theme-400 dark:text-theme-500 italic text-center py-2">
             現在、出勤者はいません
           </div>
         ) : (
-          <div className="flex flex-col gap-2.5 max-h-[280px] overflow-y-auto scrollbar-thin scrollbar-thumb-theme-300 dark:scrollbar-thumb-theme-700">
+          <div className="grid grid-cols-2 gap-3">
             {groupedEmployees.map(({ name, employees: deptEmployees }) => (
-              <div key={name} className="flex flex-col gap-1">
+              <div key={name} className="flex flex-col gap-1.5">
                 {/* Department Header */}
-                <div className="flex items-center gap-1.5 px-1">
-                  <span className="text-[10px] font-semibold text-theme-500 dark:text-theme-400 whitespace-nowrap">
+                <div className="flex items-center gap-1.5 border-b border-theme-200/50 dark:border-theme-700/40 pb-1">
+                  <span className="text-[10px] font-semibold text-theme-500 dark:text-theme-400">
                     {name.replace(" - UO", "")}
                   </span>
-                  <span className="text-[9px] text-theme-400 dark:text-theme-500 opacity-60">
-                    ({deptEmployees.length})
+                  <span className="text-[10px] font-bold text-orange-500 dark:text-orange-400">
+                    {deptEmployees.length}
                   </span>
-                  <div className="flex-1 h-px bg-theme-200/50 dark:bg-theme-700/40" />
                 </div>
                 {/* Employee Badges */}
-                <div className="flex flex-wrap gap-1 px-1">
+                <div className="flex flex-wrap gap-1">
                   {deptEmployees.map((emp, idx) => (
                     <div
                       key={`${emp.employee}-${idx}`}
