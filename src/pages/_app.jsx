@@ -87,7 +87,7 @@ function MyApp({ Component, pageProps }) {
           <SettingsProvider>
             <TabProvider>
               <TabBadgeProvider>
-                <Component {...pageProps} />
+              <Component {...pageProps} />
               </TabBadgeProvider>
             </TabProvider>
           </SettingsProvider>
