@@ -102,14 +102,16 @@ function KeywordItem({ item }) {
 }
 
 function LoadingSkeleton() {
+  const col = [...Array(5)].map((_, i) => (
+    <div key={`skel-${i}`} className="flex items-center gap-2 px-2 py-1.5">
+      <div className="w-6 h-6 rounded-full bg-theme-200/50 dark:bg-theme-900/20 animate-pulse shrink-0" />
+      <div className="h-4 flex-1 bg-theme-200/50 dark:bg-theme-900/20 rounded animate-pulse" />
+    </div>
+  ));
   return (
-    <div className="grid grid-cols-2 gap-x-3 gap-y-1 p-2">
-      {[...Array(10)].map((_, i) => (
-        <div key={`skel-${i}`} className="flex items-center gap-2 px-2 py-1.5">
-          <div className="w-6 h-6 rounded-full bg-theme-200/50 dark:bg-theme-900/20 animate-pulse shrink-0" />
-          <div className="h-4 flex-1 bg-theme-200/50 dark:bg-theme-900/20 rounded animate-pulse" />
-        </div>
-      ))}
+    <div className="flex gap-3 p-2">
+      <div className="flex flex-col gap-y-1 flex-1">{col}</div>
+      <div className="flex flex-col gap-y-1 flex-1">{col}</div>
     </div>
   );
 }
@@ -170,9 +172,14 @@ export default function Component({ service }) {
             ))}
           </div>
           <div className="flex items-center gap-2">
-            {data?.lastModified && (
-              <span className="text-[10px] text-theme-600 dark:text-theme-300 tabular-nums">
-                {data.lastModified}
+            {data && (data.startDate || data.endDate || data.lastModified) && (
+              <span className="text-[10px] text-theme-500 dark:text-theme-400 tabular-nums">
+                {data.startDate && data.endDate && (
+                  <>{data.startDate === data.endDate ? data.startDate : `${data.startDate}〜${data.endDate}`}</>
+                )}
+                {data.lastModified && (
+                  <span className="ml-1 text-theme-600 dark:text-theme-300">更新: {data.lastModified}</span>
+                )}
               </span>
             )}
             <button
@@ -193,11 +200,21 @@ export default function Component({ service }) {
           <LoadingSkeleton />
         ) : (
           <div className="max-h-[540px] overflow-y-auto scrollbar-thin scrollbar-thumb-theme-300/50 dark:scrollbar-thumb-theme-600/50 scrollbar-track-transparent">
-            {data.items?.length > 0 ? (
-              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 p-1.5">
-                {data.items.map((item) => <KeywordItem key={`${activeTab}-${item.rank}`} item={item} />)}
-              </div>
-            ) : (
+            {data.items?.length > 0 ? (() => {
+              const mid = Math.ceil(data.items.length / 2);
+              const left = data.items.slice(0, mid);
+              const right = data.items.slice(mid);
+              return (
+                <div className="flex gap-3 p-1.5">
+                  <div className="flex flex-col gap-y-0.5 flex-1 min-w-0">
+                    {left.map((item) => <KeywordItem key={`${activeTab}-${item.rank}`} item={item} />)}
+                  </div>
+                  <div className="flex flex-col gap-y-0.5 flex-1 min-w-0">
+                    {right.map((item) => <KeywordItem key={`${activeTab}-${item.rank}`} item={item} />)}
+                  </div>
+                </div>
+              );
+            })() : (
               <div className="text-xs text-theme-400 dark:text-theme-500 italic text-center py-4">
                 ランキングデータがありません
               </div>
