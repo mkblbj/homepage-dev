@@ -107,6 +107,7 @@ import pyload from "./pyload/widget";
 import qbittorrent from "./qbittorrent/widget";
 import qnap from "./qnap/widget";
 import radarr from "./radarr/widget";
+import rakutenranking from "./rakutenranking/widget";
 import readarr from "./readarr/widget";
 import romm from "./romm/widget";
 import rutorrent from "./rutorrent/widget";
@@ -262,6 +263,7 @@ const widgets = {
   qbittorrent,
   qnap,
   radarr,
+  rakutenranking,
   readarr,
   romm,
   rutorrent,

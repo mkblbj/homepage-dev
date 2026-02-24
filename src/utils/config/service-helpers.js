@@ -429,6 +429,10 @@ export function cleanServiceGroups(groups) {
           tab,
           maxNotes,
           showTimestamp,
+
+          // rakutenranking
+          genres,
+          defaultGenre,
         } = widgetData;
 
         let fieldsList = fields;
@@ -666,6 +670,11 @@ export function cleanServiceGroups(groups) {
           if (tab) widget.tab = tab;
           if (maxNotes !== undefined) widget.maxNotes = maxNotes;
           if (showTimestamp !== undefined) widget.showTimestamp = showTimestamp;
+        }
+        if (type === "rakutenranking") {
+          if (genres) widget.genres = genres;
+          if (defaultGenre !== undefined) widget.defaultGenre = defaultGenre;
+          if (refreshInterval) widget.refreshInterval = refreshInterval;
         }
         return widget;
       });
