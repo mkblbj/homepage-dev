@@ -155,6 +155,7 @@ const components = {
   wgeasy: dynamic(() => import("./wgeasy/component")),
   whatsupdocker: dynamic(() => import("./whatsupdocker/component")),
   xteve: dynamic(() => import("./xteve/component")),
+  yahooranking: dynamic(() => import("./yahooranking/component")),
   yahoorss: dynamic(() => import("./yahoorss/component")),
   yourspotify: dynamic(() => import("./yourspotify/component")),
   zabbix: dynamic(() => import("./zabbix/component")),

@@ -146,6 +146,7 @@ import watchtower from "./watchtower/widget";
 import wgeasy from "./wgeasy/widget";
 import whatsupdocker from "./whatsupdocker/widget";
 import xteve from "./xteve/widget";
+import yahooranking from "./yahooranking/widget";
 import yahoorss from "./yahoorss/widget";
 import yourspotify from "./yourspotify/widget";
 import zabbix from "./zabbix/widget";
@@ -303,6 +304,7 @@ const widgets = {
   wgeasy,
   whatsupdocker,
   xteve,
+  yahooranking,
   yahoorss,
   yourspotify,
   zabbix,
