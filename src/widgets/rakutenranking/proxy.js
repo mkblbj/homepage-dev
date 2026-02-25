@@ -45,6 +45,8 @@ export default async function rakutenRankingProxyHandler(req, res) {
   const totalPages = Math.min(Math.ceil(limit / PAGE_SIZE), 34);
 
   try {
+    const delay = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
+
     const fetchPage = async (page) => {
       const pageParams = new URLSearchParams(params);
       pageParams.set("page", String(page));
@@ -63,9 +65,11 @@ export default async function rakutenRankingProxyHandler(req, res) {
       return JSON.parse(data.toString());
     };
 
-    const results = await Promise.all(
-      Array.from({ length: totalPages }, (_, i) => fetchPage(i + 1)),
-    );
+    const results = [];
+    for (let i = 0; i < totalPages; i += 1) {
+      if (i > 0) await delay(300);
+      results.push(await fetchPage(i + 1));
+    }
 
     const firstResult = results.find((r) => r !== null);
     if (!firstResult) {
