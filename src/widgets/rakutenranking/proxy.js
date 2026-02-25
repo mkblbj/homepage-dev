@@ -40,26 +40,43 @@ export default async function rakutenRankingProxyHandler(req, res) {
   if (period === "realtime") params.set("period", "realtime");
   if (genreId) params.set("genreId", genreId);
 
-  const url = new URL(`${API_BASE}?${params.toString()}`);
+  const limit = widget.limit || 10;
+  const PAGE_SIZE = 30;
+  const totalPages = Math.min(Math.ceil(limit / PAGE_SIZE), 34);
 
   try {
-    const [status, , data] = await httpProxy(url, {
-      method: "GET",
-      headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; Homepage/1.0)",
-        Accept: "application/json",
-      },
-    });
+    const fetchPage = async (page) => {
+      const pageParams = new URLSearchParams(params);
+      pageParams.set("page", String(page));
+      const pageUrl = new URL(`${API_BASE}?${pageParams.toString()}`);
+      const [status, , data] = await httpProxy(pageUrl, {
+        method: "GET",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; Homepage/1.0)",
+          Accept: "application/json",
+        },
+      });
+      if (status !== 200) {
+        logger.error("Error fetching Rakuten ranking (endpoint=%s, page=%d): status %d", endpoint, page, status);
+        return null;
+      }
+      return JSON.parse(data.toString());
+    };
 
-    if (status !== 200) {
-      logger.error("Error fetching Rakuten ranking (endpoint=%s): status %d", endpoint, status);
-      return res.status(status).json({ error: `Rakuten API returned HTTP ${status}` });
+    const results = await Promise.all(
+      Array.from({ length: totalPages }, (_, i) => fetchPage(i + 1)),
+    );
+
+    const firstResult = results.find((r) => r !== null);
+    if (!firstResult) {
+      return res.status(502).json({ error: "Rakuten API returned no valid responses" });
     }
 
-    const json = JSON.parse(data.toString());
-    const limit = widget.limit || 10;
+    const allItems = results
+      .filter(Boolean)
+      .flatMap((json) => json.Items || json.items || [])
+      .sort((a, b) => a.rank - b.rank);
 
-    const allItems = (json.Items || json.items || []).sort((a, b) => a.rank - b.rank);
     const items = allItems.slice(0, limit).map((item) => ({
       rank: item.rank,
       itemName: item.itemName,
@@ -74,8 +91,8 @@ export default async function rakutenRankingProxyHandler(req, res) {
     }));
 
     return res.status(200).json({
-      title: json.title || "",
-      lastBuildDate: json.lastBuildDate || "",
+      title: firstResult.title || "",
+      lastBuildDate: firstResult.lastBuildDate || "",
       items,
     });
   } catch (e) {
