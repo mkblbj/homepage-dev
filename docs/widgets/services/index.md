@@ -70,6 +70,7 @@ You can also find a list of all available service widgets in the sidebar navigat
 - [Komodo](komodo.md)
 - [Kopia](kopia.md)
 - [Lidarr](lidarr.md)
+- [Linux.do](linuxdo.md)
 - [Linkwarden](linkwarden.md)
 - [Lubelogger](lubelogger.md)
 - [Mastodon](mastodon.md)

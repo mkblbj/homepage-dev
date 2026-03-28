@@ -60,6 +60,7 @@ import komga from "./komga/widget";
 import komodo from "./komodo/widget";
 import kopia from "./kopia/widget";
 import lidarr from "./lidarr/widget";
+import linuxdo from "./linuxdo/widget";
 import linkwarden from "./linkwarden/widget";
 import lubelogger from "./lubelogger/widget";
 import mailcow from "./mailcow/widget";
@@ -216,6 +217,7 @@ const widgets = {
   komodo,
   kopia,
   lidarr,
+  linuxdo,
   linkwarden,
   lubelogger,
   mailcow,

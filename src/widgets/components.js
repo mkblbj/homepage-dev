@@ -69,6 +69,7 @@ const components = {
   komodo: dynamic(() => import("./komodo/component")),
   kopia: dynamic(() => import("./kopia/component")),
   lidarr: dynamic(() => import("./lidarr/component")),
+  linuxdo: dynamic(() => import("./linuxdo/component")),
   linkwarden: dynamic(() => import("./linkwarden/component")),
   lubelogger: dynamic(() => import("./lubelogger/component")),
   mailcow: dynamic(() => import("./mailcow/component")),

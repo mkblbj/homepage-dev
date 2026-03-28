@@ -12,6 +12,7 @@ import kubernetes from "utils/kubernetes/export";
 import createLogger from "utils/logger";
 
 const logger = createLogger("service-helpers");
+const linuxdoFeedIdRegex = /^[A-Za-z0-9_-]+$/;
 
 function parseServicesToGroups(services) {
   if (!services) {
@@ -356,6 +357,10 @@ export function cleanServiceGroups(groups) {
           namespace,
           podSelector,
 
+          // linuxdo
+          defaultFeed,
+          feeds,
+
           // lubelogger
           vehicleID,
 
@@ -431,8 +436,8 @@ export function cleanServiceGroups(groups) {
           showTimestamp,
 
           // rakutenranking
-          genres,
           defaultGenre,
+          genres,
         } = widgetData;
 
         let fieldsList = fields;
@@ -670,6 +675,26 @@ export function cleanServiceGroups(groups) {
           if (tab) widget.tab = tab;
           if (maxNotes !== undefined) widget.maxNotes = maxNotes;
           if (showTimestamp !== undefined) widget.showTimestamp = showTimestamp;
+        }
+        if (type === "linuxdo") {
+          if (Array.isArray(feeds)) {
+            widget.feeds = feeds
+              .filter(
+                (feed) =>
+                  feed &&
+                  typeof feed === "object" &&
+                  typeof feed.id === "string" &&
+                  linuxdoFeedIdRegex.test(feed.id) &&
+                  typeof feed.label === "string" &&
+                  typeof feed.url === "string" &&
+                  feed.url.trim(),
+              )
+              .map((feed) => ({ id: feed.id, label: feed.label }));
+          }
+          if (defaultFeed !== undefined && linuxdoFeedIdRegex.test(defaultFeed)) {
+            widget.defaultFeed = defaultFeed;
+          }
+          if (refreshInterval) widget.refreshInterval = refreshInterval;
         }
         if (type === "rakutenranking") {
           if (genres) widget.genres = genres;
