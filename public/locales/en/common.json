@@ -1150,5 +1150,19 @@
     "uoprinters": {
         "loading": "Loading...",
         "noPrinters": "No printers"
+    },
+    "uoshippingdashboard": {
+        "allPlatforms": "All",
+        "loading": "Loading...",
+        "refresh": "Refresh",
+        "updatedAt": "Updated",
+        "todayOutput": "Today's Output",
+        "tomorrowOutput": "Tomorrow's Planned Output",
+        "todayShipping": "Today's Shipping",
+        "yesterdayShipping": "Yesterday's Shipping",
+        "activeShops": "Active Shops",
+        "courierCount": "Couriers",
+        "noShippingData": "No shipping data",
+        "noOutputData": "No output data"
     }
 }

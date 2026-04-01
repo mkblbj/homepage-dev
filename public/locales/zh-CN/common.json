@@ -762,5 +762,19 @@
     "uoprinters": {
         "loading": "加载中...",
         "noPrinters": "暂无打印机"
+    },
+    "uoshippingdashboard": {
+        "allPlatforms": "全部",
+        "loading": "加载中...",
+        "refresh": "更新",
+        "updatedAt": "更新时间",
+        "todayOutput": "今日出力",
+        "tomorrowOutput": "明日预定",
+        "todayShipping": "今日出荷",
+        "yesterdayShipping": "昨日出荷",
+        "activeShops": "活跃店铺",
+        "courierCount": "快递数",
+        "noShippingData": "暂无出荷数据",
+        "noOutputData": "暂无出力数据"
     }
 }

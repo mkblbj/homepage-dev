@@ -1149,5 +1149,19 @@
     "uoprinters": {
         "loading": "読み込み中...",
         "noPrinters": "プリンターなし"
+    },
+    "uoshippingdashboard": {
+        "allPlatforms": "全部",
+        "loading": "読み込み中...",
+        "refresh": "更新",
+        "updatedAt": "更新時刻",
+        "todayOutput": "今日出力",
+        "tomorrowOutput": "明日予定",
+        "todayShipping": "今日出荷",
+        "yesterdayShipping": "昨日出荷",
+        "activeShops": "稼働店舗",
+        "courierCount": "配送種別",
+        "noShippingData": "出荷データがありません",
+        "noOutputData": "出力データがありません"
     }
 }
