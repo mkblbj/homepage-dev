@@ -435,6 +435,9 @@ export function cleanServiceGroups(groups) {
           maxNotes,
           showTimestamp,
 
+          // uoattendance
+          scheduleUrl,
+
           // rakutenranking
           defaultGenre,
           genres,
@@ -606,6 +609,10 @@ export function cleanServiceGroups(groups) {
         if (type === "customapi") {
           if (mappings) widget.mappings = mappings;
           if (display) widget.display = display;
+          if (refreshInterval) widget.refreshInterval = refreshInterval;
+        }
+        if (type === "uoattendance") {
+          if (scheduleUrl) widget.scheduleUrl = scheduleUrl;
           if (refreshInterval) widget.refreshInterval = refreshInterval;
         }
         if (type === "calendar") {
