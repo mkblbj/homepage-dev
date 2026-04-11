@@ -1162,6 +1162,10 @@
         "activeShops": "稼働店舗",
         "courierCount": "配送種別",
         "noShippingData": "出荷データがありません",
-        "noOutputData": "出力データがありません"
+        "noOutputData": "出力データがありません",
+        "noTodayShippingYet": "本日の出荷はまだありません",
+        "noTomorrowScheduleYet": "明日の予定はまだありません",
+        "waitingForUpdate": "更新を待機中",
+        "willAppearNextRefresh": "次回更新で反映されます"
     }
 }
