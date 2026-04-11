@@ -126,7 +126,7 @@ function HeroHeader({ hero, onRefresh, t, updatedAt }) {
           </svg>
         </button>
       </div>
-      <div className="mt-3 grid grid-cols-1 gap-2 lg:grid-cols-[1.35fr,1fr,1fr,1fr]">
+      <div className="mt-3 grid grid-cols-1 gap-2 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
         <HeroMetric label={hero.primaryMetric.label} value={hero.primaryMetric.value} primary />
         {hero.secondaryMetrics.map((metric) => (
           <HeroMetric key={metric.id} label={metric.label} value={metric.value} />
@@ -209,7 +209,7 @@ function LoadingSkeleton() {
           </div>
           <div className="h-9 w-9 animate-pulse rounded-xl bg-theme-300/30 dark:bg-theme-700/30" />
         </div>
-        <div className="mt-3 grid grid-cols-1 gap-2 lg:grid-cols-[1.35fr,1fr,1fr,1fr]">
+        <div className="mt-3 grid grid-cols-1 gap-2 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
           <div className="rounded-2xl border border-theme-200/30 bg-theme-200/20 p-4 dark:border-theme-700/30 dark:bg-theme-900/20">
             <div className="h-8 w-20 animate-pulse rounded bg-theme-300/40 dark:bg-theme-700/40" />
             <div className="mt-2 h-3 w-16 animate-pulse rounded bg-theme-300/30 dark:bg-theme-700/30" />
