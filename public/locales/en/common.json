@@ -1163,6 +1163,10 @@
         "activeShops": "Active Shops",
         "courierCount": "Couriers",
         "noShippingData": "No shipping data",
-        "noOutputData": "No output data"
+        "noOutputData": "No output data",
+        "noTodayShippingYet": "No shipments yet today",
+        "noTomorrowScheduleYet": "No schedule for tomorrow yet",
+        "waitingForUpdate": "Waiting for update",
+        "willAppearNextRefresh": "Will appear after the next refresh"
     }
 }
