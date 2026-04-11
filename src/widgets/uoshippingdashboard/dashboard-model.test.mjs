@@ -99,3 +99,15 @@ test("buildDashboardModel marks the usually-empty panels as compact empty cards"
   assert.equal(model.sections[0].emptyVariant, "default");
   assert.equal(model.sections[1].emptyVariant, "default");
 });
+
+test("buildDashboardModel exposes one primary hero metric and three secondary hero metrics", () => {
+  const model = buildDashboardModel({ data: fixture, formatNumber, labels });
+
+  assert.equal(model.hero.primaryMetric.id, "today-output");
+  assert.deepEqual(
+    model.hero.secondaryMetrics.map((metric) => metric.id),
+    ["yesterday-shipping", "today-shipping", "tomorrow-output"],
+  );
+  assert.equal(model.hero.primaryMetric.value, "1,190");
+  assert.equal(model.hero.secondaryMetrics[0].value, "898");
+});

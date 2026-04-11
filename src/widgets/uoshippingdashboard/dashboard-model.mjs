@@ -132,9 +132,16 @@ export function buildDashboardModel({ data, formatNumber, labels }) {
     "tomorrow-output": createMetric("tomorrow-output", labels.tomorrowOutput, tomorrowOutput?.total_quantity, formatNumber),
   };
 
+  const metrics = SECTION_ORDER.map((id) => metricsById[id]);
+  const [primaryMetric, ...secondaryMetrics] = metrics;
+
   return {
     updatedAt: data?.updated_at ?? "",
-    metrics: SECTION_ORDER.map((id) => metricsById[id]),
+    metrics,
+    hero: {
+      primaryMetric,
+      secondaryMetrics,
+    },
     sections: SECTION_ORDER.map((id) => sectionsById[id]),
   };
 }
