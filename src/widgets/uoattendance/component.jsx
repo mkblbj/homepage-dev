@@ -187,11 +187,11 @@ export default function Component({ service }) {
                     {count}
                   </span>
                 </div>
-                <div className="flex flex-wrap gap-1">
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] gap-1">
                   {employees.map((employee, index) => (
                     <div
                       key={`${key}-${employee.employee}-${index}`}
-                      className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-xs transition-colors ${employee.statusMeta.chipClass}`}
+                      className={`flex min-h-8 w-full min-w-0 items-center gap-1 rounded border px-1.5 py-1 text-xs transition-colors ${employee.statusMeta.chipClass}`}
                       title={[
                         employee.employee_name,
                         employee.shiftText,
@@ -202,19 +202,19 @@ export default function Component({ service }) {
                         .join(" / ")}
                     >
                       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${employee.statusMeta.dotClass}`} />
-                      <span className="leading-tight">{employee.employee_name}</span>
+                      <span className="min-w-0 truncate leading-tight">{employee.employee_name}</span>
                       {todayModel.hasRoster ? (
                         <span
-                          className={`rounded px-1 py-px text-[9px] font-bold leading-tight tabular-nums ${employee.shiftBadgeClass}`}
+                          className={`shrink-0 whitespace-nowrap rounded px-1 py-px text-[9px] font-bold leading-tight tabular-nums ${employee.shiftBadgeClass}`}
                         >
                           {employee.shiftText}
                         </span>
                       ) : null}
-                      <span className="text-[9px] font-semibold leading-tight opacity-80">
+                      <span className="shrink-0 whitespace-nowrap text-[9px] font-semibold leading-tight opacity-80">
                         {employee.attendance_status_label}
                       </span>
                       {employee.displayTime ? (
-                        <span className="text-[9px] leading-tight opacity-70 tabular-nums">
+                        <span className="shrink-0 whitespace-nowrap text-[9px] leading-tight opacity-70 tabular-nums">
                           {employee.displayTime}
                         </span>
                       ) : null}

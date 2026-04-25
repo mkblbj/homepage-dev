@@ -63,7 +63,7 @@ const actualEmployees = [
   },
   {
     employee: "EMP-999",
-    employee_name: "未排班 太郎",
+    employee_name: "予定外 太郎",
     department: "臨時",
     checkin_time: "10:15:00",
     location: "office-10F",
@@ -117,7 +117,8 @@ test("buildTodayAttendanceModel groups scheduled employees and counts three stat
   assert.equal(model.groups[0].employees[0].statusMeta.label, "出勤中");
   assert.equal(model.groups[1].employees[0].statusMeta.label, "退勤済");
   assert.equal(model.groups[1].employees[1].statusMeta.label, "未打刻");
-  assert.equal(model.groups[2].employees[0].shiftText, "未排班");
+  assert.equal(model.groups[2].label, "予定外出勤");
+  assert.equal(model.groups[2].employees[0].shiftText, "予定外");
 });
 
 test("buildTodayAttendanceModel exposes visible time only for off-work employees", () => {

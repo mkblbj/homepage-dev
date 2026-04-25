@@ -137,7 +137,7 @@ function makeCurrentWorkingEmployee(employee) {
     last_checkin_time: formatCheckinTime(employee.checkin_time || employee.last_checkin_time),
     last_checkin_location: employee.location || employee.last_checkin_location || null,
     displayTime: null,
-    shiftText: "未排班",
+    shiftText: "予定外",
     shiftBadgeClass:
       "border border-amber-200/80 bg-amber-100/75 text-amber-700 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200",
     statusMeta: getStatusMeta("working"),
@@ -244,7 +244,7 @@ function buildUnscheduledWorkingGroup(todaySnapshot, actualEmployees) {
 
   return {
     key: "unscheduled-working",
-    label: "未排班出勤",
+    label: "予定外出勤",
     count: unscheduledEmployees.length,
     employees: unscheduledEmployees
       .map(makeCurrentWorkingEmployee)
