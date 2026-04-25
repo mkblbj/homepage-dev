@@ -64,7 +64,7 @@ const actualEmployees = [
   {
     employee: "EMP-999",
     employee_name: "予定外 太郎",
-    department: "臨時",
+    department: "オフィス - UO",
     checkin_time: "10:15:00",
     location: "office-10F",
   },
@@ -109,16 +109,14 @@ test("buildTodayAttendanceModel groups scheduled employees and counts three stat
   assert.deepEqual(
     model.groups.map((group) => [group.key, group.count, group.employees.map((employee) => employee.employee)]),
     [
-      ["Office", 1, ["EMP-001"]],
+      ["Office", 2, ["EMP-001", "EMP-999"]],
       ["Production", 2, ["EMP-002", "EMP-003"]],
-      ["unscheduled-working", 1, ["EMP-999"]],
     ],
   );
   assert.equal(model.groups[0].employees[0].statusMeta.label, "出勤中");
+  assert.equal(model.groups[0].employees[1].shiftText, "予定外");
   assert.equal(model.groups[1].employees[0].statusMeta.label, "退勤済");
   assert.equal(model.groups[1].employees[1].statusMeta.label, "未打刻");
-  assert.equal(model.groups[2].label, "予定外出勤");
-  assert.equal(model.groups[2].employees[0].shiftText, "予定外");
 });
 
 test("buildTodayAttendanceModel exposes visible time only for off-work employees", () => {
@@ -128,9 +126,33 @@ test("buildTodayAttendanceModel exposes visible time only for off-work employees
   });
 
   assert.equal(model.groups[0].employees[0].displayTime, null);
+  assert.equal(model.groups[0].employees[1].displayTime, null);
   assert.equal(model.groups[1].employees[0].displayTime, "17:02");
   assert.equal(model.groups[1].employees[1].displayTime, null);
-  assert.equal(model.groups[2].employees[0].displayTime, null);
+});
+
+test("buildTodayAttendanceModel groups unrecognized unscheduled employees by their department label", () => {
+  const model = buildTodayAttendanceModel({
+    todaySnapshot,
+    actualEmployees: [
+      {
+        employee: "EMP-999",
+        employee_name: "予定外 太郎",
+        department: "臨時",
+        checkin_time: "10:15:00",
+      },
+    ],
+  });
+
+  assert.deepEqual(
+    model.groups.map((group) => [group.key, group.label, group.count, group.employees.map((employee) => employee.employee)]),
+    [
+      ["Office", "オフィス", 1, ["EMP-001"]],
+      ["Production", "生産", 2, ["EMP-002", "EMP-003"]],
+      ["臨時", "臨時", 1, ["EMP-999"]],
+    ],
+  );
+  assert.equal(model.groups[2].employees[0].shiftText, "予定外");
 });
 
 test("buildTodayAttendanceModel falls back to current-at-work rows when today roster is unavailable", () => {

@@ -85,6 +85,31 @@ function getCategoryLabel(category) {
   return DEPARTMENT_CATEGORY_LABELS[category] || category || "未分類";
 }
 
+function cleanDepartmentLabel(department) {
+  return String(department || "Other")
+    .replace(/\s+-\s+UO$/, "")
+    .trim();
+}
+
+function resolveActualDepartmentCategory(employee) {
+  if (employee?.department_category) {
+    return employee.department_category;
+  }
+
+  const department = String(employee?.department || "");
+  const normalizedDepartment = department.toLowerCase();
+
+  if (department.includes("オフィス") || normalizedDepartment.includes("office")) {
+    return "Office";
+  }
+
+  if (department.includes("生産") || normalizedDepartment.includes("production")) {
+    return "Production";
+  }
+
+  return cleanDepartmentLabel(department);
+}
+
 function categorySortKey(category) {
   const index = DEPARTMENT_CATEGORY_ORDER.indexOf(category);
   return index === -1 ? 100 : index;
@@ -232,24 +257,44 @@ function buildCurrentWorkingFallbackGroup(actualEmployees) {
     : [];
 }
 
-function buildUnscheduledWorkingGroup(todaySnapshot, actualEmployees) {
+function getUnscheduledWorkingEmployees(todaySnapshot, actualEmployees) {
   const scheduledEmployeeIds = new Set((todaySnapshot?.employees || []).map((employee) => employee.employee));
-  const unscheduledEmployees = (actualEmployees || []).filter(
-    (employee) => employee.employee && !scheduledEmployeeIds.has(employee.employee),
-  );
 
-  if (unscheduledEmployees.length === 0) {
-    return null;
-  }
+  return (actualEmployees || [])
+    .filter((employee) => employee.employee && !scheduledEmployeeIds.has(employee.employee))
+    .map((employee) => ({
+      ...makeCurrentWorkingEmployee(employee),
+      department_category: resolveActualDepartmentCategory(employee),
+    }))
+    .sort(sortEmployeesForSchedule);
+}
 
-  return {
-    key: "unscheduled-working",
-    label: "予定外出勤",
-    count: unscheduledEmployees.length,
-    employees: unscheduledEmployees
-      .map(makeCurrentWorkingEmployee)
-      .sort((a, b) => (a.employee_name || "").localeCompare(b.employee_name || "", "ja")),
-  };
+function mergeUnscheduledWorkingEmployees(groups, unscheduledEmployees) {
+  const mergedGroups = groups.map((group) => ({
+    ...group,
+    employees: [...group.employees],
+  }));
+
+  unscheduledEmployees.forEach((employee) => {
+    const category = employee.department_category || "Other";
+    let group = mergedGroups.find((candidate) => candidate.key === category);
+
+    if (!group) {
+      group = {
+        key: category,
+        label: getCategoryLabel(category),
+        count: 0,
+        employees: [],
+      };
+      mergedGroups.push(group);
+    }
+
+    group.employees.push(employee);
+    group.employees.sort(sortEmployeesForSchedule);
+    group.count = group.employees.length;
+  });
+
+  return mergedGroups;
 }
 
 function countEmployeesByStatus(employees, status) {
@@ -275,15 +320,12 @@ export function buildTodayAttendanceModel({ todaySnapshot, actualEmployees = [] 
   }
 
   const scheduledEmployees = (todaySnapshot.employees || []).map(makeScheduledEmployee);
-  const groups = buildScheduledTodayGroups({
+  const scheduledGroups = buildScheduledTodayGroups({
     ...todaySnapshot,
     employees: scheduledEmployees,
   });
-  const unscheduledWorkingGroup = buildUnscheduledWorkingGroup(todaySnapshot, actualEmployees);
-
-  if (unscheduledWorkingGroup) {
-    groups.push(unscheduledWorkingGroup);
-  }
+  const unscheduledEmployees = getUnscheduledWorkingEmployees(todaySnapshot, actualEmployees);
+  const groups = mergeUnscheduledWorkingEmployees(scheduledGroups, unscheduledEmployees);
 
   return {
     hasRoster: true,
@@ -293,7 +335,7 @@ export function buildTodayAttendanceModel({ todaySnapshot, actualEmployees = [] 
       workingCount: countEmployeesByStatus(scheduledEmployees, "working"),
       offWorkCount: countEmployeesByStatus(scheduledEmployees, "off_work"),
       notCheckedInCount: countEmployeesByStatus(scheduledEmployees, "not_checked_in"),
-      unscheduledWorkingCount: unscheduledWorkingGroup?.count || 0,
+      unscheduledWorkingCount: unscheduledEmployees.length,
     },
     groups,
   };
