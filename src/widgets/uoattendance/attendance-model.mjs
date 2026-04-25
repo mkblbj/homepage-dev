@@ -114,12 +114,14 @@ function makeScheduledEmployee(employee) {
   const attendanceStatus = employee.attendance_status || "not_checked_in";
   const statusMeta = getStatusMeta(attendanceStatus);
   const shiftText = formatScheduledShift(employee);
+  const lastCheckinTime = formatCheckinTime(employee.last_checkin_time);
 
   return {
     ...employee,
     attendance_status: attendanceStatus,
     attendance_status_label: employee.attendance_status_label || statusMeta.label,
-    last_checkin_time: formatCheckinTime(employee.last_checkin_time),
+    last_checkin_time: lastCheckinTime,
+    displayTime: attendanceStatus === "off_work" ? lastCheckinTime : null,
     shiftText,
     shiftBadgeClass: getShiftBadgeClass(shiftText),
     statusMeta,
@@ -134,6 +136,7 @@ function makeCurrentWorkingEmployee(employee) {
     last_log_type: "IN",
     last_checkin_time: formatCheckinTime(employee.checkin_time || employee.last_checkin_time),
     last_checkin_location: employee.location || employee.last_checkin_location || null,
+    displayTime: null,
     shiftText: "未排班",
     shiftBadgeClass:
       "border border-amber-200/80 bg-amber-100/75 text-amber-700 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200",

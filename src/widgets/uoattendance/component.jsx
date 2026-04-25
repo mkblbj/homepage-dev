@@ -196,7 +196,7 @@ export default function Component({ service }) {
                         employee.employee_name,
                         employee.shiftText,
                         employee.attendance_status_label,
-                        employee.last_checkin_time ? `${employee.last_log_type} ${employee.last_checkin_time}` : "",
+                        employee.displayTime ? `${employee.last_log_type} ${employee.displayTime}` : "",
                       ]
                         .filter(Boolean)
                         .join(" / ")}
@@ -213,9 +213,9 @@ export default function Component({ service }) {
                       <span className="text-[9px] font-semibold leading-tight opacity-80">
                         {employee.attendance_status_label}
                       </span>
-                      {employee.last_checkin_time ? (
+                      {employee.displayTime ? (
                         <span className="text-[9px] leading-tight opacity-70 tabular-nums">
-                          {employee.last_checkin_time}
+                          {employee.displayTime}
                         </span>
                       ) : null}
                     </div>

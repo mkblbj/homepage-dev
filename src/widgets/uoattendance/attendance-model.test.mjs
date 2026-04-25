@@ -120,6 +120,18 @@ test("buildTodayAttendanceModel groups scheduled employees and counts three stat
   assert.equal(model.groups[2].employees[0].shiftText, "未排班");
 });
 
+test("buildTodayAttendanceModel exposes visible time only for off-work employees", () => {
+  const model = buildTodayAttendanceModel({
+    todaySnapshot,
+    actualEmployees,
+  });
+
+  assert.equal(model.groups[0].employees[0].displayTime, null);
+  assert.equal(model.groups[1].employees[0].displayTime, "17:02");
+  assert.equal(model.groups[1].employees[1].displayTime, null);
+  assert.equal(model.groups[2].employees[0].displayTime, null);
+});
+
 test("buildTodayAttendanceModel falls back to current-at-work rows when today roster is unavailable", () => {
   const model = buildTodayAttendanceModel({
     todaySnapshot: null,
