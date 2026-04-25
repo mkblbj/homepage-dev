@@ -130,7 +130,7 @@ export default function Component({ service }) {
 
   return (
     <Container service={service}>
-      <div className="flex flex-col w-full gap-3">
+      <div className="flex flex-col w-full gap-2.5">
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center gap-2.5 flex-wrap">
             <span className="text-[10px] font-semibold tracking-wide text-theme-500 dark:text-theme-400">
@@ -176,10 +176,10 @@ export default function Component({ service }) {
             {todayModel.hasRoster ? "本日の予定はありません" : "現在、出勤者はいません"}
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-x-3 gap-y-2">
             {todayModel.groups.map(({ key, label, count, employees }) => (
-              <div key={key} className="flex flex-col gap-1.5">
-                <div className="flex items-center gap-1.5 border-b border-theme-200/50 dark:border-theme-700/40 pb-1">
+              <div key={key} className="flex flex-col gap-1">
+                <div className="flex items-center gap-1.5 border-b border-theme-200/50 dark:border-theme-700/40 pb-0.5">
                   <span className="text-[10px] font-semibold text-theme-500 dark:text-theme-400">
                     {label.replace(" - UO", "")}
                   </span>
@@ -191,7 +191,7 @@ export default function Component({ service }) {
                   {employees.map((employee, index) => (
                     <div
                       key={`${key}-${employee.employee}-${index}`}
-                      className={`flex min-h-8 w-full min-w-0 items-center gap-1 rounded border px-1.5 py-1 text-xs transition-colors ${employee.statusMeta.chipClass}`}
+                      className={`flex min-h-7 w-full min-w-0 items-center gap-1 rounded border px-1.5 py-0.5 text-xs transition-colors ${employee.statusMeta.chipClass}`}
                       title={[
                         employee.employee_name,
                         employee.shiftText,
@@ -227,7 +227,7 @@ export default function Component({ service }) {
         )}
 
         {widget.scheduleUrl && (
-          <div className="rounded-lg border border-orange-200/50 dark:border-orange-900/30 bg-orange-500/5 px-2 py-2">
+          <div className="rounded-lg border border-orange-200/50 dark:border-orange-900/30 bg-orange-500/5 px-2 py-1.5">
             <div className="flex items-center gap-2.5 flex-wrap">
               <span className="text-[10px] font-semibold tracking-wide text-orange-600 dark:text-orange-400">
                 明日予定
@@ -251,26 +251,26 @@ export default function Component({ service }) {
             </div>
 
             {tomorrowScheduleError ? (
-              <div className="mt-2 text-[10px] text-theme-400 dark:text-theme-500">
+              <div className="mt-1.5 text-[10px] text-theme-400 dark:text-theme-500">
                 明日予定を取得できませんでした
               </div>
             ) : !tomorrowScheduleData ? (
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <div className="h-11 rounded-md bg-theme-100/60 dark:bg-theme-900/20 animate-pulse" />
-                <div className="h-11 rounded-md bg-theme-100/60 dark:bg-theme-900/20 animate-pulse" />
+              <div className="mt-1.5 grid grid-cols-2 gap-2">
+                <div className="h-9 rounded-md bg-theme-100/60 dark:bg-theme-900/20 animate-pulse" />
+                <div className="h-9 rounded-md bg-theme-100/60 dark:bg-theme-900/20 animate-pulse" />
               </div>
             ) : tomorrowModel.groups.length === 0 ? (
-              <div className="mt-2 text-[10px] text-theme-400 dark:text-theme-500">
+              <div className="mt-1.5 text-[10px] text-theme-400 dark:text-theme-500">
                 明日の予定はありません
               </div>
             ) : (
-              <div className="mt-2 grid grid-cols-2 gap-2">
+              <div className="mt-1.5 grid grid-cols-2 gap-2">
                 {tomorrowModel.groups.map(({ key, label, count, employees }) => (
                   <div
                     key={key}
-                    className="rounded-md border border-orange-200/40 dark:border-orange-900/20 bg-theme-100/60 dark:bg-theme-900/20 px-2 py-2"
+                    className="rounded-md border border-orange-200/40 dark:border-orange-900/20 bg-theme-100/60 dark:bg-theme-900/20 px-2 py-1.5"
                   >
-                    <div className="flex items-center gap-1.5 border-b border-theme-200/40 dark:border-theme-700/30 pb-1">
+                    <div className="flex items-center gap-1.5 border-b border-theme-200/40 dark:border-theme-700/30 pb-0.5">
                       <span className="text-[10px] font-semibold text-theme-600 dark:text-theme-300">
                         {label}
                       </span>
@@ -280,7 +280,7 @@ export default function Component({ service }) {
                     </div>
 
                     {employees.length > 0 ? (
-                      <div className="mt-2 flex flex-wrap gap-1">
+                      <div className="mt-1.5 flex flex-wrap gap-1">
                         {employees.map((employee, index) => (
                           <div
                             key={`${key}-${employee.employee}-${index}`}
@@ -300,7 +300,7 @@ export default function Component({ service }) {
                         ))}
                       </div>
                     ) : (
-                      <div className="mt-2 text-[10px] text-theme-400 dark:text-theme-500">
+                      <div className="mt-1.5 text-[10px] text-theme-400 dark:text-theme-500">
                         {count === 0 ? "予定なし" : "明細なし"}
                       </div>
                     )}
