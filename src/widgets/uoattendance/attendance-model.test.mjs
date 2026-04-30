@@ -113,6 +113,13 @@ test("buildTodayAttendanceModel groups scheduled employees and counts three stat
       ["Production", 2, ["EMP-002", "EMP-003"]],
     ],
   );
+  assert.deepEqual(
+    model.groups.map((group) => [group.key, group.workingCount, group.totalCount]),
+    [
+      ["Office", 2, 2],
+      ["Production", 0, 2],
+    ],
+  );
   assert.equal(model.groups[0].employees[0].statusMeta.label, "出勤中");
   assert.equal(model.groups[0].employees[1].shiftText, "予定外");
   assert.equal(model.groups[1].employees[0].statusMeta.label, "退勤済");

@@ -229,11 +229,14 @@ function buildScheduledTodayGroups(todaySnapshot) {
       const employees = (employeesByCategory[category] || [])
         .map(makeScheduledEmployee)
         .sort(sortEmployeesForSchedule);
+      const totalCount = todaySnapshot?.departments?.[category]?.count ?? employees.length;
 
       return {
         key: category,
         label: getCategoryLabel(category),
-        count: todaySnapshot?.departments?.[category]?.count ?? employees.length,
+        count: totalCount,
+        totalCount,
+        workingCount: countEmployeesByStatus(employees, "working"),
         employees,
       };
     })
@@ -284,6 +287,8 @@ function mergeUnscheduledWorkingEmployees(groups, unscheduledEmployees) {
         key: category,
         label: getCategoryLabel(category),
         count: 0,
+        totalCount: 0,
+        workingCount: 0,
         employees: [],
       };
       mergedGroups.push(group);
@@ -291,7 +296,9 @@ function mergeUnscheduledWorkingEmployees(groups, unscheduledEmployees) {
 
     group.employees.push(employee);
     group.employees.sort(sortEmployeesForSchedule);
-    group.count = group.employees.length;
+    group.totalCount = (group.totalCount ?? group.count ?? 0) + 1;
+    group.workingCount = (group.workingCount ?? 0) + 1;
+    group.count = group.totalCount;
   });
 
   return mergedGroups;

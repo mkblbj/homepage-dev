@@ -177,52 +177,56 @@ export default function Component({ service }) {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-x-3 gap-y-2">
-            {todayModel.groups.map(({ key, label, count, employees }) => (
-              <div key={key} className="flex flex-col gap-1">
-                <div className="flex items-center gap-1.5 border-b border-theme-200/50 dark:border-theme-700/40 pb-0.5">
-                  <span className="text-[10px] font-semibold text-theme-500 dark:text-theme-400">
-                    {label.replace(" - UO", "")}
-                  </span>
-                  <span className="text-[10px] font-bold text-orange-500 dark:text-orange-400 tabular-nums">
-                    {count}
-                  </span>
-                </div>
-                <div className="grid grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] gap-1">
-                  {employees.map((employee, index) => (
-                    <div
-                      key={`${key}-${employee.employee}-${index}`}
-                      className={`flex min-h-7 w-full min-w-0 items-center gap-1 rounded border px-1.5 py-0.5 text-xs transition-colors ${employee.statusMeta.chipClass}`}
-                      title={[
-                        employee.employee_name,
-                        employee.shiftText,
-                        employee.attendance_status_label,
-                        employee.displayTime ? `${employee.last_log_type} ${employee.displayTime}` : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" / ")}
-                    >
-                      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${employee.statusMeta.dotClass}`} />
-                      <span className="min-w-0 truncate leading-tight">{employee.employee_name}</span>
-                      {todayModel.hasRoster ? (
-                        <span
-                          className={`shrink-0 whitespace-nowrap rounded px-1 py-px text-[9px] font-bold leading-tight tabular-nums ${employee.shiftBadgeClass}`}
-                        >
-                          {employee.shiftText}
+            {todayModel.groups.map(({ key, label, count, workingCount, totalCount, employees }) => {
+              const showAttendanceRatio = todayModel.hasRoster && (key === "Office" || key === "Production");
+
+              return (
+                <div key={key} className="flex flex-col gap-1">
+                  <div className="flex items-center gap-1.5 border-b border-theme-200/50 dark:border-theme-700/40 pb-0.5">
+                    <span className="text-[10px] font-semibold text-theme-500 dark:text-theme-400">
+                      {label.replace(" - UO", "")}
+                    </span>
+                    <span className="text-[10px] font-bold text-orange-500 dark:text-orange-400 tabular-nums">
+                      {showAttendanceRatio ? `${workingCount ?? 0}/${totalCount ?? count}` : count}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] gap-1">
+                    {employees.map((employee, index) => (
+                      <div
+                        key={`${key}-${employee.employee}-${index}`}
+                        className={`flex min-h-7 w-full min-w-0 items-center gap-1 rounded border px-1.5 py-0.5 text-xs transition-colors ${employee.statusMeta.chipClass}`}
+                        title={[
+                          employee.employee_name,
+                          employee.shiftText,
+                          employee.attendance_status_label,
+                          employee.displayTime ? `${employee.last_log_type} ${employee.displayTime}` : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" / ")}
+                      >
+                        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${employee.statusMeta.dotClass}`} />
+                        <span className="min-w-0 truncate leading-tight">{employee.employee_name}</span>
+                        {todayModel.hasRoster ? (
+                          <span
+                            className={`shrink-0 whitespace-nowrap rounded px-1 py-px text-[9px] font-bold leading-tight tabular-nums ${employee.shiftBadgeClass}`}
+                          >
+                            {employee.shiftText}
+                          </span>
+                        ) : null}
+                        <span className="shrink-0 whitespace-nowrap text-[9px] font-semibold leading-tight opacity-80">
+                          {employee.attendance_status_label}
                         </span>
-                      ) : null}
-                      <span className="shrink-0 whitespace-nowrap text-[9px] font-semibold leading-tight opacity-80">
-                        {employee.attendance_status_label}
-                      </span>
-                      {employee.displayTime ? (
-                        <span className="shrink-0 whitespace-nowrap text-[9px] leading-tight opacity-70 tabular-nums">
-                          {employee.displayTime}
-                        </span>
-                      ) : null}
-                    </div>
-                  ))}
+                        {employee.displayTime ? (
+                          <span className="shrink-0 whitespace-nowrap text-[9px] leading-tight opacity-70 tabular-nums">
+                            {employee.displayTime}
+                          </span>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
