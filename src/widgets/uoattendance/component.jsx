@@ -148,7 +148,7 @@ export default function Component({ service }) {
               {todayModel.summary.workingCount + todayModel.summary.unscheduledWorkingCount} 名出勤中
             </span>
             {todayModel.hasRoster ? (
-              <span className="text-[10px] font-semibold text-theme-400 dark:text-theme-500 tabular-nums">
+              <span className="text-[11px] font-bold text-theme-600 dark:text-theme-300 tabular-nums">
                 / {todayModel.summary.scheduledCount} 名予定
               </span>
             ) : null}
