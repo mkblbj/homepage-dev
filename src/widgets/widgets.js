@@ -135,6 +135,7 @@ import truenas from "./truenas/widget";
 import tubearchivist from "./tubearchivist/widget";
 import uoattendance from "./uoattendance/widget";
 import uoprinters from "./uoprinters/widget";
+import uorakutensales from "./uorakutensales/widget";
 import uoshippingdashboard from "./uoshippingdashboard/widget";
 import unifi from "./unifi/widget";
 import unmanic from "./unmanic/widget";
@@ -294,6 +295,7 @@ const widgets = {
   truenas,
   uoattendance,
   uoprinters,
+  uorakutensales,
   uoshippingdashboard,
   unifi,
   unifi_console: unifi,

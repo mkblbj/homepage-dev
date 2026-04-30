@@ -435,7 +435,7 @@ export function cleanServiceGroups(groups) {
           maxNotes,
           showTimestamp,
 
-          // uoattendance
+          // uoattendance, uorakutensales
           scheduleUrl,
 
           // rakutenranking
@@ -613,6 +613,9 @@ export function cleanServiceGroups(groups) {
         }
         if (type === "uoattendance") {
           if (scheduleUrl) widget.scheduleUrl = scheduleUrl;
+          if (refreshInterval) widget.refreshInterval = refreshInterval;
+        }
+        if (type === "uorakutensales") {
           if (refreshInterval) widget.refreshInterval = refreshInterval;
         }
         if (type === "calendar") {
