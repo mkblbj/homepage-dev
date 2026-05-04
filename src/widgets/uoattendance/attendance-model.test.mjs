@@ -126,14 +126,14 @@ test("buildTodayAttendanceModel groups scheduled employees and counts three stat
   assert.equal(model.groups[1].employees[1].statusMeta.label, "未打刻");
 });
 
-test("buildTodayAttendanceModel exposes visible time only for off-work employees", () => {
+test("buildTodayAttendanceModel exposes visible attendance times for working and off-work employees", () => {
   const model = buildTodayAttendanceModel({
     todaySnapshot,
     actualEmployees,
   });
 
-  assert.equal(model.groups[0].employees[0].displayTime, null);
-  assert.equal(model.groups[0].employees[1].displayTime, null);
+  assert.equal(model.groups[0].employees[0].displayTime, "09:03");
+  assert.equal(model.groups[0].employees[1].displayTime, "10:15");
   assert.equal(model.groups[1].employees[0].displayTime, "17:02");
   assert.equal(model.groups[1].employees[1].displayTime, null);
 });
