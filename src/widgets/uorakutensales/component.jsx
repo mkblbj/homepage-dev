@@ -1,5 +1,5 @@
 import Container from "components/services/widget/container";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 
 import {
@@ -197,15 +197,39 @@ export default function Component({ service }) {
     [data],
   );
 
+  const queryActiveRef = useRef(false);
+
+  useEffect(() => {
+    if (!refreshOption.milliseconds) return undefined;
+
+    const id = setInterval(async () => {
+      if (queryActiveRef.current) return;
+      queryActiveRef.current = true;
+      try {
+        const response = await fetch(formatProxyUrl(widget, "query"), { method: "POST" });
+        if (response.ok) {
+          await mutate();
+        }
+      } catch {
+        /* auto-refresh errors are non-critical */
+      } finally {
+        queryActiveRef.current = false;
+      }
+    }, refreshOption.milliseconds);
+
+    return () => clearInterval(id);
+  }, [refreshOption.milliseconds, widget, mutate]);
+
   const handleQueryRefresh = useCallback(
     async (event) => {
       event.preventDefault();
       event.stopPropagation();
 
-      if (queryState.status === "loading") {
+      if (queryState.status === "loading" || queryActiveRef.current) {
         return;
       }
 
+      queryActiveRef.current = true;
       setQueryState({ status: "loading", message: "売上を更新中" });
 
       try {
@@ -220,6 +244,8 @@ export default function Component({ service }) {
         setQueryState({ status: "success", message: "更新完了" });
       } catch (e) {
         setQueryState({ status: "error", message: e.message || "売上更新に失敗しました" });
+      } finally {
+        queryActiveRef.current = false;
       }
     },
     [mutate, queryState.status, widget],
