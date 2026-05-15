@@ -1,5 +1,6 @@
 /* eslint-disable react/no-array-index-key */
 import classNames from "classnames";
+import AnnouncementBanner from "components/announcement-banner";
 import BookmarksGroup from "components/bookmarks/group";
 import ErrorBoundary from "components/errorboundry";
 import QuickLaunch from "components/quicklaunch";
@@ -21,7 +22,7 @@ import { SettingsContext } from "utils/contexts/settings";
 import { TabContext } from "utils/contexts/tab";
 import { ThemeContext } from "utils/contexts/theme";
 
-import { bookmarksResponse, servicesResponse, widgetsResponse } from "utils/config/api-response";
+import { announcementsResponse, bookmarksResponse, servicesResponse, widgetsResponse } from "utils/config/api-response";
 import { getSettings } from "utils/config/config";
 import useWindowFocus from "utils/hooks/window-focus";
 import createLogger from "utils/logger";
@@ -50,6 +51,7 @@ export async function getStaticProps() {
     const services = await servicesResponse();
     const bookmarks = await bookmarksResponse();
     const widgets = await widgetsResponse();
+    const announcements = await announcementsResponse();
 
     return {
       props: {
@@ -58,6 +60,7 @@ export async function getStaticProps() {
           "/api/services": services,
           "/api/bookmarks": bookmarks,
           "/api/widgets": widgets,
+          "/api/announcements": announcements,
           "/api/hash": false,
         },
         ...(await serverSideTranslations(settings.language ?? "en")),
@@ -74,6 +77,7 @@ export async function getStaticProps() {
           "/api/services": [],
           "/api/bookmarks": [],
           "/api/widgets": [],
+          "/api/announcements": { enabled: false, label: "公告", speedSeconds: 28, items: [] },
           "/api/hash": false,
         },
         ...(await serverSideTranslations("en")),
@@ -212,6 +216,7 @@ function Home({ initialSettings }) {
   const { data: services } = useSWR("/api/services");
   const { data: bookmarks } = useSWR("/api/bookmarks");
   const { data: widgets } = useSWR("/api/widgets");
+  const { data: announcements } = useSWR("/api/announcements");
 
   const servicesAndBookmarks = [...bookmarks.map((bg) => bg.bookmarks).flat(), ...getAllServices(services)].filter(
     (i) => i?.href,
@@ -422,6 +427,8 @@ function Home({ initialSettings }) {
       </Head>
 
       <Script src="/api/config/custom.js" />
+
+      <AnnouncementBanner announcement={announcements} />
 
       <div
         className={classNames(

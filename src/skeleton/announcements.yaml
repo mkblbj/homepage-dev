@@ -1,0 +1,41 @@
+---
+# 公告功能总开关。
+# false 时前端不显示公告横幅，items 可以保留备用。
+enabled: false
+
+# 左侧标签文字。
+# 对应 OD 设计里的橘色“公告”标签。
+label: 公告
+
+# 跑马灯滚动一轮的时间，单位：秒。
+# 数字越大滚动越慢；OD 设计稿是 28 秒。
+speedSeconds: 28
+
+# 公告列表。
+# 可以写一条，也可以写多条；多条会用 ◆ 分隔并连续滚动。
+items:
+  - id: uo-ec-manager-0.2.1
+    # 是否启用这一条公告。
+    enabled: false
+
+    # 公告正文。
+    # 建议保持一句话内。太长也可以，但用户需要等待更久才能读完整。
+    text: 请大家更新 uo-ec-manager 到最新版本 0.2.1，新版稳定性更好。下载地址 →
+
+    # 可选：正文前的小图标或 emoji。
+    # 不填时前端默认使用 📢。
+    icon: 📢
+
+    # 可选：内联链接。
+    # 会显示在正文后面，例如 Mac / Win。
+    links:
+      - label: Mac
+        href: http://192.168.1.26:3911/uo-ec-manager/uo-ec-manager-0.2.1-arm64.dmg
+      - label: Win
+        href: http://192.168.1.26:3911/uo-ec-manager/uo-ec-manager-0.2.1-win.zip
+
+  - id: maintenance-2026-05-20
+    enabled: false
+    text: 5月20日 18:00-19:00 将进行系统维护，期间部分服务可能不可用。
+    icon: 🔧
+    links: []

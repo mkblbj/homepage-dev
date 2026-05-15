@@ -1,0 +1,183 @@
+.announcement-banner {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 40px;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-size: 14px;
+  color: oklch(30% 0.025 50);
+  background: linear-gradient(90deg, oklch(97% 0.012 85), oklch(96% 0.018 80), oklch(97% 0.012 85));
+  border-bottom: 1px solid oklch(88% 0.02 75);
+  box-shadow: 0 1px 0 oklch(100% 0 0 / 0.4) inset;
+}
+
+.announcement-banner-spacer {
+  height: 40px;
+}
+
+.announcement-banner__tag {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+  padding: 0 14px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: oklch(98% 0.01 85);
+  white-space: nowrap;
+  background: oklch(64% 0.13 45);
+  border-right: 1px solid oklch(56% 0.12 45 / 0.4);
+}
+
+.announcement-banner__tag-dot {
+  width: 6px;
+  height: 6px;
+  background: oklch(97% 0.02 85);
+  border-radius: 50%;
+  box-shadow: 0 0 6px oklch(97% 0.02 85 / 0.8);
+  animation: announcement-banner-pulse-dot 2s ease-in-out infinite;
+}
+
+.announcement-banner__marquee {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  height: 100%;
+  overflow: hidden;
+  mask-image: linear-gradient(90deg, transparent 0%, black 4%, black 96%, transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, black 4%, black 96%, transparent 100%);
+}
+
+.announcement-banner__track {
+  display: flex;
+  align-items: center;
+  gap: 80px;
+  padding-left: 100%;
+  white-space: nowrap;
+  animation: announcement-banner-marquee-scroll var(--announcement-scroll-duration, 28s) linear infinite;
+}
+
+.announcement-banner__track:hover {
+  animation-play-state: paused;
+}
+
+.announcement-banner__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: oklch(30% 0.025 50);
+}
+
+.announcement-banner__item-icon {
+  flex-shrink: 0;
+}
+
+.announcement-banner__item-text {
+  white-space: nowrap;
+}
+
+.announcement-banner__link {
+  font-weight: 600;
+  color: oklch(56% 0.14 45);
+  text-decoration: underline;
+  text-decoration-color: oklch(56% 0.14 45 / 0.4);
+  text-underline-offset: 3px;
+  transition: color 0.15s, text-decoration-color 0.15s;
+}
+
+.announcement-banner__link:hover {
+  color: oklch(48% 0.16 45);
+  text-decoration-color: oklch(56% 0.14 45);
+}
+
+.announcement-banner__separator {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: oklch(70% 0.04 70);
+}
+
+.announcement-banner__close {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 100%;
+  color: oklch(48% 0.04 55);
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  transition: color 0.15s, background 0.15s;
+}
+
+.announcement-banner__close:hover {
+  color: oklch(35% 0.06 50);
+  background: oklch(90% 0.025 75 / 0.7);
+}
+
+.announcement-banner__close svg {
+  width: 14px;
+  height: 14px;
+}
+
+.announcement-banner__close:focus-visible {
+  outline: 2px solid oklch(64% 0.13 45);
+  outline-offset: -2px;
+}
+
+@keyframes announcement-banner-marquee-scroll {
+  0% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes announcement-banner-pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.5;
+    transform: scale(0.7);
+  }
+}
+
+@media (max-width: 640px) {
+  .announcement-banner {
+    font-size: 13px;
+  }
+
+  .announcement-banner__tag {
+    padding: 0 10px;
+  }
+
+  .announcement-banner__track {
+    gap: 48px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .announcement-banner__tag-dot,
+  .announcement-banner__track {
+    animation: none;
+  }
+
+  .announcement-banner__track {
+    padding-left: 12px;
+  }
+}
