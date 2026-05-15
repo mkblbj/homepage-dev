@@ -4,6 +4,7 @@ import path from "path";
 
 import yaml from "js-yaml";
 
+import { normalizeAnnouncementConfig } from "utils/config/announcements.mjs";
 import checkAndCopyConfig, { CONF_DIR, getSettings, substituteEnvironmentVars } from "utils/config/config";
 import {
   cleanServiceGroups,
@@ -83,6 +84,25 @@ export async function widgetsResponse() {
   }
 
   return configuredWidgets;
+}
+
+export async function announcementsResponse() {
+  checkAndCopyConfig("announcements.yaml");
+
+  const announcementsYaml = path.join(CONF_DIR, "announcements.yaml");
+
+  try {
+    const rawFileContents = await fs.readFile(announcementsYaml, "utf8");
+    const fileContents = substituteEnvironmentVars(rawFileContents);
+    const announcements = yaml.load(fileContents) ?? {};
+
+    return normalizeAnnouncementConfig(announcements);
+  } catch (e) {
+    console.error("Failed to load announcements.yaml, please check for errors");
+    if (e) console.error(e.toString());
+
+    return normalizeAnnouncementConfig({ enabled: false });
+  }
 }
 
 function convertLayoutGroupToGroup(name, layoutGroup) {
