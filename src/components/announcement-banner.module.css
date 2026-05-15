@@ -1,6 +1,8 @@
 .announcement-banner {
-  position: sticky;
+  position: fixed;
   top: 0;
+  right: 0;
+  left: 0;
   z-index: 9999;
   display: flex;
   align-items: center;
@@ -13,6 +15,10 @@
   background: linear-gradient(90deg, oklch(97% 0.012 85), oklch(96% 0.018 80), oklch(97% 0.012 85));
   border-bottom: 1px solid oklch(88% 0.02 75);
   box-shadow: 0 1px 0 oklch(100% 0 0 / 0.4) inset;
+}
+
+.announcement-banner-spacer {
+  height: 40px;
 }
 
 .announcement-banner__tag {

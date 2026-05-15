@@ -1,4 +1,5 @@
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 import styles from "./announcement-banner.module.css";
 
@@ -22,7 +23,12 @@ function AnnouncementItem({ item }) {
 
 export default function AnnouncementBanner({ announcement }) {
   const [hidden, setHidden] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const items = announcement?.items ?? [];
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   if (hidden || !announcement?.enabled || items.length === 0) {
     return null;
@@ -31,8 +37,7 @@ export default function AnnouncementBanner({ announcement }) {
   const label = announcement.label || "公告";
   const speedSeconds = Number(announcement.speedSeconds) > 0 ? Number(announcement.speedSeconds) : 28;
   const loopItems = [...items, ...items];
-
-  return (
+  const banner = (
     <div className={styles["announcement-banner"]} role="banner" aria-label={label}>
       <div className={styles["announcement-banner__tag"]}>
         <span className={styles["announcement-banner__tag-dot"]} aria-hidden="true" />
@@ -62,14 +67,17 @@ export default function AnnouncementBanner({ announcement }) {
         onClick={() => setHidden(true)}
       >
         <svg viewBox="0 0 14 14" fill="none" aria-hidden="true" focusable="false">
-          <path
-            d="M1 1l12 12M13 1L1 13"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-          />
+          <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
         </svg>
       </button>
     </div>
+  );
+  const canPortal = mounted && typeof document !== "undefined";
+
+  return (
+    <>
+      {canPortal ? createPortal(banner, document.body) : null}
+      <div className={styles["announcement-banner-spacer"]} aria-hidden="true" />
+    </>
   );
 }
