@@ -1,9 +1,8 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import test from "node:test";
 
-test("hash route watches announcements config changes", () => {
-  const hashRouteSource = readFileSync(new URL("./hash.js", import.meta.url), "utf8");
+import { HASHED_CONFIGS } from "./hash-configs.mjs";
 
-  assert.match(hashRouteSource, /"announcements\.yaml"/);
+test("hash route watches announcements config changes", () => {
+  assert.equal(HASHED_CONFIGS.includes("announcements.yaml"), true);
 });

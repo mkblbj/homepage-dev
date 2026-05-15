@@ -3,17 +3,7 @@ import { readFileSync } from "fs";
 import { join } from "path";
 
 import checkAndCopyConfig, { CONF_DIR } from "utils/config/config";
-
-const configs = [
-  "docker.yaml",
-  "settings.yaml",
-  "services.yaml",
-  "bookmarks.yaml",
-  "widgets.yaml",
-  "announcements.yaml",
-  "custom.css",
-  "custom.js",
-];
+import { HASHED_CONFIGS } from "./hash-configs.mjs";
 
 function hash(buffer) {
   const hashSum = createHash("sha256");
@@ -22,7 +12,7 @@ function hash(buffer) {
 }
 
 export default async function handler(req, res) {
-  const hashes = configs.map((config) => {
+  const hashes = HASHED_CONFIGS.map((config) => {
     checkAndCopyConfig(config);
     const configYaml = join(CONF_DIR, config);
     return hash(readFileSync(configYaml, "utf8"));
