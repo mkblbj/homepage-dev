@@ -2,8 +2,9 @@ import { createHash } from "crypto";
 import { readFileSync } from "fs";
 import { join } from "path";
 
-import checkAndCopyConfig, { CONF_DIR } from "utils/config/config";
 import { HASHED_CONFIGS } from "./hash-configs.mjs";
+
+import checkAndCopyConfig, { CONF_DIR } from "utils/config/config";
 
 function hash(buffer) {
   const hashSum = createHash("sha256");
