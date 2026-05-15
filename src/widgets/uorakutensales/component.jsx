@@ -155,16 +155,13 @@ function ShopCard({ shop }) {
           </div>
         </div>
       </div>
-      <div className="mt-1.5 flex min-w-0 items-center justify-between gap-1.5 border-t border-theme-200/35 pt-1 dark:border-theme-700/35">
-        <span className="min-w-0 truncate text-[9px] leading-tight text-theme-500 dark:text-theme-400">
-          {shop.updatedDisplay}
-        </span>
-        {shop.lastError ? (
-          <span className="shrink-0 truncate text-[9px] font-semibold leading-tight text-rose-600 dark:text-rose-300" title={shop.lastError}>
+      {shop.lastError ? (
+        <div className="mt-1.5 border-t border-theme-200/35 pt-1 dark:border-theme-700/35">
+          <span className="truncate text-[9px] font-semibold leading-tight text-rose-600 dark:text-rose-300" title={shop.lastError}>
             {shop.lastError}
           </span>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }
