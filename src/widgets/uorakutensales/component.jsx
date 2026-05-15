@@ -163,11 +163,7 @@ function ShopCard({ shop }) {
           <span className="shrink-0 truncate text-[9px] font-semibold leading-tight text-rose-600 dark:text-rose-300" title={shop.lastError}>
             {shop.lastError}
           </span>
-        ) : (
-          <span className="hidden shrink-0 truncate text-[9px] leading-tight text-theme-400 dark:text-theme-500 sm:block">
-            {shop.activityDisplay}
-          </span>
-        )}
+        ) : null}
       </div>
     </div>
   );
