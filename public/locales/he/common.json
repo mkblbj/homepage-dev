@@ -66,6 +66,11 @@
         "wait": "נא להמתין",
         "empty_data": "מצב תת-מערכת לא ידוע"
     },
+    "unifi_drive": {
+        "healthy": "Healthy",
+        "degraded": "Degraded",
+        "no_data": "No storage data available"
+    },
     "docker": {
         "rx": "RX",
         "tx": "TX",
@@ -106,6 +111,16 @@
         "series": "סדרות",
         "episodes": "פרקים",
         "songs": "שירים"
+    },
+    "jellyfin": {
+        "playing": "Playing",
+        "transcoding": "Transcoding",
+        "bitrate": "Bitrate",
+        "no_active": "No Active Streams",
+        "movies": "Movies",
+        "series": "Series",
+        "episodes": "Episodes",
+        "songs": "Songs"
     },
     "esphome": {
         "offline": "מכובה",
@@ -173,6 +188,13 @@
         "bitrate": "קצב נתונים",
         "no_active": "אין הזרמות פעילות",
         "plex_connection_error": "בדוק חיבור ל-Plex"
+    },
+    "tracearr": {
+        "no_active": "No Active Streams",
+        "streams": "Streams",
+        "transcodes": "Transcodes",
+        "directplay": "Direct Play",
+        "bitrate": "Bitrate"
     },
     "omada": {
         "connectedAp": "נקודות גישה מחוברות",
@@ -272,17 +294,13 @@
         "approved": "מאושר",
         "available": "זמין"
     },
-    "jellyseerr": {
-        "pending": "ממתין לאישור",
-        "approved": "מאושר",
-        "available": "זמין",
+    "seerr": {
+        "pending": "Pending",
+        "approved": "Approved",
+        "available": "Available",
+        "completed": "Completed",
+        "processing": "Processing",
         "issues": "Open Issues"
-    },
-    "overseerr": {
-        "pending": "ממתין לאישור",
-        "processing": "מעבד",
-        "approved": "מאושר",
-        "available": "זמין"
     },
     "netalertx": {
         "total": "סה\"כ",
@@ -326,6 +344,16 @@
         "address": "כתובת",
         "expires": "תאריך תפוגה",
         "never": "אף פעם",
+        "user": "User",
+        "hostname": "Hostname",
+        "name": "Name",
+        "client_version": "Client Version",
+        "os": "OS",
+        "created": "Created",
+        "authorized": "Authorized",
+        "is_external": "Is External",
+        "update_available": "Update Available",
+        "tags": "Tags",
         "last_seen": "נראה לאחרונה",
         "now": "כעת",
         "years": "{{number}}y",
@@ -334,7 +362,9 @@
         "hours": "{{number}}h",
         "minutes": "{{number}}m",
         "seconds": "{{number}}s",
-        "ago": "{{value}} Ago"
+        "ago": "{{value}} Ago",
+        "true": "Yes",
+        "false": "No"
     },
     "technitium": {
         "totalQueries": "שאילתות",
@@ -532,7 +562,8 @@
         "child_bridges_status": "{{ok}}/{{total}}",
         "up": "למעלה",
         "pending": "ממתין",
-        "down": "למטה"
+        "down": "למטה",
+        "ok": "Ok"
     },
     "healthchecks": {
         "new": "חדש",
@@ -598,6 +629,15 @@
     "paperlessngx": {
         "inbox": "תיבת דואר נכנס",
         "total": "סה\"כ"
+    },
+    "pangolin": {
+        "orgs": "Orgs",
+        "sites": "Sites",
+        "resources": "Resources",
+        "targets": "Targets",
+        "traffic": "Traffic",
+        "in": "In",
+        "out": "Out"
     },
     "peanut": {
         "battery_charge": "טעינת סוללה",
@@ -695,6 +735,10 @@
         "uptime": "זמן פעילות",
         "volumeAvailable": "זמין"
     },
+    "dispatcharr": {
+        "channels": "Channels",
+        "streams": "Streams"
+    },
     "mylar": {
         "series": "סדרות",
         "issues": "גיליונות",
@@ -759,7 +803,8 @@
     "ghostfolio": {
         "gross_percent_today": "היום",
         "gross_percent_1y": "שנה",
-        "gross_percent_max": "כל הזמן"
+        "gross_percent_max": "כל הזמן",
+        "net_worth": "Net Worth"
     },
     "audiobookshelf": {
         "podcasts": "פודקאסטים",
@@ -781,6 +826,12 @@
         "authors": "מחברים",
         "categories": "קטגוריות",
         "series": "סדרות"
+    },
+    "booklore": {
+        "libraries": "Libraries",
+        "books": "Books",
+        "reading": "Reading",
+        "finished": "Finished"
     },
     "jdownloader": {
         "downloadCount": "תור",
@@ -884,6 +935,19 @@
     "netdata": {
         "warnings": "התראות",
         "criticals": "קריטיים"
+    },
+    "ntfy": {
+        "title": "Title",
+        "priority": "Priority",
+        "lastReceived": "Last Received",
+        "message": "Message",
+        "tags": "Tags",
+        "none": "None",
+        "min": "Min",
+        "low": "Low",
+        "default": "Default",
+        "high": "High",
+        "urgent": "Urgent"
     },
     "plantit": {
         "events": "אירועים",
@@ -1119,5 +1183,32 @@
         "songs": "Songs",
         "time": "Time",
         "artists": "Artists"
+    },
+    "arcane": {
+        "containers": "Containers",
+        "images": "Images",
+        "image_updates": "Image Updates",
+        "images_unused": "Unused",
+        "environment_required": "Environment ID Required"
+    },
+    "dockhand": {
+        "running": "Running",
+        "stopped": "Stopped",
+        "cpu": "CPU",
+        "memory": "Memory",
+        "images": "Images",
+        "volumes": "Volumes",
+        "events_today": "Events Today",
+        "pending_updates": "Pending Updates",
+        "stacks": "Stacks",
+        "paused": "Paused",
+        "total": "Total",
+        "environment_not_found": "Environment Not Found"
+    },
+    "sparkyfitness": {
+        "eaten": "Eaten",
+        "burned": "Burned",
+        "remaining": "Remaining",
+        "steps": "Steps"
     }
 }

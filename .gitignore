@@ -47,7 +47,7 @@ next-env.d.ts
 # IDEs
 /.idea/
 
-# MkDocs documentation
+# Zensical documentation
 site*/
 .cache/
 

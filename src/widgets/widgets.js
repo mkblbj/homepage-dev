@@ -1,5 +1,6 @@
 import adguard from "./adguard/widget";
 import apcups from "./apcups/widget";
+import arcane from "./arcane/widget";
 import argocd from "./argocd/widget";
 import atsumeru from "./atsumeru/widget";
 import audiobookshelf from "./audiobookshelf/widget";
@@ -9,6 +10,7 @@ import azuredevops from "./azuredevops/widget";
 import backrest from "./backrest/widget";
 import bazarr from "./bazarr/widget";
 import beszel from "./beszel/widget";
+import booklore from "./booklore/widget";
 import caddy from "./caddy/widget";
 import calendar from "./calendar/widget";
 import calibreweb from "./calibreweb/widget";
@@ -22,6 +24,8 @@ import customapi from "./customapi/widget";
 import deluge from "./deluge/widget";
 import develancacheui from "./develancacheui/widget";
 import diskstation from "./diskstation/widget";
+import dispatcharr from "./dispatcharr/widget";
+import dockhand from "./dockhand/widget";
 import downloadstation from "./downloadstation/widget";
 import emby from "./emby/widget";
 import esphome from "./esphome/widget";
@@ -51,7 +55,7 @@ import homebridge from "./homebridge/widget";
 import immich from "./immich/widget";
 import jackett from "./jackett/widget";
 import jdownloader from "./jdownloader/widget";
-import jellyseerr from "./jellyseerr/widget";
+import jellyfin from "./jellyfin/widget";
 import jellystat from "./jellystat/widget";
 import karakeep from "./karakeep/widget";
 import kavita from "./kavita/widget";
@@ -81,6 +85,7 @@ import netdata from "./netdata/widget";
 import nextcloud from "./nextcloud/widget";
 import nextdns from "./nextdns/widget";
 import npm from "./npm/widget";
+import ntfy from "./ntfy/widget";
 import nzbget from "./nzbget/widget";
 import octoprint from "./octoprint/widget";
 import omada from "./omada/widget";
@@ -89,7 +94,7 @@ import opendtu from "./opendtu/widget";
 import openmediavault from "./openmediavault/widget";
 import openwrt from "./openwrt/widget";
 import opnsense from "./opnsense/widget";
-import overseerr from "./overseerr/widget";
+import pangolin from "./pangolin/widget";
 import paperlessngx from "./paperlessngx/widget";
 import peanut from "./peanut/widget";
 import pfsense from "./pfsense/widget";
@@ -114,8 +119,10 @@ import romm from "./romm/widget";
 import rutorrent from "./rutorrent/widget";
 import sabnzbd from "./sabnzbd/widget";
 import scrutiny from "./scrutiny/widget";
+import seerr from "./seerr/widget";
 import slskd from "./slskd/widget";
 import sonarr from "./sonarr/widget";
+import sparkyfitness from "./sparkyfitness/widget";
 import speedtest from "./speedtest/widget";
 import spoolman from "./spoolman/widget";
 import stash from "./stash/widget";
@@ -128,6 +135,7 @@ import tandoor from "./tandoor/widget";
 import tautulli from "./tautulli/widget";
 import tdarr from "./tdarr/widget";
 import technitium from "./technitium/widget";
+import tracearr from "./tracearr/widget";
 import traefik from "./traefik/widget";
 import transmission from "./transmission/widget";
 import trilium from "./trilium/widget";
@@ -138,6 +146,7 @@ import uoprinters from "./uoprinters/widget";
 import uorakutensales from "./uorakutensales/widget";
 import uoshippingdashboard from "./uoshippingdashboard/widget";
 import unifi from "./unifi/widget";
+import unifi_drive from "./unifi_drive/widget";
 import unmanic from "./unmanic/widget";
 import unraid from "./unraid/widget";
 import uptimekuma from "./uptimekuma/widget";
@@ -157,6 +166,7 @@ import zabbix from "./zabbix/widget";
 const widgets = {
   adguard,
   apcups,
+  arcane,
   argocd,
   atsumeru,
   audiobookshelf,
@@ -165,6 +175,7 @@ const widgets = {
   azuredevops,
   backrest,
   bazarr,
+  booklore,
   beszel,
   caddy,
   calibreweb,
@@ -178,6 +189,8 @@ const widgets = {
   deluge,
   develancacheui,
   diskstation,
+  dispatcharr,
+  dockhand,
   downloadstation,
   emby,
   esphome,
@@ -210,8 +223,8 @@ const widgets = {
   immich,
   jackett,
   jdownloader,
-  jellyfin: emby,
-  jellyseerr,
+  jellyfin,
+  jellyseerr: seerr,
   jellystat,
   kavita,
   kobeweather,
@@ -240,16 +253,18 @@ const widgets = {
   nextcloud,
   nextdns,
   npm,
+  ntfy,
   nzbget,
   octoprint,
   omada,
   ombi,
   opendtu,
   opnsense,
-  overseerr,
+  overseerr: seerr,
   openmediavault,
   openwrt,
   paperlessngx,
+  pangolin,
   peanut,
   pfsense,
   photoprism,
@@ -274,8 +289,10 @@ const widgets = {
   rutorrent,
   sabnzbd,
   scrutiny,
+  seerr,
   slskd,
   sonarr,
+  sparkyfitness,
   speedtest,
   spoolman,
   stash,
@@ -288,6 +305,7 @@ const widgets = {
   tautulli,
   technitium,
   tdarr,
+  tracearr,
   traefik,
   transmission,
   trilium,
@@ -299,6 +317,7 @@ const widgets = {
   uoshippingdashboard,
   unifi,
   unifi_console: unifi,
+  unifi_drive,
   unmanic,
   unraid,
   uptimekuma,

@@ -66,6 +66,11 @@
         "wait": "Veuillez patienter",
         "empty_data": "Statut du sous-système inconnu"
     },
+    "unifi_drive": {
+        "healthy": "Sain",
+        "degraded": "Dégradé",
+        "no_data": "Aucune données de stockage disponible"
+    },
     "docker": {
         "rx": "Rx",
         "tx": "Tx",
@@ -107,6 +112,16 @@
         "episodes": "Épisodes",
         "songs": "Morceaux"
     },
+    "jellyfin": {
+        "playing": "En cours",
+        "transcoding": "En cours d'encodage",
+        "bitrate": "Débit",
+        "no_active": "Aucune lecture en cours",
+        "movies": "Films",
+        "series": "Séries",
+        "episodes": "Épisodes",
+        "songs": "Chansons"
+    },
     "esphome": {
         "offline": "Hors ligne",
         "offline_alt": "Hors ligne",
@@ -142,8 +157,8 @@
         "connectionStatusDisconnected": "Déconnecté",
         "connectionStatusConnected": "Connecté",
         "uptime": "Démarré depuis",
-        "maxDown": "Réception max.",
-        "maxUp": "Envoi max.",
+        "maxDown": "Réception max",
+        "maxUp": "Envoi max",
         "down": "Réception",
         "up": "Envoi",
         "received": "Reçu",
@@ -173,6 +188,13 @@
         "bitrate": "Débit",
         "no_active": "Aucune lecture en cours",
         "plex_connection_error": "Vérifier la connexion à Plex"
+    },
+    "tracearr": {
+        "no_active": "Aucune lecture en cours",
+        "streams": "Lectures",
+        "transcodes": "Transcodages",
+        "directplay": "Lectures directes",
+        "bitrate": "Débit"
     },
     "omada": {
         "connectedAp": "APs connectées",
@@ -229,7 +251,7 @@
         "seed": "En partage"
     },
     "develancacheui": {
-        "cachehitbytes": "Cache Hit (B)",
+        "cachehitbytes": "Octets acquis du cache",
         "cachemissbytes": "Cache Miss (B)"
     },
     "downloadstation": {
@@ -272,17 +294,13 @@
         "approved": "Approuvé",
         "available": "Disponible"
     },
-    "jellyseerr": {
+    "seerr": {
         "pending": "En attente",
-        "approved": "Approuvé",
-        "available": "Disponible",
+        "approved": "Validées",
+        "available": "Disponibles",
+        "completed": "Complétées",
+        "processing": "En traitement",
         "issues": "Problèmes non résolus"
-    },
-    "overseerr": {
-        "pending": "En attente",
-        "processing": "En cours de traitement",
-        "approved": "Approuvé",
-        "available": "Disponible"
     },
     "netalertx": {
         "total": "Total",
@@ -294,7 +312,7 @@
         "queries": "Requêtes",
         "blocked": "Bloqué",
         "blocked_percent": "% bloqué",
-        "gravity": "Listes dom. bloqués"
+        "gravity": "Listes dom. Bloqués"
     },
     "adguard": {
         "queries": "Requêtes",
@@ -326,6 +344,16 @@
         "address": "Adresse",
         "expires": "Expire",
         "never": "Jamais",
+        "user": "Utilisateur",
+        "hostname": "Nom d'hôte",
+        "name": "Nom",
+        "client_version": "Version client",
+        "os": "OS",
+        "created": "Créé",
+        "authorized": "Autorisée",
+        "is_external": "Externe",
+        "update_available": "Mise à jour disponible",
+        "tags": "Tags",
         "last_seen": "Vu pour la dernière fois",
         "now": "Maintenant",
         "years": "{{number}}a",
@@ -334,7 +362,9 @@
         "hours": "{{number}}h",
         "minutes": "{{number}}m",
         "seconds": "{{number}}s",
-        "ago": "Il y a {{value}}"
+        "ago": "Il y a {{value}}",
+        "true": "Oui",
+        "false": "Non"
     },
     "technitium": {
         "totalQueries": "Requêtes",
@@ -532,7 +562,8 @@
         "child_bridges_status": "{{ok}}/{{total}}",
         "up": "En ligne",
         "pending": "En attente",
-        "down": "Hors ligne"
+        "down": "Hors ligne",
+        "ok": "Ok"
     },
     "healthchecks": {
         "new": "Nouveau",
@@ -598,6 +629,15 @@
     "paperlessngx": {
         "inbox": "Boîte de réception",
         "total": "Total"
+    },
+    "pangolin": {
+        "orgs": "Organisations",
+        "sites": "Sites",
+        "resources": "Ressources",
+        "targets": "Cibles",
+        "traffic": "Trafique",
+        "in": "Entrant",
+        "out": "Sortant"
     },
     "peanut": {
         "battery_charge": "Charge de la batterie",
@@ -692,8 +732,12 @@
     },
     "diskstation": {
         "days": "Jours",
-        "uptime": "Disponibilité",
+        "uptime": "Démarré depuis",
         "volumeAvailable": "Disponible"
+    },
+    "dispatcharr": {
+        "channels": "Chaînes",
+        "streams": "Lectures"
     },
     "mylar": {
         "series": "Séries",
@@ -719,7 +763,7 @@
     "grafana": {
         "dashboards": "Tableau de bord",
         "datasources": "Sources données",
-        "totalalerts": "Total alertes",
+        "totalalerts": "Alertes totales",
         "alertstriggered": "Alertes déclenchées"
     },
     "nextcloud": {
@@ -759,7 +803,8 @@
     "ghostfolio": {
         "gross_percent_today": "Aujourd'hui",
         "gross_percent_1y": "Un an",
-        "gross_percent_max": "Depuis le début"
+        "gross_percent_max": "Depuis le début",
+        "net_worth": "Patrimoine net"
     },
     "audiobookshelf": {
         "podcasts": "Podcasts",
@@ -781,6 +826,12 @@
         "authors": "Auteurs",
         "categories": "Catégories",
         "series": "Séries"
+    },
+    "booklore": {
+        "libraries": "Bibliothèques",
+        "books": "Livres",
+        "reading": "En cours de lecture",
+        "finished": "Terminés"
     },
     "jdownloader": {
         "downloadCount": "File d'attente",
@@ -885,6 +936,19 @@
         "warnings": "Avertissements",
         "criticals": "Urgent"
     },
+    "ntfy": {
+        "title": "Titre",
+        "priority": "Priorité",
+        "lastReceived": "Dernière réception",
+        "message": "Message",
+        "tags": "Tags",
+        "none": "Aucun",
+        "min": "Min",
+        "low": "Bas",
+        "default": "Défaut",
+        "high": "Haut",
+        "urgent": "Urgent"
+    },
     "plantit": {
         "events": "Événements",
         "plants": "Plantes",
@@ -911,7 +975,7 @@
         "studios": "Studios",
         "movies": "Films",
         "tags": "Tags",
-        "oCount": "0 Compte"
+        "oCount": "O-mètre"
     },
     "tandoor": {
         "users": "Utilisateurs",
@@ -966,11 +1030,11 @@
     },
     "zabbix": {
         "unclassified": "Non classé",
-        "information": "Informations",
-        "warning": "Attention",
-        "average": "Moyenne",
-        "high": "Élevé",
-        "disaster": ""
+        "information": "Information",
+        "warning": "Avertissement",
+        "average": "Moyen",
+        "high": "Haut",
+        "disaster": "Désastre"
     },
     "lubelogger": {
         "vehicle": "Véhicule",
@@ -1091,7 +1155,7 @@
         "NEW_ARRAY": "Nouveau tableau",
         "RECON_DISK": "Reconstruction du disque",
         "DISABLE_DISK": "Disque désactivé",
-        "SWAP_DSBL": "Swap Disable",
+        "SWAP_DSBL": "Désactiver le swap",
         "INVALID_EXPANSION": "Extension invalide",
         "PARITY_NOT_BIGGEST": "La parité n'est pas la plus grande",
         "TOO_MANY_MISSING_DISKS": "Trop de disques manquants",
@@ -1119,5 +1183,32 @@
         "songs": "Musiques",
         "time": "Durée",
         "artists": "Artistes"
+    },
+    "arcane": {
+        "containers": "Conteneurs",
+        "images": "Images",
+        "image_updates": "Mises à jour d'images",
+        "images_unused": "Inutilisées",
+        "environment_required": "ID d'environnement requis"
+    },
+    "dockhand": {
+        "running": "En cours d'exécution",
+        "stopped": "Arrêtés",
+        "cpu": "CPU",
+        "memory": "Mémoire",
+        "images": "Images",
+        "volumes": "Volumes",
+        "events_today": "Événements aujourd'hui",
+        "pending_updates": "Mises à jour en attente",
+        "stacks": "Stacks",
+        "paused": "En pause",
+        "total": "Total",
+        "environment_not_found": "Environnement introuvable"
+    },
+    "sparkyfitness": {
+        "eaten": "Mangé",
+        "burned": "Brûlé",
+        "remaining": "Restant",
+        "steps": "Pas"
     }
 }

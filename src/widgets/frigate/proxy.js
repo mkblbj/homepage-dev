@@ -1,7 +1,7 @@
 import getServiceWidget from "utils/config/service-helpers";
 import createLogger from "utils/logger";
 import { asJson, formatApiCall, sanitizeErrorURL } from "utils/proxy/api-helpers";
-import { addCookieToJar } from "utils/proxy/cookie-jar";
+import { addCookieToJar, setCookieHeader } from "utils/proxy/cookie-jar";
 import { httpProxy } from "utils/proxy/http";
 import widgets from "widgets/widgets";
 
@@ -13,6 +13,11 @@ export default async function frigateProxyHandler(req, res, map) {
 
   if (group && service) {
     const widget = await getServiceWidget(group, service, index);
+
+    if (!widget) {
+      logger.debug("Invalid or missing widget for service '%s' in group '%s'", service, group);
+      return res.status(400).json({ error: "Invalid proxy service type" });
+    }
 
     if (!widgets?.[widget.type]?.api) {
       return res.status(403).json({ error: "Service does not support API calls" });
@@ -52,6 +57,7 @@ export default async function frigateProxyHandler(req, res, map) {
         }
 
         addCookieToJar(url, loginResponseHeaders);
+        setCookieHeader(url, params, { overwrite: true });
         // Retry original request with cookie set
         [status, , data] = await httpProxy(url, params);
       }
@@ -69,7 +75,7 @@ export default async function frigateProxyHandler(req, res, map) {
       data = asJson(data);
 
       if (endpoint == "stats") {
-        res.status(status).send({
+        return res.status(status).send({
           num_cameras: data?.cameras !== undefined ? Object.keys(data?.cameras).length : 0,
           uptime: data?.service?.uptime,
           version: data?.service.version,

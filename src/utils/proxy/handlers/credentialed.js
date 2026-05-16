@@ -18,6 +18,11 @@ export default async function credentialedProxyHandler(req, res, map) {
   if (group && service) {
     const widget = await getServiceWidget(group, service, index);
 
+    if (!widget) {
+      logger.debug("Invalid or missing widget for service '%s' in group '%s'", service, group);
+      return res.status(400).json({ error: "Invalid proxy service type" });
+    }
+
     if (!widgets?.[widget.type]?.api) {
       return res.status(403).json({ error: "Service does not support API calls" });
     }
@@ -27,6 +32,9 @@ export default async function credentialedProxyHandler(req, res, map) {
 
       const headers = {
         "Content-Type": "application/json",
+        ...(widgets[widget.type].headers ?? {}),
+        ...(widget.headers ?? {}),
+        ...(req.extraHeaders ?? {}),
       };
 
       if (widget.type === "stocks") {
@@ -53,8 +61,10 @@ export default async function credentialedProxyHandler(req, res, map) {
           "linkwarden",
           "mealie",
           "netalertx",
+          "pangolin",
           "tailscale",
           "tandoor",
+          "tracearr",
           "pterodactyl",
           "vikunja",
           "firefly",
@@ -65,6 +75,12 @@ export default async function credentialedProxyHandler(req, res, map) {
         if (widget.key) {
           headers.Authorization = `Bearer ${widget.key}`;
         } else {
+          headers.Authorization = basicAuthHeader(widget);
+        }
+      } else if (widget.type === "ntfy") {
+        if (widget.key) {
+          headers.Authorization = `Bearer ${widget.key}`;
+        } else if (widget.username && widget.password) {
           headers.Authorization = basicAuthHeader(widget);
         }
       } else if (widget.type === "proxmox") {
@@ -142,6 +158,14 @@ export default async function credentialedProxyHandler(req, res, map) {
 
       if (status >= 400) {
         logger.error("HTTP Error %d calling %s", status, url.toString());
+        return res.status(status).json({
+          error: {
+            message: resultData?.error?.message ?? "HTTP Error",
+            url: sanitizeErrorURL(url),
+            ...(resultData?.error?.rawError ? { rawError: resultData.error.rawError } : {}),
+            data: Buffer.isBuffer(resultData) ? Buffer.from(resultData).toString() : resultData,
+          },
+        });
       }
 
       if (status === 200) {

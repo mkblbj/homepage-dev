@@ -177,6 +177,16 @@ labels:
   - homepage.widget.fields=["field1","field2"] # optional
 ```
 
+!!! note
+
+    If you use mapping syntax (`:`) for labels instead of list syntax (`-`), array values like `fields` must be wrapped in single quotes so they are passed as a string:
+
+    ```yaml
+    labels:
+      ...
+      homepage.widget.fields: '["field1","field2"]'
+    ```
+
 Multiple widgets can be specified by incrementing the index, e.g.
 
 ```yaml
@@ -188,6 +198,8 @@ labels: ...
   - homepage.widgets[1].url=http://uptimekuma.home
   - homepage.widgets[1].slug=youreventslughere
 ```
+
+To pass custom HTTP headers with a widget request when using labels, use the same dot-notation: `homepage.widget.headers.X-Auth-Key=secret` (or `homepage.widgets[0].headers.X-Auth-Key=secret` when multiple widgets are present).
 
 You can add specify fields for e.g. the [CustomAPI](../widgets/services/customapi.md) widget by using array-style dot notation:
 

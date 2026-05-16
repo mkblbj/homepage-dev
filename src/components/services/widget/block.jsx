@@ -6,7 +6,7 @@ import { BlockHighlightContext } from "./highlight-context";
 
 import { evaluateHighlight, getHighlightClass } from "utils/highlights";
 
-export default function Block({ value, label, field }) {
+export default function Block({ value, highlightValue, label, field }) {
   const { t } = useTranslation();
   const highlightConfig = useContext(BlockHighlightContext);
 
@@ -20,17 +20,19 @@ export default function Block({ value, label, field }) {
     }
 
     for (const candidate of candidates) {
-      const result = evaluateHighlight(candidate, value, highlightConfig);
+      const result = evaluateHighlight(candidate, highlightValue ?? value, highlightConfig);
       if (result) return result;
     }
 
     return null;
-  }, [field, label, value, highlightConfig]);
+  }, [field, label, value, highlightValue, highlightConfig]);
 
   const highlightClass = useMemo(() => {
     if (!highlight?.level) return undefined;
     return getHighlightClass(highlight.level, highlightConfig);
   }, [highlight, highlightConfig]);
+
+  const applyToValueOnly = highlight?.valueOnly === true;
 
   return (
     <div
@@ -44,7 +46,11 @@ export default function Block({ value, label, field }) {
       data-highlight-source={highlight?.source}
     >
       <div className="font-thin text-sm">{value === undefined || value === null ? "-" : value}</div>
-      <div className="font-bold text-xs uppercase">{t(label)}</div>
+      <div
+        className={classNames("font-bold text-xs uppercase", applyToValueOnly && "text-theme-700 dark:text-theme-200")}
+      >
+        {t(label)}
+      </div>
     </div>
   );
 }

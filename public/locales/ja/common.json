@@ -66,10 +66,15 @@
         "wait": "お待ちください",
         "empty_data": "サブシステムの状態は不明"
     },
+    "unifi_drive": {
+        "healthy": "Healthy",
+        "degraded": "Degraded",
+        "no_data": "No storage data available"
+    },
     "docker": {
         "rx": "受信済み",
         "tx": "送信済み",
-        "mem": "MEM",
+        "mem": "メモリ",
         "cpu": "CPU",
         "running": "起動中",
         "offline": "オフライン",
@@ -83,7 +88,7 @@
         "partial": "部分的"
     },
     "ping": {
-        "error": "Error",
+        "error": "エラー",
         "ping": "Ping",
         "down": "下へ",
         "up": "稼働",
@@ -107,12 +112,22 @@
         "episodes": "エピソード",
         "songs": "曲"
     },
+    "jellyfin": {
+        "playing": "Playing",
+        "transcoding": "Transcoding",
+        "bitrate": "Bitrate",
+        "no_active": "No Active Streams",
+        "movies": "Movies",
+        "series": "Series",
+        "episodes": "Episodes",
+        "songs": "Songs"
+    },
     "esphome": {
         "offline": "",
         "offline_alt": "オフライン",
         "online": "オンライン",
         "total": "Total",
-        "unknown": "Unknown"
+        "unknown": "不明"
     },
     "evcc": {
         "pv_power": "発電量",
@@ -174,6 +189,13 @@
         "no_active": "No Active Streams",
         "plex_connection_error": "Plex接続の確認"
     },
+    "tracearr": {
+        "no_active": "No Active Streams",
+        "streams": "Streams",
+        "transcodes": "Transcodes",
+        "directplay": "Direct Play",
+        "bitrate": "Bitrate"
+    },
     "omada": {
         "connectedAp": "接続されたAP",
         "activeUser": "アクティブデバイス",
@@ -223,8 +245,8 @@
         "invalid": "無効"
     },
     "deluge": {
-        "download": "Download",
-        "upload": "Upload",
+        "download": "ダウンロード",
+        "upload": "アップロード",
         "leech": "Leech",
         "seed": "Seed"
     },
@@ -233,8 +255,8 @@
         "cachemissbytes": "キャッシュミスバイト"
     },
     "downloadstation": {
-        "download": "Download",
-        "upload": "Upload",
+        "download": "ダウンロード",
+        "upload": "アップロード",
         "leech": "Leech",
         "seed": "Seed"
     },
@@ -251,7 +273,7 @@
         "queued": "Queued",
         "movies": "Movies",
         "queue": "Queue",
-        "unknown": "Unknown"
+        "unknown": "不明"
     },
     "lidarr": {
         "wanted": "Wanted",
@@ -272,17 +294,13 @@
         "approved": "承認済",
         "available": "利用可"
     },
-    "jellyseerr": {
+    "seerr": {
         "pending": "Pending",
         "approved": "Approved",
         "available": "Available",
+        "completed": "Completed",
+        "processing": "Processing",
         "issues": "Open Issues"
-    },
-    "overseerr": {
-        "pending": "Pending",
-        "processing": "処理中",
-        "approved": "Approved",
-        "available": "Available"
     },
     "netalertx": {
         "total": "Total",
@@ -326,6 +344,16 @@
         "address": "アドレス",
         "expires": "失効",
         "never": "なし",
+        "user": "User",
+        "hostname": "Hostname",
+        "name": "Name",
+        "client_version": "Client Version",
+        "os": "OS",
+        "created": "Created",
+        "authorized": "Authorized",
+        "is_external": "Is External",
+        "update_available": "Update Available",
+        "tags": "Tags",
         "last_seen": "最終日時",
         "now": "現在",
         "years": "{{number}}年",
@@ -334,7 +362,9 @@
         "hours": "{{number}}時間",
         "minutes": "{{number}}分",
         "seconds": "{{number}}秒",
-        "ago": "{{value}} 前"
+        "ago": "{{value}} 前",
+        "true": "Yes",
+        "false": "No"
     },
     "technitium": {
         "totalQueries": "Queries",
@@ -532,7 +562,8 @@
         "child_bridges_status": "{{ok}}/{{total}}",
         "up": "Up",
         "pending": "Pending",
-        "down": "Down"
+        "down": "Down",
+        "ok": "Ok"
     },
     "healthchecks": {
         "new": "新着",
@@ -598,6 +629,15 @@
     "paperlessngx": {
         "inbox": "受信トレイ",
         "total": "Total"
+    },
+    "pangolin": {
+        "orgs": "Orgs",
+        "sites": "Sites",
+        "resources": "Resources",
+        "targets": "Targets",
+        "traffic": "Traffic",
+        "in": "In",
+        "out": "Out"
     },
     "peanut": {
         "battery_charge": "バッテリー充電",
@@ -692,8 +732,12 @@
     },
     "diskstation": {
         "days": "Days",
-        "uptime": "Uptime",
-        "volumeAvailable": "Available"
+        "uptime": "稼働時間",
+        "volumeAvailable": "利用可能"
+    },
+    "dispatcharr": {
+        "channels": "Channels",
+        "streams": "Streams"
     },
     "mylar": {
         "series": "Series",
@@ -754,12 +798,13 @@
     "gatus": {
         "up": "Sites Up",
         "down": "Sites Down",
-        "uptime": "Uptime"
+        "uptime": "稼働時間"
     },
     "ghostfolio": {
         "gross_percent_today": "Today",
         "gross_percent_1y": "1年",
-        "gross_percent_max": "全期間"
+        "gross_percent_max": "全期間",
+        "net_worth": "Net Worth"
     },
     "audiobookshelf": {
         "podcasts": "ポッドキャスト",
@@ -781,6 +826,12 @@
         "authors": "著者",
         "categories": "Categories",
         "series": "Series"
+    },
+    "booklore": {
+        "libraries": "Libraries",
+        "books": "Books",
+        "reading": "Reading",
+        "finished": "Finished"
     },
     "jdownloader": {
         "downloadCount": "Queue",
@@ -884,6 +935,19 @@
     "netdata": {
         "warnings": "警告",
         "criticals": "重大"
+    },
+    "ntfy": {
+        "title": "Title",
+        "priority": "Priority",
+        "lastReceived": "Last Received",
+        "message": "Message",
+        "tags": "Tags",
+        "none": "None",
+        "min": "Min",
+        "low": "Low",
+        "default": "Default",
+        "high": "High",
+        "urgent": "Urgent"
     },
     "plantit": {
         "events": "イベント",
@@ -1167,5 +1231,32 @@
         "noTomorrowScheduleYet": "明日の予定はまだありません",
         "waitingForUpdate": "更新を待機中",
         "willAppearNextRefresh": "次回更新で反映されます"
+    },
+    "arcane": {
+        "containers": "Containers",
+        "images": "Images",
+        "image_updates": "Image Updates",
+        "images_unused": "Unused",
+        "environment_required": "Environment ID Required"
+    },
+    "dockhand": {
+        "running": "Running",
+        "stopped": "Stopped",
+        "cpu": "CPU",
+        "memory": "Memory",
+        "images": "Images",
+        "volumes": "Volumes",
+        "events_today": "Events Today",
+        "pending_updates": "Pending Updates",
+        "stacks": "Stacks",
+        "paused": "Paused",
+        "total": "Total",
+        "environment_not_found": "Environment Not Found"
+    },
+    "sparkyfitness": {
+        "eaten": "Eaten",
+        "burned": "Burned",
+        "remaining": "Remaining",
+        "steps": "Steps"
     }
 }

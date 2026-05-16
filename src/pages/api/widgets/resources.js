@@ -1,8 +1,23 @@
+import si from "systeminformation";
+
 import createLogger from "utils/logger";
 
 const logger = createLogger("resources");
 
-const si = require("systeminformation");
+function isMissingNetworkStat(networkData, interfaceName) {
+  return (
+    networkData.operstate === "unknown" &&
+    networkData.rx_bytes === 0 &&
+    networkData.rx_dropped === 0 &&
+    networkData.rx_errors === 0 &&
+    networkData.tx_bytes === 0 &&
+    networkData.tx_dropped === 0 &&
+    networkData.tx_errors === 0 &&
+    networkData.rx_sec === null &&
+    networkData.tx_sec === null &&
+    networkData.ms === 0
+  );
+}
 
 export default async function handler(req, res) {
   const { type, target, interfaceName = "default" } = req.query;
@@ -59,11 +74,22 @@ export default async function handler(req, res) {
   }
 
   if (type === "network") {
-    let networkData = await si.networkStats();
+    let networkData = await si.networkStats("*");
     let interfaceDefault;
     logger.debug("networkData:", JSON.stringify(networkData));
     if (interfaceName && interfaceName !== "default") {
       networkData = networkData.filter((network) => network.iface === interfaceName).at(0);
+      if (!networkData) {
+        // Fallback for e.g. docker where networkStats("*") may not return stats for host interfaces
+        const directNetworkData = await si.networkStats(interfaceName);
+        logger.debug("directNetworkData:", JSON.stringify(directNetworkData));
+        networkData = Array.isArray(directNetworkData) ? directNetworkData.at(0) : null;
+
+        // si returns unknown + zeroes when interface truly does not exist
+        if (!networkData || isMissingNetworkStat(networkData, interfaceName)) {
+          networkData = null;
+        }
+      }
       if (!networkData) {
         return res.status(404).json({
           error: "Interface not found",

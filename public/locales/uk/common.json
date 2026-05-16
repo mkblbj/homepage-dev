@@ -63,14 +63,19 @@
         "wlan_users": "WLAN користувачі",
         "up": "UP",
         "down": "Завантаження",
-        "wait": "Please wait",
+        "wait": "Будь ласка, зачекайте",
         "empty_data": "Статус підсистеми невідомий"
+    },
+    "unifi_drive": {
+        "healthy": "Healthy",
+        "degraded": "Degraded",
+        "no_data": "No storage data available"
     },
     "docker": {
         "rx": "RX",
         "tx": "TX",
-        "mem": "MEM",
-        "cpu": "CPU",
+        "mem": "Пам'ять",
+        "cpu": "Процесор",
         "running": "Запущено",
         "offline": "Офлайн",
         "error": "Помилка",
@@ -83,7 +88,7 @@
         "partial": "Частковий"
     },
     "ping": {
-        "error": "Error",
+        "error": "Помилка",
         "ping": "Пінг",
         "down": "Офлайн",
         "up": "Онлайн",
@@ -91,11 +96,11 @@
     },
     "siteMonitor": {
         "http_status": "HTTP статус",
-        "error": "Error",
+        "error": "Помилка",
         "response": "Відповідь",
-        "down": "Down",
-        "up": "Up",
-        "not_available": "Not Available"
+        "down": "Офлайн",
+        "up": "Онлайн",
+        "not_available": "Не доступний"
     },
     "emby": {
         "playing": "Відтворення",
@@ -107,11 +112,21 @@
         "episodes": "Епізоди",
         "songs": "Пісні"
     },
+    "jellyfin": {
+        "playing": "Playing",
+        "transcoding": "Transcoding",
+        "bitrate": "Bitrate",
+        "no_active": "No Active Streams",
+        "movies": "Movies",
+        "series": "Series",
+        "episodes": "Episodes",
+        "songs": "Songs"
+    },
     "esphome": {
-        "offline": "Offline",
-        "offline_alt": "Offline",
+        "offline": "Офлайн",
+        "offline_alt": "Офлайн",
         "online": "Онлайн",
-        "total": "Total",
+        "total": "Усього",
         "unknown": "Невідомо"
     },
     "evcc": {
@@ -133,7 +148,7 @@
         "unread": "Не прочитано"
     },
     "fritzbox": {
-        "connectionStatus": "Status",
+        "connectionStatus": "Стан",
         "connectionStatusUnconfigured": "Не налаштовано",
         "connectionStatusConnecting": "Підключення",
         "connectionStatusAuthenticating": "Автентифікація",
@@ -141,11 +156,11 @@
         "connectionStatusDisconnecting": "Відключення",
         "connectionStatusDisconnected": "Відключено",
         "connectionStatusConnected": "З'єднано",
-        "uptime": "Uptime",
+        "uptime": "Час роботи",
         "maxDown": "Макс. завантаження",
         "maxUp": "Макс. віддача",
-        "down": "Down",
-        "up": "Up",
+        "down": "Офлайн",
+        "up": "Онлайн",
         "received": "Отримано",
         "sent": "Надіслано",
         "externalIPAddress": "Зовнішній IP",
@@ -168,11 +183,18 @@
         "passes": "Пропуски"
     },
     "tautulli": {
-        "playing": "Playing",
-        "transcoding": "Transcoding",
-        "bitrate": "Bitrate",
-        "no_active": "No Active Streams",
+        "playing": "Грає",
+        "transcoding": "Транскодування",
+        "bitrate": "Бітрейт",
+        "no_active": "Немає активних потоків",
         "plex_connection_error": "Перевірте з'єднання Plex"
+    },
+    "tracearr": {
+        "no_active": "No Active Streams",
+        "streams": "Streams",
+        "transcodes": "Transcodes",
+        "directplay": "Direct Play",
+        "bitrate": "Bitrate"
     },
     "omada": {
         "connectedAp": "Підключені точки доступу",
@@ -189,30 +211,30 @@
     "plex": {
         "streams": "Активні потоки",
         "albums": "Альбоми",
-        "movies": "Movies",
+        "movies": "Фільми",
         "tv": "TБ шоу"
     },
     "sabnzbd": {
-        "rate": "Rate",
+        "rate": "Швидкість",
         "queue": "Черга",
         "timeleft": "Залишилось"
     },
     "rutorrent": {
         "active": "Активний",
-        "upload": "Upload",
-        "download": "Download"
+        "upload": "Вивантаж.",
+        "download": "Завантажено"
     },
     "transmission": {
-        "download": "Download",
-        "upload": "Upload",
-        "leech": "Leech",
-        "seed": "Seed"
+        "download": "Завантажено",
+        "upload": "Вивантаж.",
+        "leech": "Ліч",
+        "seed": "Сід"
     },
     "qbittorrent": {
-        "download": "Download",
-        "upload": "Upload",
-        "leech": "Leech",
-        "seed": "Seed"
+        "download": "Завантажити",
+        "upload": "Вивантаж.",
+        "leech": "Ліч",
+        "seed": "Сід"
     },
     "qnap": {
         "cpuUsage": "Використання CPU",
@@ -225,8 +247,8 @@
     "deluge": {
         "download": "Download",
         "upload": "Upload",
-        "leech": "Leech",
-        "seed": "Seed"
+        "leech": "Ліч",
+        "seed": "Сід"
     },
     "develancacheui": {
         "cachehitbytes": "Кеш-хіт байт",
@@ -234,33 +256,33 @@
     },
     "downloadstation": {
         "download": "Download",
-        "upload": "Upload",
-        "leech": "Leech",
-        "seed": "Seed"
+        "upload": "Вивантаж.",
+        "leech": "Ліч",
+        "seed": "Сід"
     },
     "sonarr": {
         "wanted": "Розшукується",
         "queued": "У черзі",
-        "series": "Series",
-        "queue": "Queue",
-        "unknown": "Unknown"
+        "series": "Серіали",
+        "queue": "Черга",
+        "unknown": "Невідомо"
     },
     "radarr": {
-        "wanted": "Wanted",
+        "wanted": "У бажаних",
         "missing": "Відсутній",
-        "queued": "Queued",
-        "movies": "Movies",
-        "queue": "Queue",
-        "unknown": "Unknown"
+        "queued": "У черзі",
+        "movies": "Фільми",
+        "queue": "Черга",
+        "unknown": "Невідомо"
     },
     "lidarr": {
-        "wanted": "Wanted",
-        "queued": "Queued",
+        "wanted": "У бажаних",
+        "queued": "У черзі",
         "artists": "Виконавці"
     },
     "readarr": {
-        "wanted": "Wanted",
-        "queued": "Queued",
+        "wanted": "У бажаних",
+        "queued": "У черзі",
         "books": "Книжки"
     },
     "bazarr": {
@@ -272,21 +294,17 @@
         "approved": "Затверджено",
         "available": "Доступно"
     },
-    "jellyseerr": {
+    "seerr": {
         "pending": "Pending",
         "approved": "Approved",
         "available": "Available",
+        "completed": "Completed",
+        "processing": "Processing",
         "issues": "Open Issues"
     },
-    "overseerr": {
-        "pending": "Pending",
-        "processing": "Обробка",
-        "approved": "Approved",
-        "available": "Available"
-    },
     "netalertx": {
-        "total": "Total",
-        "connected": "Connected",
+        "total": "Усього",
+        "connected": "З'єднано",
         "new_devices": "Нові пристрої",
         "down_alerts": "Сповіщення про падіння"
     },
@@ -297,13 +315,13 @@
         "gravity": "Доменів в списку"
     },
     "adguard": {
-        "queries": "Queries",
-        "blocked": "Blocked",
+        "queries": "Запити",
+        "blocked": "Заблоковано",
         "filtered": "Відфільтровано",
         "latency": "Затримка"
     },
     "speedtest": {
-        "upload": "Upload",
+        "upload": "Вивантаж.",
         "download": "Download",
         "ping": "Ping"
     },
@@ -326,6 +344,16 @@
         "address": "Адреса",
         "expires": "Дійсний до",
         "never": "Ніколи",
+        "user": "User",
+        "hostname": "Hostname",
+        "name": "Name",
+        "client_version": "Client Version",
+        "os": "OS",
+        "created": "Created",
+        "authorized": "Authorized",
+        "is_external": "Is External",
+        "update_available": "Update Available",
+        "tags": "Tags",
         "last_seen": "Востаннє у мережі",
         "now": "Зараз",
         "years": "{{number}}р",
@@ -334,7 +362,9 @@
         "hours": "{{number}}год",
         "minutes": "{{number}}хв",
         "seconds": "{{number}}с",
-        "ago": "{{value}} тому"
+        "ago": "{{value}} тому",
+        "true": "Yes",
+        "false": "No"
     },
     "technitium": {
         "totalQueries": "Queries",
@@ -532,7 +562,8 @@
         "child_bridges_status": "{{ok}}/{{total}}",
         "up": "Up",
         "pending": "Pending",
-        "down": "Down"
+        "down": "Down",
+        "ok": "Ok"
     },
     "healthchecks": {
         "new": "Новий",
@@ -598,6 +629,15 @@
     "paperlessngx": {
         "inbox": "Вхідні",
         "total": "Total"
+    },
+    "pangolin": {
+        "orgs": "Orgs",
+        "sites": "Sites",
+        "resources": "Resources",
+        "targets": "Targets",
+        "traffic": "Traffic",
+        "in": "In",
+        "out": "Out"
     },
     "peanut": {
         "battery_charge": "Заряд батареї",
@@ -695,6 +735,10 @@
         "uptime": "Uptime",
         "volumeAvailable": "Available"
     },
+    "dispatcharr": {
+        "channels": "Channels",
+        "streams": "Streams"
+    },
     "mylar": {
         "series": "Series",
         "issues": "Питання",
@@ -759,7 +803,8 @@
     "ghostfolio": {
         "gross_percent_today": "Today",
         "gross_percent_1y": "Один рік",
-        "gross_percent_max": "Весь час"
+        "gross_percent_max": "Весь час",
+        "net_worth": "Net Worth"
     },
     "audiobookshelf": {
         "podcasts": "Подкасти",
@@ -781,6 +826,12 @@
         "authors": "Автори",
         "categories": "Categories",
         "series": "Series"
+    },
+    "booklore": {
+        "libraries": "Libraries",
+        "books": "Books",
+        "reading": "Reading",
+        "finished": "Finished"
     },
     "jdownloader": {
         "downloadCount": "Queue",
@@ -884,6 +935,19 @@
     "netdata": {
         "warnings": "Попередження",
         "criticals": "Критичні"
+    },
+    "ntfy": {
+        "title": "Title",
+        "priority": "Priority",
+        "lastReceived": "Last Received",
+        "message": "Message",
+        "tags": "Tags",
+        "none": "None",
+        "min": "Min",
+        "low": "Low",
+        "default": "Default",
+        "high": "High",
+        "urgent": "Urgent"
     },
     "plantit": {
         "events": "Події",
@@ -1119,5 +1183,32 @@
         "songs": "Songs",
         "time": "Time",
         "artists": "Artists"
+    },
+    "arcane": {
+        "containers": "Containers",
+        "images": "Images",
+        "image_updates": "Image Updates",
+        "images_unused": "Unused",
+        "environment_required": "Environment ID Required"
+    },
+    "dockhand": {
+        "running": "Running",
+        "stopped": "Stopped",
+        "cpu": "CPU",
+        "memory": "Memory",
+        "images": "Images",
+        "volumes": "Volumes",
+        "events_today": "Events Today",
+        "pending_updates": "Pending Updates",
+        "stacks": "Stacks",
+        "paused": "Paused",
+        "total": "Total",
+        "environment_not_found": "Environment Not Found"
+    },
+    "sparkyfitness": {
+        "eaten": "Eaten",
+        "burned": "Burned",
+        "remaining": "Remaining",
+        "steps": "Steps"
     }
 }

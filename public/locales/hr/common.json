@@ -66,6 +66,11 @@
         "wait": "Pričekaj",
         "empty_data": "Stanje podsustava nepoznato"
     },
+    "unifi_drive": {
+        "healthy": "Zdravo",
+        "degraded": "Degradirano",
+        "no_data": "Nema dostupnih podataka spremišta"
+    },
     "docker": {
         "rx": "RX",
         "tx": "TX",
@@ -99,6 +104,16 @@
     },
     "emby": {
         "playing": "Reprodukcija",
+        "transcoding": "Prekodiranje",
+        "bitrate": "Stopa bitova",
+        "no_active": "Nema aktivnih prijenosa",
+        "movies": "Filmovi",
+        "series": "Serije",
+        "episodes": "Epizode",
+        "songs": "Pjesme"
+    },
+    "jellyfin": {
+        "playing": "Reprodukcija u tijeku",
         "transcoding": "Prekodiranje",
         "bitrate": "Stopa bitova",
         "no_active": "Nema aktivnih prijenosa",
@@ -173,6 +188,13 @@
         "bitrate": "Stopa bitova",
         "no_active": "Nema aktivnih prijenosa",
         "plex_connection_error": "Provjeri Plex vezu"
+    },
+    "tracearr": {
+        "no_active": "Nema aktivnih prijenosa",
+        "streams": "Prijenosi",
+        "transcodes": "Prekodiranja",
+        "directplay": "Izravna reprodukcija",
+        "bitrate": "Stopa bitova"
     },
     "omada": {
         "connectedAp": "Povezani AP-ovi",
@@ -272,17 +294,13 @@
         "approved": "Odobreno",
         "available": "Dostupno"
     },
-    "jellyseerr": {
-        "pending": "U tijeku",
+    "seerr": {
+        "pending": "Na čekanju",
         "approved": "Odobreno",
         "available": "Dostupno",
-        "issues": "Otvoreni problemi"
-    },
-    "overseerr": {
-        "pending": "U tijeku",
+        "completed": "Dovršeno",
         "processing": "Obrada",
-        "approved": "Odobreno",
-        "available": "Dostupno"
+        "issues": "Otvoreni problemi"
     },
     "netalertx": {
         "total": "Ukupno",
@@ -326,6 +344,16 @@
         "address": "Adresa",
         "expires": "Isteče",
         "never": "Nikada",
+        "user": "Korisnik",
+        "hostname": "Ime računala",
+        "name": "Ime",
+        "client_version": "Verzija klijenta",
+        "os": "OS",
+        "created": "Stvoreno",
+        "authorized": "Autorizirano",
+        "is_external": "Je eksterna",
+        "update_available": "Dostupna je nova verzija",
+        "tags": "Oznake",
         "last_seen": "Zadnje viđeno",
         "now": "Sada",
         "years": "{{number}} god",
@@ -334,7 +362,9 @@
         "hours": "{{number}} h",
         "minutes": "{{number}} min",
         "seconds": "{{number}} s",
-        "ago": "Prije {{value}}"
+        "ago": "Prije {{value}}",
+        "true": "Da",
+        "false": "Ne"
     },
     "technitium": {
         "totalQueries": "Upiti",
@@ -532,7 +562,8 @@
         "child_bridges_status": "{{ok}}/{{total}}",
         "up": "Aktivno",
         "pending": "U tijeku",
-        "down": "Neaktivno"
+        "down": "Neaktivno",
+        "ok": "U redu"
     },
     "healthchecks": {
         "new": "Novo",
@@ -598,6 +629,15 @@
     "paperlessngx": {
         "inbox": "Ulazni sandučić",
         "total": "Ukupno"
+    },
+    "pangolin": {
+        "orgs": "Organizacije",
+        "sites": "Web-stranice",
+        "resources": "Resursi",
+        "targets": "Ciljevi",
+        "traffic": "Promet",
+        "in": "Ulaz",
+        "out": "Izlaz"
     },
     "peanut": {
         "battery_charge": "Napunjenost baterije",
@@ -695,6 +735,10 @@
         "uptime": "Vrijeme rada",
         "volumeAvailable": "Dostupno"
     },
+    "dispatcharr": {
+        "channels": "Kanali",
+        "streams": "Prijenosi"
+    },
     "mylar": {
         "series": "Serije",
         "issues": "Problemi",
@@ -759,7 +803,8 @@
     "ghostfolio": {
         "gross_percent_today": "Danas",
         "gross_percent_1y": "Jedna godina",
-        "gross_percent_max": "Svo vrijeme"
+        "gross_percent_max": "Svo vrijeme",
+        "net_worth": "Neto vrijednost"
     },
     "audiobookshelf": {
         "podcasts": "Podcasti",
@@ -781,6 +826,12 @@
         "authors": "Autori",
         "categories": "Kategorije",
         "series": "Serije"
+    },
+    "booklore": {
+        "libraries": "Knjižnice",
+        "books": "Knjige",
+        "reading": "Čitanje",
+        "finished": "Završeno"
     },
     "jdownloader": {
         "downloadCount": "Red čekanja",
@@ -884,6 +935,19 @@
     "netdata": {
         "warnings": "Upozorenja",
         "criticals": "Kritično"
+    },
+    "ntfy": {
+        "title": "Naslov",
+        "priority": "Prioritet",
+        "lastReceived": "Zadnji primitak",
+        "message": "Poruka",
+        "tags": "Oznake",
+        "none": "Ništa",
+        "min": "Min.",
+        "low": "Nisko",
+        "default": "Standardno",
+        "high": "Visoko",
+        "urgent": "Hitno"
     },
     "plantit": {
         "events": "Događaji",
@@ -1070,7 +1134,7 @@
         "unhealthy": "Nezdravo",
         "unknown": "Nepoznato",
         "servers": "Serveri",
-        "stacks": "Stacks",
+        "stacks": "Stogovi",
         "containers": "Kontejneri"
     },
     "filebrowser": {
@@ -1119,5 +1183,32 @@
         "songs": "Pjesme",
         "time": "Vrijeme",
         "artists": "Izvođači"
+    },
+    "arcane": {
+        "containers": "Kontejneri",
+        "images": "Slike",
+        "image_updates": "Aktualizirane slike",
+        "images_unused": "Nekorišteno",
+        "environment_required": "ID okruženja se mora navesti"
+    },
+    "dockhand": {
+        "running": "Pokreće se",
+        "stopped": "Zaustavljeno",
+        "cpu": "CPU",
+        "memory": "Memorija",
+        "images": "Slike",
+        "volumes": "Jedinice memorije",
+        "events_today": "Događanja danas",
+        "pending_updates": "Aktualiziranja na čekanju",
+        "stacks": "Stogovi",
+        "paused": "Pauzirano",
+        "total": "Ukupno",
+        "environment_not_found": "Okruženje nije pronađeno"
+    },
+    "sparkyfitness": {
+        "eaten": "Pojedeno",
+        "burned": "Potrošeno",
+        "remaining": "Preostalo",
+        "steps": "Koraci"
     }
 }

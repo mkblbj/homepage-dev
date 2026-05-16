@@ -12,8 +12,19 @@ export PGID=${PGID:-0}
 
 export HOMEPAGE_BUILDTIME=$(date +%s)
 
+# Try IPv6 first (dual stack when available), but fall back to IPv4 if the bind fails
+export HOSTNAME=${HOSTNAME:-::}
+if [ "$HOSTNAME" = "::" ]; then
+  if ! node -e "const server = require('http').createServer(() => {}); const host = '::'; const port = process.env.PORT || 3000; server.once('error', (err) => { console.error('IPv6 bind failed:', err.message); process.exit(1); }); server.listen(port, host, () => server.close(() => process.exit(0)));"; then
+    echo "Falling back to IPv4 bind at 0.0.0.0"
+    export HOSTNAME=0.0.0.0
+  fi
+fi
+
 # Check ownership before chown
-if [ -e /app/config ]; then
+if [ "$PUID" = "0" ]; then
+  echo "Skipping ownership changes for /app/config"
+elif [ -e /app/config ]; then
   CURRENT_UID=$(stat -c %u /app/config)
   CURRENT_GID=$(stat -c %g /app/config)
 
@@ -30,7 +41,9 @@ else
 fi
 
 # Ensure /app/config/logs exists and is owned
-if [ -n "$PUID" ] && [ -n "$PGID" ]; then
+if [ "$PUID" = "0" ]; then
+  echo "Skipping ownership changes for /app/config/logs"
+elif [ -n "$PUID" ] && [ -n "$PGID" ]; then
   mkdir -p /app/config/logs 2>/dev/null || true
   if [ -d /app/config/logs ]; then
     LOG_UID=$(stat -c %u /app/config/logs)

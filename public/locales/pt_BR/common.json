@@ -14,7 +14,7 @@
         "date": "{{value, date}}",
         "relativeDate": "{{value, relativeDate}}",
         "duration": "{{value, duration}}",
-        "months": "M",
+        "months": "mo",
         "days": "d",
         "hours": "h",
         "minutes": "m",
@@ -66,9 +66,14 @@
         "wait": "Por favor, aguarde",
         "empty_data": "Status do Subsistema desconhecido"
     },
+    "unifi_drive": {
+        "healthy": "Saudável",
+        "degraded": "Degradado",
+        "no_data": "Sem dados de armazenamento disponíveis"
+    },
     "docker": {
-        "rx": "Rx",
-        "tx": "Tx",
+        "rx": "RX",
+        "tx": "TX",
         "mem": "MEM",
         "cpu": "CPU",
         "running": "Executando",
@@ -101,11 +106,21 @@
         "playing": "A reproduzir",
         "transcoding": "Transcodificação",
         "bitrate": "Taxa de bits",
-        "no_active": "Sem Streams Ativos",
+        "no_active": "Sem Transmissões Ativas",
         "movies": "Filmes",
         "series": "Séries",
         "episodes": "Episódios",
         "songs": "Canções"
+    },
+    "jellyfin": {
+        "playing": "Jogando",
+        "transcoding": "Transcodificando",
+        "bitrate": "Bitrate",
+        "no_active": "Sem Transmissões Ativas",
+        "movies": "Filmes",
+        "series": "Séries",
+        "episodes": "Episódios",
+        "songs": "Músicas"
     },
     "esphome": {
         "offline": "Offline",
@@ -173,6 +188,13 @@
         "bitrate": "Taxa de bits",
         "no_active": "Sem Streams Ativos",
         "plex_connection_error": "Verifique a conexão do Plex"
+    },
+    "tracearr": {
+        "no_active": "Sem Transmissões Ativas",
+        "streams": "Transmissões",
+        "transcodes": "Transcodificações",
+        "directplay": "Reprodução direta",
+        "bitrate": "Bitrate"
     },
     "omada": {
         "connectedAp": "APs Ligados",
@@ -272,17 +294,13 @@
         "approved": "Aprovada",
         "available": "Disponível"
     },
-    "jellyseerr": {
+    "seerr": {
         "pending": "Pendente",
         "approved": "Aprovado",
         "available": "Disponível",
-        "issues": "Incidentes Abertos"
-    },
-    "overseerr": {
-        "pending": "Pendente",
+        "completed": "Concluído",
         "processing": "Processando",
-        "approved": "Aprovado",
-        "available": "Disponível"
+        "issues": "Erros pendentes"
     },
     "netalertx": {
         "total": "Total",
@@ -326,6 +344,16 @@
         "address": "Endereço",
         "expires": "Expira em",
         "never": "Nunca",
+        "user": "User",
+        "hostname": "Hostname",
+        "name": "Name",
+        "client_version": "Client Version",
+        "os": "OS",
+        "created": "Created",
+        "authorized": "Authorized",
+        "is_external": "Is External",
+        "update_available": "Update Available",
+        "tags": "Tags",
         "last_seen": "Visto por último",
         "now": "Agora",
         "years": "{{number}}a",
@@ -334,7 +362,9 @@
         "hours": "{{number}}h",
         "minutes": "{{number}}m",
         "seconds": "{{number}}s",
-        "ago": "{{value}} Atrás"
+        "ago": "{{value}} Atrás",
+        "true": "Yes",
+        "false": "No"
     },
     "technitium": {
         "totalQueries": "Consultas",
@@ -532,7 +562,8 @@
         "child_bridges_status": "{{ok}}/{{total}}",
         "up": "Ativo",
         "pending": "Pendente",
-        "down": "Inativo"
+        "down": "Inativo",
+        "ok": "Ok"
     },
     "healthchecks": {
         "new": "Novo",
@@ -598,6 +629,15 @@
     "paperlessngx": {
         "inbox": "Caixa de entrada",
         "total": "Total"
+    },
+    "pangolin": {
+        "orgs": "Organizações",
+        "sites": "Sites",
+        "resources": "Recursos",
+        "targets": "Alvos",
+        "traffic": "Tráfego",
+        "in": "Em",
+        "out": "Saída"
     },
     "peanut": {
         "battery_charge": "Carga da bateria",
@@ -695,6 +735,10 @@
         "uptime": "Tempo ativo",
         "volumeAvailable": "Disponível"
     },
+    "dispatcharr": {
+        "channels": "Canais",
+        "streams": "Transmissões"
+    },
     "mylar": {
         "series": "Séries",
         "issues": "Problemas",
@@ -759,7 +803,8 @@
     "ghostfolio": {
         "gross_percent_today": "Hoje",
         "gross_percent_1y": "Um ano",
-        "gross_percent_max": "Todo o tempo"
+        "gross_percent_max": "Todo o tempo",
+        "net_worth": "Patrimônio Líquido"
     },
     "audiobookshelf": {
         "podcasts": "Podcasts",
@@ -781,6 +826,12 @@
         "authors": "Autores",
         "categories": "Categorias",
         "series": "Séries"
+    },
+    "booklore": {
+        "libraries": "Bibliotecas",
+        "books": "Livros",
+        "reading": "Lendo",
+        "finished": "Finalizado"
     },
     "jdownloader": {
         "downloadCount": "Fila de espera",
@@ -884,6 +935,19 @@
     "netdata": {
         "warnings": "Alertas",
         "criticals": "Críticos"
+    },
+    "ntfy": {
+        "title": "Title",
+        "priority": "Priority",
+        "lastReceived": "Last Received",
+        "message": "Message",
+        "tags": "Tags",
+        "none": "None",
+        "min": "Min",
+        "low": "Low",
+        "default": "Default",
+        "high": "High",
+        "urgent": "Urgent"
     },
     "plantit": {
         "events": "Eventos",
@@ -1119,5 +1183,32 @@
         "songs": "Músicas",
         "time": "Tempo",
         "artists": "Artistas"
+    },
+    "arcane": {
+        "containers": "Recipientes",
+        "images": "Imagens",
+        "image_updates": "Atualizações de Imagem",
+        "images_unused": "Não utilizado",
+        "environment_required": "ID do ambiente necessário"
+    },
+    "dockhand": {
+        "running": "Executando",
+        "stopped": "Parado",
+        "cpu": "CPU",
+        "memory": "Memória",
+        "images": "Imagens",
+        "volumes": "Quantidades",
+        "events_today": "Eventos hoje",
+        "pending_updates": "Atualizações pendentes",
+        "stacks": "Pilhas",
+        "paused": "Pausado",
+        "total": "Total",
+        "environment_not_found": "Ambiente não encontrado"
+    },
+    "sparkyfitness": {
+        "eaten": "Comido",
+        "burned": "Queimado",
+        "remaining": "Restante",
+        "steps": "Passos"
     }
 }
