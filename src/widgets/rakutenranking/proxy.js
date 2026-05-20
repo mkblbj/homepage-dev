@@ -1,5 +1,7 @@
 import { buildRankingSignals, normalizeSignalConfig } from "./signals-model.mjs";
 import { readSignalState, writeSignalState } from "./signals-store.mjs";
+import { createRakutenPageFetcher } from "./ranking-api.mjs";
+import { createRakutenCredentialPicker, normalizeRakutenApplications } from "./credentials.mjs";
 
 import getServiceWidget from "utils/config/service-helpers";
 import createLogger from "utils/logger";
@@ -10,39 +12,20 @@ const logger = createLogger(proxyName);
 
 const API_BASE = "https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601";
 const PAGE_SIZE = 30;
-const PAGE_CACHE_TTL_MS = 60 * 1000;
-const rankingPageCache = new Map();
 
-function fetchRankingPage(pageUrl) {
-  const key = pageUrl.toString();
-  const cached = rankingPageCache.get(key);
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.promise;
-  }
-  rankingPageCache.delete(key);
-
-  const promise = httpProxy(pageUrl, {
+const credentialPicker = createRakutenCredentialPicker();
+const rankingPageFetcher = createRakutenPageFetcher({
+  request: (pageUrl) => httpProxy(pageUrl, {
     method: "GET",
     headers: {
       "User-Agent": "Mozilla/5.0 (compatible; Homepage/1.0)",
       Accept: "application/json",
     },
-  })
-    .then((result) => {
-      if (result[0] !== 200) rankingPageCache.delete(key);
-      return result;
-    })
-    .catch((error) => {
-      rankingPageCache.delete(key);
-      throw error;
-    });
+  }),
+});
 
-  rankingPageCache.set(key, {
-    expiresAt: Date.now() + PAGE_CACHE_TTL_MS,
-    promise,
-  });
-
-  return promise;
+function isCredentialAuthorizationError(status) {
+  return status === 401 || status === 403;
 }
 
 export default async function rakutenRankingProxyHandler(req, res) {
@@ -59,14 +42,13 @@ export default async function rakutenRankingProxyHandler(req, res) {
     return res.status(400).json({ error: "Invalid proxy service type" });
   }
 
-  const { applicationId, accessKey } = widget;
-  if (!applicationId || !accessKey) {
+  const applications = normalizeRakutenApplications(widget);
+  if (applications.length === 0) {
     return res.status(400).json({ error: "Missing applicationId or accessKey in widget config" });
   }
+  const widgetKey = `${group}:${service}:${index || 0}`;
 
   const params = new URLSearchParams({
-    applicationId,
-    accessKey,
     formatVersion: "2",
   });
 
@@ -77,8 +59,6 @@ export default async function rakutenRankingProxyHandler(req, res) {
   const [, period, genreId] = match;
 
   try {
-    const delay = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
-
     const fetchRanking = async ({ requestedPeriod, requestedLimit, requireComplete = false }) => {
       const rankingParams = new URLSearchParams(params);
       if (requestedPeriod === "realtime") rankingParams.set("period", "realtime");
@@ -88,19 +68,42 @@ export default async function rakutenRankingProxyHandler(req, res) {
       const results = [];
 
       const fetchPage = async (page) => {
-        const pageParams = new URLSearchParams(rankingParams);
-        pageParams.set("page", String(page));
-        const pageUrl = new URL(`${API_BASE}?${pageParams.toString()}`);
-        const [status, , data] = await fetchRankingPage(pageUrl);
-        if (status !== 200) {
+        const cacheParams = new URLSearchParams(rankingParams);
+        cacheParams.set("page", String(page));
+        const cacheKey = `${API_BASE}?${cacheParams.toString()}`;
+
+        const attemptedCredentialKeys = new Set();
+
+        for (let attempt = 0; attempt < applications.length; attempt += 1) {
+          const credential = credentialPicker.next(widgetKey, applications, { exclude: attemptedCredentialKeys });
+          if (!credential) break;
+          attemptedCredentialKeys.add(credential.bucketKey);
+
+          const pageParams = new URLSearchParams(cacheParams);
+          pageParams.set("applicationId", credential.applicationId);
+          pageParams.set("accessKey", credential.accessKey);
+          const pageUrl = new URL(`${API_BASE}?${pageParams.toString()}`);
+          const [status, , data] = await rankingPageFetcher.fetchPage(pageUrl, {
+            period: requestedPeriod,
+            bucketKey: credential.bucketKey,
+            cacheKey,
+          });
+          credentialPicker.reportStatus(credential, status);
+
+          if (status === 200) {
+            return JSON.parse(data.toString());
+          }
+
           logger.error("Error fetching Rakuten ranking (endpoint=%s, page=%d): status %d", endpoint, page, status);
-          return null;
+          if (!isCredentialAuthorizationError(status)) {
+            return null;
+          }
         }
-        return JSON.parse(data.toString());
+
+        return null;
       };
 
       for (let i = 0; i < totalPages; i += 1) {
-        if (i > 0) await delay(300);
         results.push(await fetchPage(i + 1));
       }
 
@@ -155,7 +158,6 @@ export default async function rakutenRankingProxyHandler(req, res) {
         requestedLimit: signalConfig.realtimeTop,
         requireComplete: true,
       });
-      await delay(300);
       const dailyRanking = await fetchRanking({
         requestedPeriod: "daily",
         requestedLimit: signalConfig.dailyTop,
