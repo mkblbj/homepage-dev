@@ -2,6 +2,8 @@ import Container from "components/services/widget/container";
 import { useState, useCallback } from "react";
 import useSWR from "swr";
 
+import { buildSignalPanelState } from "./signals-display.mjs";
+
 import { formatProxyUrl } from "utils/proxy/api-helpers";
 
 function StarRating({ rating }) {
@@ -86,26 +88,35 @@ function signalTone(signal) {
   return "border-rose-400/60 bg-rose-100/75 text-rose-900 dark:border-rose-300/40 dark:bg-rose-500/20 dark:text-rose-100";
 }
 
-function SignalPanel({ data }) {
-  const signals = data?.signals || [];
-  if (!data?.enabled || data?.warmingUp || signals.length === 0) return null;
+function panelTone(mode) {
+  if (mode === "error") {
+    return "border-amber-400/60 bg-gradient-to-r from-amber-50 via-orange-50 to-white dark:border-amber-300/40 dark:from-amber-950/40 dark:via-orange-950/30 dark:to-theme-900/40";
+  }
+  return "border-rose-400/50 bg-gradient-to-r from-rose-50 via-amber-50 to-white dark:border-rose-300/30 dark:from-rose-950/40 dark:via-amber-950/30 dark:to-theme-900/40";
+}
+
+function SignalPanel({ enabled, data, error }) {
+  const panel = buildSignalPanelState({ enabled, data, error });
+  if (!panel.visible) return null;
+  const hasSignals = panel.signals.length > 0;
 
   return (
-    <div className="mx-2 mt-1.5 mb-1.5 overflow-hidden rounded-lg border border-rose-400/50 bg-gradient-to-r from-rose-50 via-amber-50 to-white shadow-sm dark:border-rose-300/30 dark:from-rose-950/40 dark:via-amber-950/30 dark:to-theme-900/40">
+    <div className={`mx-2 mt-1.5 mb-1.5 overflow-hidden rounded-lg border shadow-sm ${panelTone(panel.mode)}`}>
       <div className="flex items-center justify-between gap-2 border-b border-rose-200/70 px-2.5 py-1.5 dark:border-rose-800/40">
         <div className="flex min-w-0 items-center gap-1.5">
           <span className="inline-flex h-2 w-2 rounded-full bg-rose-500 shadow-[0_0_0_3px_rgba(244,63,94,0.16)]" />
           <span className="text-xs font-bold text-rose-700 dark:text-rose-200">急浮上</span>
           <span className="rounded-full bg-rose-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-            {signals.length}件
+            {panel.statusLabel}
           </span>
         </div>
         <span className="shrink-0 text-[10px] text-theme-600 dark:text-theme-300">
-          实时前{data.config?.realtimeTop || 50}
+          {panel.message}
         </span>
       </div>
-      <div className="flex flex-col divide-y divide-rose-100/80 dark:divide-rose-900/30">
-        {signals.map((signal) => (
+      {hasSignals && (
+        <div className="flex flex-col divide-y divide-rose-100/80 dark:divide-rose-900/30">
+          {panel.signals.map((signal) => (
           <a
             key={`${signal.status}-${signal.itemCode}`}
             href={signal.itemUrl}
@@ -135,8 +146,9 @@ function SignalPanel({ data }) {
               {signalLabel(signal)}
             </span>
           </a>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -226,7 +238,7 @@ export default function Component({ service }) {
     dedupingInterval: 60000,
   });
 
-  const { data: signalData } = useSWR(signalUrl, {
+  const { data: signalData, error: signalError } = useSWR(signalUrl, {
     refreshInterval,
     revalidateIfStale: false,
     revalidateOnFocus: false,
@@ -251,7 +263,7 @@ export default function Component({ service }) {
   return (
     <Container service={service}>
       <div className="flex flex-col w-full min-w-0">
-        <SignalPanel data={signalData} />
+        <SignalPanel enabled={widget.signal?.enabled} data={signalData} error={signalError} />
 
         {/* Genre selector */}
         {showGenres && (
