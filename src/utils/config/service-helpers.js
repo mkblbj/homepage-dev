@@ -453,6 +453,7 @@ export function cleanServiceGroups(groups) {
           // rakutenranking
           defaultGenre,
           genres,
+          signal,
         } = widgetData;
 
         let fieldsList = fields;
@@ -751,6 +752,16 @@ export function cleanServiceGroups(groups) {
           if (genres) widget.genres = genres;
           if (defaultGenre !== undefined) widget.defaultGenre = defaultGenre;
           if (refreshInterval) widget.refreshInterval = refreshInterval;
+          if (signal && typeof signal === "object") {
+            widget.signal = {
+              enabled: signal.enabled === true,
+              realtimeTop: Number.parseInt(signal.realtimeTop, 10) || 50,
+              dailyTop: Number.parseInt(signal.dailyTop, 10) || 50,
+              historyDays: Number.parseInt(signal.historyDays, 10) || 7,
+              minRealtimeHits: Number.parseInt(signal.minRealtimeHits, 10) || 2,
+              limit: Number.parseInt(signal.limit, 10) || 3,
+            };
+          }
         }
         return widget;
       });
