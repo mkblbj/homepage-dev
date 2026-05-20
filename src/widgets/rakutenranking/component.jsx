@@ -70,6 +70,77 @@ function formatPrice(price) {
   return `¥${Number(price).toLocaleString("ja-JP")}`;
 }
 
+function signalLabel(signal) {
+  if (signal.status === "daily_confirmed") return "日榜確認";
+  if (signal.status === "watching") return "連続上榜";
+  return "实时突入";
+}
+
+function signalTone(signal) {
+  if (signal.status === "daily_confirmed") {
+    return "border-amber-400/70 bg-amber-100/80 text-amber-900 dark:border-amber-300/50 dark:bg-amber-500/20 dark:text-amber-100";
+  }
+  if (signal.status === "watching") {
+    return "border-sky-400/60 bg-sky-100/70 text-sky-900 dark:border-sky-300/40 dark:bg-sky-500/20 dark:text-sky-100";
+  }
+  return "border-rose-400/60 bg-rose-100/75 text-rose-900 dark:border-rose-300/40 dark:bg-rose-500/20 dark:text-rose-100";
+}
+
+function SignalPanel({ data }) {
+  const signals = data?.signals || [];
+  if (!data?.enabled || data?.warmingUp || signals.length === 0) return null;
+
+  return (
+    <div className="mx-2 mt-1.5 mb-1.5 overflow-hidden rounded-lg border border-rose-400/50 bg-gradient-to-r from-rose-50 via-amber-50 to-white shadow-sm dark:border-rose-300/30 dark:from-rose-950/40 dark:via-amber-950/30 dark:to-theme-900/40">
+      <div className="flex items-center justify-between gap-2 border-b border-rose-200/70 px-2.5 py-1.5 dark:border-rose-800/40">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className="inline-flex h-2 w-2 rounded-full bg-rose-500 shadow-[0_0_0_3px_rgba(244,63,94,0.16)]" />
+          <span className="text-xs font-bold text-rose-700 dark:text-rose-200">急浮上</span>
+          <span className="rounded-full bg-rose-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+            {signals.length}件
+          </span>
+        </div>
+        <span className="shrink-0 text-[10px] text-theme-600 dark:text-theme-300">
+          实时前{data.config?.realtimeTop || 50}
+        </span>
+      </div>
+      <div className="flex flex-col divide-y divide-rose-100/80 dark:divide-rose-900/30">
+        {signals.map((signal) => (
+          <a
+            key={`${signal.status}-${signal.itemCode}`}
+            href={signal.itemUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 px-2.5 py-2 transition-colors hover:bg-white/60 dark:hover:bg-white/5"
+          >
+            {signal.imageUrl && (
+              <img
+                src={signal.imageUrl}
+                alt=""
+                className="h-10 w-10 shrink-0 rounded-md bg-white object-contain"
+                loading="lazy"
+              />
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="line-clamp-1 text-xs font-semibold text-theme-800 dark:text-theme-100">
+                {signal.itemName}
+              </div>
+              <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-theme-600 dark:text-theme-300">
+                {signal.realtimeRank && <span>RT #{signal.realtimeRank}</span>}
+                {signal.dailyRank && <span>DAY #{signal.dailyRank}</span>}
+                {signal.itemPrice && <span>{formatPrice(signal.itemPrice)}</span>}
+              </div>
+            </div>
+            <span className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${signalTone(signal)}`}>
+              {signalLabel(signal)}
+            </span>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ItemCard({ item }) {
   return (
     <a
@@ -144,8 +215,18 @@ export default function Component({ service }) {
   const refreshInterval = widget.refreshInterval || 900000;
   const endpoint = activeGenre ? `${activeTab}_${activeGenre}` : activeTab;
   const url = formatProxyUrl(widget, endpoint);
+  const signalEndpoint = activeGenre ? `signals_${activeGenre}` : "signals";
+  const signalUrl = widget.signal?.enabled ? formatProxyUrl(widget, signalEndpoint) : null;
 
   const { data, error, mutate } = useSWR(url, {
+    refreshInterval,
+    revalidateIfStale: false,
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+    dedupingInterval: 60000,
+  });
+
+  const { data: signalData } = useSWR(signalUrl, {
     refreshInterval,
     revalidateIfStale: false,
     revalidateOnFocus: false,
@@ -170,6 +251,8 @@ export default function Component({ service }) {
   return (
     <Container service={service}>
       <div className="flex flex-col w-full min-w-0">
+        <SignalPanel data={signalData} />
+
         {/* Genre selector */}
         {showGenres && (
           <div className="flex items-center gap-1 px-2 pt-1.5 pb-0.5 overflow-x-auto scrollbar-none">
