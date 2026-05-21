@@ -4,6 +4,7 @@ import { useCallback, useState, useMemo } from "react";
 import {
   buildTodayAttendanceModel,
   buildTomorrowScheduleModel,
+  formatScheduledFte,
   getShiftBadgeClass,
 } from "./attendance-model.mjs";
 
@@ -177,8 +178,9 @@ export default function Component({ service }) {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-x-3 gap-y-2">
-            {todayModel.groups.map(({ key, label, count, workingCount, totalCount, employees }) => {
+            {todayModel.groups.map(({ key, label, count, workingCount, totalCount, scheduledFte, employees }) => {
               const showAttendanceRatio = todayModel.hasRoster && (key === "Office" || key === "Production");
+              const scheduledFteText = key === "Production" ? formatScheduledFte(scheduledFte) : null;
 
               return (
                 <div key={key} className="flex flex-col gap-1">
@@ -189,6 +191,11 @@ export default function Component({ service }) {
                     <span className="text-[10px] font-bold text-orange-500 dark:text-orange-400 tabular-nums">
                       {showAttendanceRatio ? `${workingCount ?? 0}/${totalCount ?? count}` : count}
                     </span>
+                    {scheduledFteText ? (
+                      <span className="text-[10px] font-bold text-orange-500 dark:text-orange-400 tabular-nums">
+                        ｜ 換算 {scheduledFteText}人
+                      </span>
+                    ) : null}
                   </div>
                   <div className="grid grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] gap-1">
                     {employees.map((employee, index) => (
@@ -269,47 +276,56 @@ export default function Component({ service }) {
               </div>
             ) : (
               <div className="mt-1.5 grid grid-cols-2 gap-2">
-                {tomorrowModel.groups.map(({ key, label, count, employees }) => (
-                  <div
-                    key={key}
-                    className="rounded-md border border-orange-200/40 dark:border-orange-900/20 bg-theme-100/60 dark:bg-theme-900/20 px-2 py-1.5"
-                  >
-                    <div className="flex items-center gap-1.5 border-b border-theme-200/40 dark:border-theme-700/30 pb-0.5">
-                      <span className="text-[10px] font-semibold text-theme-600 dark:text-theme-300">
-                        {label}
-                      </span>
-                      <span className="text-[11px] font-bold text-orange-500 dark:text-orange-400 tabular-nums">
-                        {count}
-                      </span>
-                    </div>
+                {tomorrowModel.groups.map(({ key, label, count, scheduledFte, employees }) => {
+                  const scheduledFteText = key === "Production" ? formatScheduledFte(scheduledFte) : null;
 
-                    {employees.length > 0 ? (
-                      <div className="mt-1.5 flex flex-wrap gap-1">
-                        {employees.map((employee, index) => (
-                          <div
-                            key={`${key}-${employee.employee}-${index}`}
-                            className="inline-flex items-center gap-1 bg-theme-100/60 dark:bg-theme-800/50 hover:bg-theme-200/70 dark:hover:bg-theme-700/60 transition-colors rounded px-1.5 py-0.5 text-xs text-theme-700 dark:text-theme-200 border border-theme-200/40 dark:border-theme-700/30"
-                          >
-                            <span className="leading-tight">
-                              {employee.employee_name}
-                            </span>
-                            <span
-                              className={`rounded px-1 py-px text-[9px] font-bold leading-tight tabular-nums ${getShiftBadgeClass(
-                                employee.shiftText,
-                              )}`}
+                  return (
+                    <div
+                      key={key}
+                      className="rounded-md border border-orange-200/40 dark:border-orange-900/20 bg-theme-100/60 dark:bg-theme-900/20 px-2 py-1.5"
+                    >
+                      <div className="flex items-center gap-1.5 border-b border-theme-200/40 dark:border-theme-700/30 pb-0.5">
+                        <span className="text-[10px] font-semibold text-theme-600 dark:text-theme-300">
+                          {label}
+                        </span>
+                        <span className="text-[11px] font-bold text-orange-500 dark:text-orange-400 tabular-nums">
+                          {count}
+                        </span>
+                        {scheduledFteText ? (
+                          <span className="text-[11px] font-bold text-orange-500 dark:text-orange-400 tabular-nums">
+                            ｜ 換算 {scheduledFteText}人
+                          </span>
+                        ) : null}
+                      </div>
+
+                      {employees.length > 0 ? (
+                        <div className="mt-1.5 flex flex-wrap gap-1">
+                          {employees.map((employee, index) => (
+                            <div
+                              key={`${key}-${employee.employee}-${index}`}
+                              className="inline-flex items-center gap-1 bg-theme-100/60 dark:bg-theme-800/50 hover:bg-theme-200/70 dark:hover:bg-theme-700/60 transition-colors rounded px-1.5 py-0.5 text-xs text-theme-700 dark:text-theme-200 border border-theme-200/40 dark:border-theme-700/30"
                             >
-                              {employee.shiftText}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="mt-1.5 text-[10px] text-theme-400 dark:text-theme-500">
-                        {count === 0 ? "予定なし" : "明細なし"}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                              <span className="leading-tight">
+                                {employee.employee_name}
+                              </span>
+                              <span
+                                className={`rounded px-1 py-px text-[9px] font-bold leading-tight tabular-nums ${getShiftBadgeClass(
+                                  employee.shiftText,
+                                )}`}
+                              >
+                                {employee.shiftText}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="mt-1.5 text-[10px] text-theme-400 dark:text-theme-500">
+                          {count === 0 ? "予定なし" : "明細なし"}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

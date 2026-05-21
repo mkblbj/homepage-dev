@@ -5,6 +5,11 @@ export const DEPARTMENT_CATEGORY_LABELS = {
   Production: "生産",
 };
 
+const PRODUCTION_CATEGORY = "Production";
+const STANDARD_PRODUCTION_DAY_HOURS = 8;
+const LUNCH_BREAK_THRESHOLD_HOURS = 6;
+const LUNCH_BREAK_HOURS = 1;
+
 export const SHIFT_BADGE_STYLES = {
   "9-12": "border border-cyan-200/80 bg-cyan-100/75 text-cyan-700 dark:border-cyan-400/20 dark:bg-cyan-400/10 dark:text-cyan-200",
   "9-16": "border border-sky-200/80 bg-sky-100/75 text-sky-700 dark:border-sky-400/20 dark:bg-sky-400/10 dark:text-sky-200",
@@ -79,6 +84,91 @@ export function formatCheckinTime(value) {
     return text;
   }
   return `${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
+}
+
+export function formatScheduledFte(value) {
+  if (value == null || !Number.isFinite(value)) {
+    return null;
+  }
+
+  return value.toFixed(1);
+}
+
+function parseShiftRange(value) {
+  if (!value) {
+    return null;
+  }
+
+  const match = String(value).match(/(\d{1,2})(?::(\d{2}))?\s*-\s*(\d{1,2})(?::(\d{2}))?/);
+  if (!match) {
+    return null;
+  }
+
+  const [, startHourText, startMinuteText = "0", endHourText, endMinuteText = "0"] = match;
+  const startHour = Number(startHourText);
+  const startMinute = Number(startMinuteText);
+  const endHour = Number(endHourText);
+  const endMinute = Number(endMinuteText);
+
+  if (
+    startHour > 23 ||
+    endHour > 24 ||
+    startMinute > 59 ||
+    endMinute > 59 ||
+    (endHour === 24 && endMinute > 0)
+  ) {
+    return null;
+  }
+
+  const startMinutes = startHour * 60 + startMinute;
+  const endMinutes = endHour * 60 + endMinute;
+
+  return endMinutes > startMinutes ? { startMinutes, endMinutes } : null;
+}
+
+function getScheduledShiftRanges(employee) {
+  const ranges = [];
+
+  if (employee?.scheduled_time) {
+    ranges.push(employee.scheduled_time);
+  }
+
+  if (employee?.start_time && employee?.end_time) {
+    ranges.push(`${employee.start_time}-${employee.end_time}`);
+  }
+
+  if (employee?.shift_label) {
+    ranges.push(employee.shift_label);
+  }
+
+  return ranges;
+}
+
+function calculateEmployeeScheduledFte(employee) {
+  const range = getScheduledShiftRanges(employee).map(parseShiftRange).find(Boolean);
+  if (!range) {
+    return null;
+  }
+
+  let hours = (range.endMinutes - range.startMinutes) / 60;
+  if (hours > LUNCH_BREAK_THRESHOLD_HOURS) {
+    hours -= LUNCH_BREAK_HOURS;
+  }
+
+  return hours / STANDARD_PRODUCTION_DAY_HOURS;
+}
+
+function calculateProductionScheduledFte(category, employees) {
+  if (category !== PRODUCTION_CATEGORY) {
+    return undefined;
+  }
+
+  const fteValues = employees.map(calculateEmployeeScheduledFte).filter((value) => value != null);
+  if (fteValues.length === 0) {
+    return undefined;
+  }
+
+  return fteValues.reduce((total, value) => total + value, 0);
 }
 
 function getCategoryLabel(category) {
@@ -209,11 +299,13 @@ export function buildTomorrowScheduleModel(snapshot) {
         shiftBadgeClass: getShiftBadgeClass(formatScheduledShift(employee)),
       }))
       .sort(sortEmployeesForSchedule);
+    const scheduledFte = calculateProductionScheduledFte(category, employees);
 
     return {
       key: category,
       label: getCategoryLabel(category),
       count: snapshot?.departments?.[category]?.count ?? employees.length,
+      ...(scheduledFte != null ? { scheduledFte } : {}),
       employees,
     };
   });
@@ -233,6 +325,7 @@ function buildScheduledTodayGroups(todaySnapshot) {
         .map(makeScheduledEmployee)
         .sort(sortEmployeesForSchedule);
       const totalCount = todaySnapshot?.departments?.[category]?.count ?? employees.length;
+      const scheduledFte = calculateProductionScheduledFte(category, employees);
 
       return {
         key: category,
@@ -240,6 +333,7 @@ function buildScheduledTodayGroups(todaySnapshot) {
         count: totalCount,
         totalCount,
         workingCount: countEmployeesByStatus(employees, "working"),
+        ...(scheduledFte != null ? { scheduledFte } : {}),
         employees,
       };
     })

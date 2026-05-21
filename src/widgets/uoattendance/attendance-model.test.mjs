@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   buildTodayAttendanceModel,
   buildTomorrowScheduleModel,
+  formatScheduledFte,
   formatScheduledShift,
   getStatusMeta,
 } from "./attendance-model.mjs";
@@ -77,6 +78,12 @@ test("formatScheduledShift prefers shift_label then scheduled_time then start/en
   assert.equal(formatScheduledShift({}), "未設定");
 });
 
+test("formatScheduledFte keeps production capacity compact", () => {
+  assert.equal(formatScheduledFte(2.5), "2.5");
+  assert.equal(formatScheduledFte(3), "3.0");
+  assert.equal(formatScheduledFte(null), null);
+});
+
 test("getStatusMeta returns stable copy and tone classes for all three states", () => {
   assert.deepEqual(getStatusMeta("working"), {
     label: "出勤中",
@@ -124,6 +131,28 @@ test("buildTodayAttendanceModel groups scheduled employees and counts three stat
   assert.equal(model.groups[0].employees[1].shiftText, "予定外");
   assert.equal(model.groups[1].employees[0].statusMeta.label, "退勤済");
   assert.equal(model.groups[1].employees[1].statusMeta.label, "未打刻");
+});
+
+test("buildTodayAttendanceModel computes production scheduled fte from shifts only", () => {
+  const model = buildTodayAttendanceModel({
+    todaySnapshot,
+    actualEmployees: [
+      ...actualEmployees,
+      {
+        employee: "EMP-998",
+        employee_name: "予定外 生産",
+        department: "生産 - UO",
+        checkin_time: "11:15:00",
+      },
+    ],
+  });
+
+  const officeGroup = model.groups.find((group) => group.key === "Office");
+  const productionGroup = model.groups.find((group) => group.key === "Production");
+
+  assert.equal(officeGroup.scheduledFte, undefined);
+  assert.equal(productionGroup.totalCount, 3);
+  assert.equal(productionGroup.scheduledFte, 1.5);
 });
 
 test("buildTodayAttendanceModel exposes visible attendance times for working and off-work employees", () => {
@@ -183,24 +212,27 @@ test("buildTodayAttendanceModel falls back to current-at-work rows when today ro
 test("buildTomorrowScheduleModel keeps schedule-only grouping", () => {
   const model = buildTomorrowScheduleModel({
     date: "2026-04-26",
-    count: 2,
+    count: 3,
     employees: [
       { employee: "EMP-004", employee_name: "山田", department_category: "Office", shift_label: "9-18" },
       { employee: "EMP-005", employee_name: "林", department_category: "Production", shift_label: "10-17" },
+      { employee: "EMP-006", employee_name: "森", department_category: "Production", shift_label: "13-18" },
     ],
     departments: {
       Office: { count: 1, employees: [] },
-      Production: { count: 1, employees: [] },
+      Production: { count: 2, employees: [] },
     },
   });
 
   assert.equal(model.date, "2026-04-26");
-  assert.equal(model.count, 2);
+  assert.equal(model.count, 3);
   assert.deepEqual(
     model.groups.map((group) => [group.key, group.label, group.count]),
     [
       ["Office", "オフィス", 1],
-      ["Production", "生産", 1],
+      ["Production", "生産", 2],
     ],
   );
+  assert.equal(model.groups[0].scheduledFte, undefined);
+  assert.equal(model.groups[1].scheduledFte, 1.375);
 });
