@@ -9,6 +9,8 @@ const PRODUCTION_CATEGORY = "Production";
 const STANDARD_PRODUCTION_DAY_HOURS = 8;
 const LUNCH_BREAK_THRESHOLD_HOURS = 6;
 const LUNCH_BREAK_HOURS = 1;
+const UNSCHEDULED_SHIFT_BADGE_CLASS =
+  "border border-amber-200/80 bg-amber-100/75 text-amber-700 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200";
 
 export const SHIFT_BADGE_STYLES = {
   "9-12": "border border-cyan-200/80 bg-cyan-100/75 text-cyan-700 dark:border-cyan-400/20 dark:bg-cyan-400/10 dark:text-cyan-200",
@@ -225,30 +227,40 @@ function sortEmployeesForSchedule(a, b) {
   return (a.employee_name || "").localeCompare(b.employee_name || "", "ja");
 }
 
-function isActualEmployeeWorking(employee) {
+function getActualAttendanceStatus(employee) {
   const attendanceStatus = String(employee?.attendance_status || "")
     .trim()
     .toLowerCase();
-  if (attendanceStatus === "working") {
-    return true;
+  if (attendanceStatus === "working" || attendanceStatus === "off_work" || attendanceStatus === "not_checked_in") {
+    return attendanceStatus;
   }
-  if (attendanceStatus === "off_work" || attendanceStatus === "not_checked_in") {
-    return false;
-  }
-
   const lastLogType = String(employee?.last_log_type || "")
     .trim()
     .toUpperCase();
-  if (lastLogType) {
-    return lastLogType === "IN";
+  if (lastLogType === "IN") {
+    return "working";
+  }
+  if (lastLogType === "OUT") {
+    return "off_work";
   }
 
   const attendanceStatusLabel = String(employee?.attendance_status_label || "").trim();
   if (attendanceStatusLabel.includes("退勤")) {
-    return false;
+    return "off_work";
+  }
+  if (attendanceStatusLabel.includes("未打刻")) {
+    return "not_checked_in";
   }
 
-  return true;
+  return "working";
+}
+
+function isActualEmployeeWorking(employee) {
+  return getActualAttendanceStatus(employee) === "working";
+}
+
+function isActualEmployeeVisible(employee) {
+  return getActualAttendanceStatus(employee) !== "not_checked_in";
 }
 
 function makeScheduledEmployee(employee) {
@@ -282,9 +294,28 @@ function makeCurrentWorkingEmployee(employee) {
     last_checkin_location: employee.location || employee.last_checkin_location || null,
     displayTime: lastCheckinTime,
     shiftText: "予定外",
-    shiftBadgeClass:
-      "border border-amber-200/80 bg-amber-100/75 text-amber-700 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200",
+    shiftBadgeClass: UNSCHEDULED_SHIFT_BADGE_CLASS,
     statusMeta: getStatusMeta("working"),
+  };
+}
+
+function makeUnscheduledActualEmployee(employee) {
+  const attendanceStatus = getActualAttendanceStatus(employee);
+  const statusMeta = getStatusMeta(attendanceStatus);
+  const lastCheckinTime = formatCheckinTime(employee.last_checkin_time || employee.checkin_time);
+  const shouldShowAttendanceTime = attendanceStatus === "working" || attendanceStatus === "off_work";
+
+  return {
+    ...employee,
+    attendance_status: attendanceStatus,
+    attendance_status_label: employee.attendance_status_label || statusMeta.label,
+    last_log_type: employee.last_log_type || (attendanceStatus === "working" ? "IN" : attendanceStatus === "off_work" ? "OUT" : null),
+    last_checkin_time: lastCheckinTime,
+    last_checkin_location: employee.location || employee.last_checkin_location || null,
+    displayTime: shouldShowAttendanceTime ? lastCheckinTime : null,
+    shiftText: "予定外",
+    shiftBadgeClass: UNSCHEDULED_SHIFT_BADGE_CLASS,
+    statusMeta,
   };
 }
 
@@ -384,22 +415,22 @@ function buildCurrentWorkingFallbackGroup(actualEmployees) {
     : [];
 }
 
-function getUnscheduledWorkingEmployees(todaySnapshot, actualEmployees) {
+function getUnscheduledActualEmployees(todaySnapshot, actualEmployees) {
   const scheduledEmployeeIds = new Set((todaySnapshot?.employees || []).map((employee) => employee.employee));
 
   return (actualEmployees || [])
     .filter(
       (employee) =>
-        employee.employee && !scheduledEmployeeIds.has(employee.employee) && isActualEmployeeWorking(employee),
+        employee.employee && !scheduledEmployeeIds.has(employee.employee) && isActualEmployeeVisible(employee),
     )
     .map((employee) => ({
-      ...makeCurrentWorkingEmployee(employee),
+      ...makeUnscheduledActualEmployee(employee),
       department_category: resolveActualDepartmentCategory(employee),
     }))
     .sort(sortEmployeesForSchedule);
 }
 
-function mergeUnscheduledWorkingEmployees(groups, unscheduledEmployees) {
+function mergeUnscheduledEmployees(groups, unscheduledEmployees) {
   const mergedGroups = groups.map((group) => ({
     ...group,
     employees: [...group.employees],
@@ -424,7 +455,7 @@ function mergeUnscheduledWorkingEmployees(groups, unscheduledEmployees) {
     group.employees.push(employee);
     group.employees.sort(sortEmployeesForSchedule);
     group.totalCount = (group.totalCount ?? group.count ?? 0) + 1;
-    group.workingCount = (group.workingCount ?? 0) + 1;
+    group.workingCount = (group.workingCount ?? 0) + (employee.attendance_status === "working" ? 1 : 0);
     group.count = group.totalCount;
   });
 
@@ -460,8 +491,8 @@ export function buildTodayAttendanceModel({ todaySnapshot, actualEmployees = [] 
     ...todaySnapshot,
     employees: scheduledEmployees,
   });
-  const unscheduledEmployees = getUnscheduledWorkingEmployees(todaySnapshot, actualEmployees);
-  const groups = mergeUnscheduledWorkingEmployees(scheduledGroups, unscheduledEmployees);
+  const unscheduledEmployees = getUnscheduledActualEmployees(todaySnapshot, actualEmployees);
+  const groups = mergeUnscheduledEmployees(scheduledGroups, unscheduledEmployees);
 
   return {
     hasRoster: true,
@@ -471,7 +502,7 @@ export function buildTodayAttendanceModel({ todaySnapshot, actualEmployees = [] 
       workingCount: countEmployeesByStatus(scheduledEmployees, "working"),
       offWorkCount: countEmployeesByStatus(scheduledEmployees, "off_work"),
       notCheckedInCount: countEmployeesByStatus(scheduledEmployees, "not_checked_in"),
-      unscheduledWorkingCount: unscheduledEmployees.length,
+      unscheduledWorkingCount: countEmployeesByStatus(unscheduledEmployees, "working"),
     },
     groups,
   };

@@ -191,7 +191,7 @@ test("buildTodayAttendanceModel groups unrecognized unscheduled employees by the
   assert.equal(model.groups[2].employees[0].shiftText, "予定外");
 });
 
-test("buildTodayAttendanceModel excludes unscheduled employees whose latest log is OUT", () => {
+test("buildTodayAttendanceModel keeps unscheduled off-work employees visible without counting them as working", () => {
   const model = buildTodayAttendanceModel({
     todaySnapshot,
     actualEmployees: [
@@ -211,9 +211,18 @@ test("buildTodayAttendanceModel excludes unscheduled employees whose latest log 
 
   assert.equal(model.summary.unscheduledWorkingCount, 1);
   assert.deepEqual(
-    model.groups.flatMap((group) => group.employees.map((employee) => employee.employee)),
-    ["EMP-001", "EMP-999", "EMP-002", "EMP-003"],
+    model.groups.map((group) => [group.key, group.workingCount, group.totalCount]),
+    [
+      ["Office", 2, 2],
+      ["Production", 0, 3],
+    ],
   );
+  const offWorkEmployee = model.groups[1].employees.find((employee) => employee.employee === "EMP-997");
+  assert.equal(offWorkEmployee.shiftText, "予定外");
+  assert.equal(offWorkEmployee.attendance_status, "off_work");
+  assert.equal(offWorkEmployee.attendance_status_label, "退勤済");
+  assert.equal(offWorkEmployee.statusMeta.label, "退勤済");
+  assert.equal(offWorkEmployee.displayTime, "12:03");
 });
 
 test("buildTodayAttendanceModel falls back to current-at-work rows when today roster is unavailable", () => {
