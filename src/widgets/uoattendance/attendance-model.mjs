@@ -225,6 +225,32 @@ function sortEmployeesForSchedule(a, b) {
   return (a.employee_name || "").localeCompare(b.employee_name || "", "ja");
 }
 
+function isActualEmployeeWorking(employee) {
+  const attendanceStatus = String(employee?.attendance_status || "")
+    .trim()
+    .toLowerCase();
+  if (attendanceStatus === "working") {
+    return true;
+  }
+  if (attendanceStatus === "off_work" || attendanceStatus === "not_checked_in") {
+    return false;
+  }
+
+  const lastLogType = String(employee?.last_log_type || "")
+    .trim()
+    .toUpperCase();
+  if (lastLogType) {
+    return lastLogType === "IN";
+  }
+
+  const attendanceStatusLabel = String(employee?.attendance_status_label || "").trim();
+  if (attendanceStatusLabel.includes("退勤")) {
+    return false;
+  }
+
+  return true;
+}
+
 function makeScheduledEmployee(employee) {
   const attendanceStatus = employee.attendance_status || "not_checked_in";
   const statusMeta = getStatusMeta(attendanceStatus);
@@ -342,6 +368,7 @@ function buildScheduledTodayGroups(todaySnapshot) {
 
 function buildCurrentWorkingFallbackGroup(actualEmployees) {
   const employees = (actualEmployees || [])
+    .filter(isActualEmployeeWorking)
     .map(makeCurrentWorkingEmployee)
     .sort((a, b) => (a.employee_name || "").localeCompare(b.employee_name || "", "ja"));
 
@@ -361,7 +388,10 @@ function getUnscheduledWorkingEmployees(todaySnapshot, actualEmployees) {
   const scheduledEmployeeIds = new Set((todaySnapshot?.employees || []).map((employee) => employee.employee));
 
   return (actualEmployees || [])
-    .filter((employee) => employee.employee && !scheduledEmployeeIds.has(employee.employee))
+    .filter(
+      (employee) =>
+        employee.employee && !scheduledEmployeeIds.has(employee.employee) && isActualEmployeeWorking(employee),
+    )
     .map((employee) => ({
       ...makeCurrentWorkingEmployee(employee),
       department_category: resolveActualDepartmentCategory(employee),
@@ -409,17 +439,19 @@ export function buildTodayAttendanceModel({ todaySnapshot, actualEmployees = [] 
   const hasRoster = Boolean(todaySnapshot?.attendance_status_basis && Array.isArray(todaySnapshot?.employees));
 
   if (!hasRoster) {
+    const workingActualEmployees = actualEmployees.filter(isActualEmployeeWorking);
+
     return {
       hasRoster: false,
       date: todaySnapshot?.date || null,
       summary: {
         scheduledCount: 0,
-        workingCount: actualEmployees.length,
+        workingCount: workingActualEmployees.length,
         offWorkCount: 0,
         notCheckedInCount: 0,
         unscheduledWorkingCount: 0,
       },
-      groups: buildCurrentWorkingFallbackGroup(actualEmployees),
+      groups: buildCurrentWorkingFallbackGroup(workingActualEmployees),
     };
   }
 

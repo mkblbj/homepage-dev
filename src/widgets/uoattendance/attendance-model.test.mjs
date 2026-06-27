@@ -191,6 +191,31 @@ test("buildTodayAttendanceModel groups unrecognized unscheduled employees by the
   assert.equal(model.groups[2].employees[0].shiftText, "予定外");
 });
 
+test("buildTodayAttendanceModel excludes unscheduled employees whose latest log is OUT", () => {
+  const model = buildTodayAttendanceModel({
+    todaySnapshot,
+    actualEmployees: [
+      ...actualEmployees,
+      {
+        employee: "EMP-997",
+        employee_name: "退勤済 予定外",
+        department: "生産 - UO",
+        checkin_time: "12:03:07",
+        attendance_status: "off_work",
+        attendance_status_label: "退勤済",
+        last_log_type: "OUT",
+        last_checkin_time: "12:03",
+      },
+    ],
+  });
+
+  assert.equal(model.summary.unscheduledWorkingCount, 1);
+  assert.deepEqual(
+    model.groups.flatMap((group) => group.employees.map((employee) => employee.employee)),
+    ["EMP-001", "EMP-999", "EMP-002", "EMP-003"],
+  );
+});
+
 test("buildTodayAttendanceModel falls back to current-at-work rows when today roster is unavailable", () => {
   const model = buildTodayAttendanceModel({
     todaySnapshot: null,
@@ -207,6 +232,36 @@ test("buildTodayAttendanceModel falls back to current-at-work rows when today ro
     ],
   );
   assert.equal(model.groups[0].employees[0].statusMeta.label, "出勤中");
+});
+
+test("buildTodayAttendanceModel fallback counts only actual employees still working", () => {
+  const model = buildTodayAttendanceModel({
+    todaySnapshot: null,
+    actualEmployees: [
+      {
+        employee: "EMP-999",
+        employee_name: "予定外 太郎",
+        department: "オフィス - UO",
+        checkin_time: "10:15:00",
+        attendance_status: "working",
+        last_log_type: "IN",
+      },
+      {
+        employee: "EMP-997",
+        employee_name: "退勤済 予定外",
+        department: "生産 - UO",
+        checkin_time: "12:03:07",
+        attendance_status: "off_work",
+        last_log_type: "OUT",
+      },
+    ],
+  });
+
+  assert.equal(model.summary.workingCount, 1);
+  assert.deepEqual(
+    model.groups.map((group) => [group.key, group.count, group.employees.map((employee) => employee.employee)]),
+    [["current-working", 1, ["EMP-999"]]],
+  );
 });
 
 test("buildTomorrowScheduleModel keeps schedule-only grouping", () => {
