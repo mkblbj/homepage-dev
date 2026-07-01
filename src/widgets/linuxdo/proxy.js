@@ -1,4 +1,3 @@
-/* eslint-disable no-underscore-dangle */
 import { xml2js } from "xml-js";
 
 import getServiceWidget from "utils/config/service-helpers";

@@ -1,4 +1,5 @@
 const { loadEnvConfig } = require("@next/env");
+
 const { i18n } = require("./next-i18next.config");
 
 loadEnvConfig(process.cwd());

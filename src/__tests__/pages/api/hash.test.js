@@ -52,6 +52,7 @@ describe("pages/api/hash", () => {
       "services.yaml",
       "bookmarks.yaml",
       "widgets.yaml",
+      "announcements.yaml",
       "custom.css",
       "custom.js",
     ];

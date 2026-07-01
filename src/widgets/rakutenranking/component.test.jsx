@@ -93,7 +93,7 @@ describe("widgets/rakutenranking/component signals", () => {
     expect(container.textContent).toContain("Normal Ranking Item");
   });
 
-  it("does not reserve signal space when there are no signals after warmup", () => {
+  it("shows monitoring status when there are no signals after warmup", () => {
     useSWR.mockImplementation((url) => {
       if (String(url).includes("endpoint=signals")) {
         return {
@@ -121,6 +121,8 @@ describe("widgets/rakutenranking/component signals", () => {
       settings: { hideErrors: false },
     });
 
-    expect(container.textContent).not.toContain("急浮上");
+    expect(container.textContent).toContain("急浮上");
+    expect(container.textContent).toContain("監視中");
+    expect(container.textContent).toContain("实时前50を監視中");
   });
 });

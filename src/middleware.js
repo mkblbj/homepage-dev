@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-export function proxy(req) {
+export function middleware(req) {
   // Check the Host header, if HOMEPAGE_ALLOWED_HOSTS is set
   const host = req.headers.get("host");
   const port = process.env.PORT || 3000;

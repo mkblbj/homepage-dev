@@ -13,6 +13,7 @@ const {
   router,
   i18n,
   getSettings,
+  announcementsResponse,
   servicesResponse,
   bookmarksResponse,
   widgetsResponse,
@@ -43,6 +44,7 @@ const {
     title: "Homepage",
   }));
 
+  const announcementsResponse = vi.fn(async () => ({ enabled: false, items: [] }));
   const servicesResponse = vi.fn(async () => {
     if (state.throwIn === "services") throw new Error("services failed");
     return [{ name: "svc" }];
@@ -75,6 +77,7 @@ const {
     router,
     i18n,
     getSettings,
+    announcementsResponse,
     servicesResponse,
     bookmarksResponse,
     widgetsResponse,
@@ -92,14 +95,14 @@ vi.mock("next/head", () => ({ default: ({ children }) => children }));
 vi.mock("next/script", () => ({ default: () => null }));
 vi.mock("next/router", () => ({ useRouter: () => router }));
 
-vi.mock("next-i18next", () => ({
+vi.mock("next-i18next/pages", () => ({
   useTranslation: () => ({
     i18n,
     t: (k) => k,
   }),
 }));
 
-vi.mock("next-i18next/serverSideTranslations", () => ({
+vi.mock("next-i18next/pages/serverSideTranslations", () => ({
   serverSideTranslations,
 }));
 
@@ -117,6 +120,7 @@ vi.mock("utils/config/config", () => ({
 }));
 
 vi.mock("utils/config/api-response", () => ({
+  announcementsResponse,
   servicesResponse,
   bookmarksResponse,
   widgetsResponse,
@@ -192,6 +196,7 @@ describe("pages/index getStaticProps", () => {
     expect(result.props.fallback["/api/services"]).toEqual([{ name: "svc" }]);
     expect(result.props.fallback["/api/bookmarks"]).toEqual([{ name: "bm" }]);
     expect(result.props.fallback["/api/widgets"]).toEqual([{ type: "search" }]);
+    expect(result.props.fallback["/api/announcements"]).toEqual({ enabled: false, items: [] });
     expect(result.props.fallback["/api/hash"]).toBe(false);
     expect(serverSideTranslations).toHaveBeenCalledWith("en");
   });
@@ -324,13 +329,12 @@ describe("pages/index Index routing + SWR branches", () => {
   });
 
   it("renders config errors when /api/validate returns a list of errors", async () => {
-    state.validateData = [{ config: "services.yaml", reason: "broken", mark: { snippet: "x: y" } }];
+    state.validateData = [{ config: "services.yaml", name: "Service 1", reason: "broken", mark: { line: 4 } }];
 
     await renderIndex({ initialSettings: { title: "Homepage", layout: {} }, settings: { layout: {} } });
 
-    expect(screen.getByText("services.yaml")).toBeInTheDocument();
-    expect(screen.getByText("broken")).toBeInTheDocument();
-    expect(screen.getByText("x: y")).toBeInTheDocument();
+    expect(screen.getByText(/services.yaml/)).toBeInTheDocument();
+    expect(screen.getByText(/line 4/)).toBeInTheDocument();
   });
 
   it("marks the UI stale when the hash changes and triggers a revalidate reload", async () => {
