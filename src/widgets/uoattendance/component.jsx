@@ -5,7 +5,6 @@ import {
   buildTodayAttendanceModel,
   buildTomorrowScheduleModel,
   formatScheduledFte,
-  getShiftBadgeClass,
 } from "./attendance-model.mjs";
 
 import useWidgetAPI from "utils/proxy/use-widget-api";
@@ -33,6 +32,56 @@ function formatCurrentTime(date) {
     minute: "2-digit",
     hour12: false,
   });
+}
+
+const SHIFT_BADGE_BASE =
+  "shrink-0 whitespace-nowrap rounded px-1 py-px text-[9px] font-bold leading-tight tabular-nums";
+
+const TOMORROW_CHIP_CLASS =
+  "border-theme-200/40 bg-theme-100/60 text-theme-700 hover:bg-theme-200/70 dark:border-theme-700/30 dark:bg-theme-800/50 dark:text-theme-200 dark:hover:bg-theme-700/60";
+
+function AttendanceChip({ employee, variant, showShift }) {
+  const isToday = variant === "today";
+  const chipClass = isToday ? employee.statusMeta.chipClass : TOMORROW_CHIP_CLASS;
+  // 出勤中已由色块表达,状态文字仅在例外状态(未打刻/退勤済)才显示。
+  const showStatusLabel = isToday && employee.statusMeta?.tone !== "working";
+  const showTime = isToday && Boolean(employee.displayTime);
+
+  return (
+    <div
+      className={`inline-flex min-h-7 items-center gap-1 rounded border px-1.5 py-0.5 text-xs transition-colors ${chipClass}`}
+      title={
+        isToday
+          ? [
+              employee.employee_name,
+              employee.shiftText,
+              employee.attendance_status_label,
+              employee.displayTime ? `${employee.last_log_type} ${employee.displayTime}` : "",
+            ]
+              .filter(Boolean)
+              .join(" / ")
+          : undefined
+      }
+    >
+      {isToday ? (
+        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${employee.statusMeta.dotClass}`} />
+      ) : null}
+      <span className="leading-tight">{employee.employee_name}</span>
+      {showShift ? (
+        <span className={`${SHIFT_BADGE_BASE} ${employee.shiftBadgeClass}`}>{employee.shiftText}</span>
+      ) : null}
+      {showStatusLabel ? (
+        <span className="shrink-0 whitespace-nowrap text-[10px] font-semibold leading-tight">
+          {employee.attendance_status_label}
+        </span>
+      ) : null}
+      {showTime ? (
+        <span className="shrink-0 whitespace-nowrap text-[10px] leading-tight tabular-nums">
+          {employee.displayTime}
+        </span>
+      ) : null}
+    </div>
+  );
 }
 
 export default function Component({ service }) {
@@ -131,7 +180,7 @@ export default function Component({ service }) {
 
   return (
     <Container service={service}>
-      <div className="flex flex-col w-full gap-2.5">
+      <div className="@container flex flex-col w-full gap-2.5">
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center gap-2.5 flex-wrap">
             <span className="text-[10px] font-semibold tracking-wide text-theme-500 dark:text-theme-400">
@@ -177,7 +226,7 @@ export default function Component({ service }) {
             {todayModel.hasRoster ? "本日の予定はありません" : "現在、出勤者はいません"}
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+          <div className="grid grid-cols-1 @sm:grid-cols-2 gap-x-3 gap-y-2">
             {todayModel.groups.map(({ key, label, count, workingCount, totalCount, scheduledFte, employees }) => {
               const showAttendanceRatio = todayModel.hasRoster && (key === "Office" || key === "Production");
               const scheduledFteText = key === "Production" ? formatScheduledFte(scheduledFte) : null;
@@ -197,38 +246,14 @@ export default function Component({ service }) {
                       </span>
                     ) : null}
                   </div>
-                  <div className="grid grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] gap-1">
+                  <div className="flex flex-wrap gap-1">
                     {employees.map((employee, index) => (
-                      <div
+                      <AttendanceChip
                         key={`${key}-${employee.employee}-${index}`}
-                        className={`flex min-h-7 w-full min-w-0 items-center gap-1 rounded border px-1.5 py-0.5 text-xs transition-colors ${employee.statusMeta.chipClass}`}
-                        title={[
-                          employee.employee_name,
-                          employee.shiftText,
-                          employee.attendance_status_label,
-                          employee.displayTime ? `${employee.last_log_type} ${employee.displayTime}` : "",
-                        ]
-                          .filter(Boolean)
-                          .join(" / ")}
-                      >
-                        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${employee.statusMeta.dotClass}`} />
-                        <span className="min-w-0 truncate leading-tight">{employee.employee_name}</span>
-                        {todayModel.hasRoster ? (
-                          <span
-                            className={`shrink-0 whitespace-nowrap rounded px-1 py-px text-[9px] font-bold leading-tight tabular-nums ${employee.shiftBadgeClass}`}
-                          >
-                            {employee.shiftText}
-                          </span>
-                        ) : null}
-                        <span className="shrink-0 whitespace-nowrap text-[9px] font-semibold leading-tight opacity-80">
-                          {employee.attendance_status_label}
-                        </span>
-                        {employee.displayTime ? (
-                          <span className="shrink-0 whitespace-nowrap text-[9px] leading-tight opacity-70 tabular-nums">
-                            {employee.displayTime}
-                          </span>
-                        ) : null}
-                      </div>
+                        employee={employee}
+                        variant="today"
+                        showShift={todayModel.hasRoster}
+                      />
                     ))}
                   </div>
                 </div>
@@ -266,7 +291,7 @@ export default function Component({ service }) {
                 明日予定を取得できませんでした
               </div>
             ) : !tomorrowScheduleData ? (
-              <div className="mt-1.5 grid grid-cols-2 gap-2">
+              <div className="mt-1.5 grid grid-cols-1 @sm:grid-cols-2 gap-2">
                 <div className="h-9 rounded-md bg-theme-100/60 dark:bg-theme-900/20 animate-pulse" />
                 <div className="h-9 rounded-md bg-theme-100/60 dark:bg-theme-900/20 animate-pulse" />
               </div>
@@ -275,7 +300,7 @@ export default function Component({ service }) {
                 明日の予定はありません
               </div>
             ) : (
-              <div className="mt-1.5 grid grid-cols-2 gap-2">
+              <div className="mt-1.5 grid grid-cols-1 @sm:grid-cols-2 gap-2">
                 {tomorrowModel.groups.map(({ key, label, count, scheduledFte, employees }) => {
                   const scheduledFteText = key === "Production" ? formatScheduledFte(scheduledFte) : null;
 
@@ -301,21 +326,12 @@ export default function Component({ service }) {
                       {employees.length > 0 ? (
                         <div className="mt-1.5 flex flex-wrap gap-1">
                           {employees.map((employee, index) => (
-                            <div
+                            <AttendanceChip
                               key={`${key}-${employee.employee}-${index}`}
-                              className="inline-flex items-center gap-1 bg-theme-100/60 dark:bg-theme-800/50 hover:bg-theme-200/70 dark:hover:bg-theme-700/60 transition-colors rounded px-1.5 py-0.5 text-xs text-theme-700 dark:text-theme-200 border border-theme-200/40 dark:border-theme-700/30"
-                            >
-                              <span className="leading-tight">
-                                {employee.employee_name}
-                              </span>
-                              <span
-                                className={`rounded px-1 py-px text-[9px] font-bold leading-tight tabular-nums ${getShiftBadgeClass(
-                                  employee.shiftText,
-                                )}`}
-                              >
-                                {employee.shiftText}
-                              </span>
-                            </div>
+                              employee={employee}
+                              variant="tomorrow"
+                              showShift
+                            />
                           ))}
                         </div>
                       ) : (
