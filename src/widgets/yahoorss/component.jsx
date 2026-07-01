@@ -1,5 +1,5 @@
 import Container from "components/services/widget/container";
-import { useTranslation } from "next-i18next";
+import { useTranslation } from "next-i18next/pages";
 import { useCallback, useState } from "react";
 
 import useWidgetAPI from "utils/proxy/use-widget-api";
@@ -93,4 +93,3 @@ export default function Component({ service }) {
     </Container>
   );
 }
-

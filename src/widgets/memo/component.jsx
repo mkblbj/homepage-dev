@@ -1,6 +1,6 @@
 import classNames from "classnames";
 import Container from "components/services/widget/container";
-import { useTranslation } from "next-i18next";
+import { useTranslation } from "next-i18next/pages";
 import { useCallback, useEffect, useState } from "react";
 import { FiCheck, FiCircle, FiEdit2, FiPlus, FiTrash2, FiX } from "react-icons/fi";
 import useSWR, { mutate } from "swr";

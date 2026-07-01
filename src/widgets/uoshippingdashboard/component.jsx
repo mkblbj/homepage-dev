@@ -1,5 +1,5 @@
 import Container from "components/services/widget/container";
-import { useTranslation } from "next-i18next";
+import { useTranslation } from "next-i18next/pages";
 import { useCallback, useMemo, useState } from "react";
 
 import { buildDashboardModel, normalizeCategoryName } from "./dashboard-model.mjs";
