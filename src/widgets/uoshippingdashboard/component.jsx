@@ -9,6 +9,10 @@ import useWidgetAPI from "utils/proxy/use-widget-api";
 
 const DEFAULT_REFRESH_INTERVAL = 30000;
 
+// 列表滚动区的共享样式:单列堆叠时可高一些,多列并排时封顶,避免参差。
+const LIST_SCROLL =
+  "space-y-2 overflow-y-auto scrollbar-thin scrollbar-thumb-theme-300/50 scrollbar-track-transparent dark:scrollbar-thumb-theme-600/50 max-h-[60vh] @2xl:max-h-[232px]";
+
 function formatNumber(t, value) {
   return t("common.number", { value: Number(value) || 0 });
 }
@@ -43,8 +47,8 @@ function getCategoryTone(categoryName, active = false) {
   };
 
   return tones[category] ?? (active
-    ? "border-theme-300/70 bg-theme-400/20 text-theme-50"
-    : "border-theme-300/30 bg-theme-300/10 text-theme-200");
+    ? "border-theme-300/70 bg-theme-400/20 text-theme-800 dark:text-theme-50"
+    : "border-theme-300/30 bg-theme-300/10 text-theme-700 dark:text-theme-200");
 }
 
 function getSectionCategories(items) {
@@ -82,19 +86,19 @@ function HeroMetric({ label, primary = false, value }) {
   return (
     <div
       className={primary
-        ? "rounded-2xl border border-theme-200/35 bg-black/20 px-4 py-3 text-left shadow-sm dark:border-theme-700/40 dark:bg-black/20"
-        : "rounded-2xl border border-theme-200/20 bg-white/5 px-3 py-3 text-left dark:border-theme-700/30 dark:bg-white/5"
+        ? "rounded-2xl border border-theme-200/35 bg-theme-200/50 px-4 py-3 text-left shadow-sm dark:border-theme-700/40 dark:bg-black/20"
+        : "rounded-2xl border border-theme-200/20 bg-theme-100/40 px-3 py-3 text-left dark:border-theme-700/30 dark:bg-white/5"
       }
     >
       <div
         className={primary
-          ? "text-[2rem] font-semibold leading-none tabular-nums text-theme-50"
-          : "text-xl font-semibold leading-none tabular-nums text-theme-50"
+          ? "text-[2rem] font-semibold leading-none tabular-nums text-theme-900 dark:text-theme-50"
+          : "text-xl font-semibold leading-none tabular-nums text-theme-900 dark:text-theme-50"
         }
       >
         {value}
       </div>
-      <div className="mt-1 text-[11px] font-medium text-theme-200/90">{label}</div>
+      <div className="mt-1 text-[11px] font-medium text-theme-600 dark:text-theme-200/90">{label}</div>
     </div>
   );
 }
@@ -114,8 +118,9 @@ function HeroHeader({ hero, onRefresh, t, updatedAt }) {
         <button
           type="button"
           onClick={onRefresh}
-          className="rounded-xl border border-theme-200/30 p-2 text-theme-600 transition-colors hover:bg-theme-200/40 hover:text-theme-800 dark:border-theme-700/40 dark:text-theme-300 dark:hover:bg-theme-700/40 dark:hover:text-theme-50"
+          className="rounded-xl border border-theme-200/30 p-2 text-theme-600 transition-colors hover:bg-theme-200/40 hover:text-theme-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-400/60 dark:border-theme-700/40 dark:text-theme-300 dark:hover:bg-theme-700/40 dark:hover:text-theme-50"
           title={t("uoshippingdashboard.refresh")}
+          aria-label={t("uoshippingdashboard.refresh")}
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path
@@ -126,7 +131,7 @@ function HeroHeader({ hero, onRefresh, t, updatedAt }) {
           </svg>
         </button>
       </div>
-      <div className="mt-3 grid grid-cols-1 gap-2 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="mt-3 grid grid-cols-1 gap-2 @2xl:grid-cols-2 @5xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
         <HeroMetric label={hero.primaryMetric.label} value={hero.primaryMetric.value} primary />
         {hero.secondaryMetrics.map((metric) => (
           <HeroMetric key={metric.id} label={metric.label} value={metric.value} />
@@ -138,7 +143,7 @@ function HeroHeader({ hero, onRefresh, t, updatedAt }) {
 
 function Panel({ bodyClassName = "", children, date, statLabel, statValue, title }) {
   return (
-    <section className="min-w-0 self-start overflow-hidden rounded-2xl border border-theme-200/25 bg-theme-100/5 dark:border-theme-700/30 dark:bg-white/5">
+    <section className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-theme-200/25 bg-theme-200/20 dark:border-theme-700/30 dark:bg-white/5">
       <div className="flex flex-wrap items-start justify-between gap-2 border-b border-theme-200/20 px-3 py-2.5 dark:border-theme-700/30">
         <div className="min-w-0">
           <div className="text-base font-semibold text-theme-900 dark:text-theme-50">{title}</div>
@@ -150,28 +155,19 @@ function Panel({ bodyClassName = "", children, date, statLabel, statValue, title
           </div>
         ) : null}
       </div>
-      <div className={bodyClassName}>{children}</div>
+      <div className={`grow ${bodyClassName}`}>{children}</div>
     </section>
   );
 }
 
-function EmptyState({ compact = false, message }) {
+function EmptyState({ hint = null, message, variant = "default" }) {
+  const compact = variant === "compact";
   return (
-    <div className={`${compact ? "px-2 py-2.5" : "px-2.5 py-3"} text-center text-xs text-theme-500 dark:text-theme-400`}>
-      <div className={`rounded-xl border border-dashed border-theme-300/30 dark:border-theme-700/40 ${compact ? "px-3 py-4" : "px-3 py-5"}`}>
+    <div className={`flex h-full flex-col items-center justify-center text-center ${compact ? "px-4 py-6" : "px-3 py-6"}`}>
+      <div className={compact ? "text-xs font-medium text-theme-800 dark:text-theme-100" : "text-xs text-theme-500 dark:text-theme-400"}>
         {message}
       </div>
-    </div>
-  );
-}
-
-function CompactEmptyState({ hint, message }) {
-  return (
-    <div className="px-2.5 py-2.5">
-      <div className="rounded-xl border border-dashed border-theme-300/35 bg-theme-200/10 px-3 py-3 text-left dark:border-theme-700/40 dark:bg-theme-900/10">
-        <div className="text-xs font-medium text-theme-800 dark:text-theme-100">{message}</div>
-        {hint ? <div className="mt-1 text-[10px] text-theme-500 dark:text-theme-400">{hint}</div> : null}
-      </div>
+      {hint ? <div className="mt-1 text-[10px] text-theme-500 dark:text-theme-400">{hint}</div> : null}
     </div>
   );
 }
@@ -186,11 +182,16 @@ function CategoryTabs({ activeCategory, categories, onChange, t }) {
           <button
             key={category.name}
             type="button"
+            aria-pressed={isActive}
             onClick={() => onChange(category.name)}
-            className={`rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors ${getCategoryTone(category.name, isActive)}`}
+            className={`inline-flex cursor-pointer items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors ${
+              isActive
+                ? `${getCategoryTone(category.name, true)} ring-1 ring-inset ring-current`
+                : "border-theme-300/30 bg-theme-200/10 text-theme-600 hover:bg-theme-200/30 dark:border-theme-700/40 dark:bg-theme-800/30 dark:text-theme-300 dark:hover:bg-theme-700/40"
+            }`}
           >
             <span>{category.name}</span>
-            <span className="ml-1 tabular-nums opacity-90">{t("common.number", { value: category.total })}</span>
+            <span className="tabular-nums opacity-80">{t("common.number", { value: category.total })}</span>
           </button>
         );
       })}
@@ -198,9 +199,18 @@ function CategoryTabs({ activeCategory, categories, onChange, t }) {
   );
 }
 
+function ItemRow({ name, value }) {
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-xl border border-theme-200/20 bg-theme-200/15 px-3 py-2 dark:border-theme-700/30 dark:bg-theme-900/10">
+      <div className="min-w-0 truncate text-sm font-medium text-theme-900 dark:text-theme-100">{name}</div>
+      <div className="shrink-0 text-sm font-semibold tabular-nums text-theme-800 dark:text-theme-100">{value}</div>
+    </div>
+  );
+}
+
 function LoadingSkeleton() {
   return (
-    <div className="flex w-full min-w-0 flex-col gap-3 p-1.5">
+    <div className="@container flex w-full min-w-0 flex-col gap-3 p-1.5">
       <div className="overflow-hidden rounded-2xl border border-theme-200/35 bg-theme-200/15 p-3 dark:border-theme-700/40 dark:bg-theme-900/20">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -209,7 +219,7 @@ function LoadingSkeleton() {
           </div>
           <div className="h-9 w-9 animate-pulse rounded-xl bg-theme-300/30 dark:bg-theme-700/30" />
         </div>
-        <div className="mt-3 grid grid-cols-1 gap-2 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="mt-3 grid grid-cols-1 gap-2 @2xl:grid-cols-2 @5xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
           <div className="rounded-2xl border border-theme-200/30 bg-theme-200/20 p-4 dark:border-theme-700/30 dark:bg-theme-900/20">
             <div className="h-8 w-20 animate-pulse rounded bg-theme-300/40 dark:bg-theme-700/40" />
             <div className="mt-2 h-3 w-16 animate-pulse rounded bg-theme-300/30 dark:bg-theme-700/30" />
@@ -223,9 +233,9 @@ function LoadingSkeleton() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 @2xl:grid-cols-2 @5xl:grid-cols-4">
         {[...Array(4)].map((_, panelIndex) => (
-          <div key={panelIndex} className="overflow-hidden rounded-2xl border border-theme-200/25 bg-theme-100/5 dark:border-theme-700/30 dark:bg-white/5">
+          <div key={panelIndex} className="overflow-hidden rounded-2xl border border-theme-200/25 bg-theme-200/20 dark:border-theme-700/30 dark:bg-white/5">
             <div className="flex items-center justify-between border-b border-theme-200/20 px-3 py-2.5 dark:border-theme-700/30">
               <div>
                 <div className="h-4 w-20 animate-pulse rounded bg-theme-300/40 dark:bg-theme-700/40" />
@@ -299,10 +309,10 @@ export default function Component({ service }) {
 
   return (
     <Container service={service}>
-      <div className="flex w-full min-w-0 flex-col gap-3 p-1.5">
+      <div className="@container flex w-full min-w-0 flex-col gap-3 p-1.5">
         <HeroHeader hero={dashboard.hero} onRefresh={handleRefresh} t={t} updatedAt={dashboard.updatedAt} />
 
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 @2xl:grid-cols-2 @5xl:grid-cols-4">
           {dashboard.sections.map((section) => (
             <Panel
               key={section.id}
@@ -317,11 +327,20 @@ export default function Component({ service }) {
                   const rawActiveCategory = section.id === "today-output" ? todayCategory : tomorrowCategory;
                   const activeCategory = resolveActiveCategory(rawActiveCategory, categoryTotals);
                   const visibleItems = filterItemsByCategory(section.items, activeCategory);
-                  const isCompactEmpty = section.emptyVariant === "compact" && visibleItems.length === 0;
+
+                  if (visibleItems.length === 0) {
+                    return (
+                      <EmptyState
+                        variant={section.emptyVariant}
+                        message={t(`uoshippingdashboard.${section.emptyMessageKey}`)}
+                        hint={section.emptyHintKey ? t(`uoshippingdashboard.${section.emptyHintKey}`) : null}
+                      />
+                    );
+                  }
 
                   return (
                     <div className="p-2.5">
-                      {visibleItems.length > 0 && categoryTotals.length > 1 ? (
+                      {categoryTotals.length > 1 ? (
                         <CategoryTabs
                           activeCategory={activeCategory}
                           categories={categoryTotals}
@@ -330,60 +349,32 @@ export default function Component({ service }) {
                         />
                       ) : null}
 
-                      {visibleItems.length === 0 ? (
-                        isCompactEmpty ? (
-                          <CompactEmptyState
-                            message={t(`uoshippingdashboard.${section.emptyMessageKey}`)}
-                            hint={section.emptyHintKey ? t(`uoshippingdashboard.${section.emptyHintKey}`) : null}
+                      <div className={`${LIST_SCROLL} pr-1`}>
+                        {visibleItems.map((item) => (
+                          <ItemRow
+                            key={`${section.id}-${item.shop_id}`}
+                            name={item.shop_name}
+                            value={formatNumber(t, item.total_quantity)}
                           />
-                        ) : (
-                          <EmptyState compact message={t(`uoshippingdashboard.${section.emptyMessageKey}`)} />
-                        )
-                      ) : (
-                        <div className="max-h-[232px] space-y-2 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-theme-300/50 scrollbar-track-transparent dark:scrollbar-thumb-theme-600/50">
-                          {visibleItems.map((item) => (
-                            <div
-                              key={`${section.id}-${item.shop_id}`}
-                              className="flex items-center justify-between gap-2 rounded-xl border border-theme-200/20 bg-theme-200/15 px-3 py-2 dark:border-theme-700/30 dark:bg-theme-900/10"
-                            >
-                              <div className="min-w-0 truncate text-sm font-medium text-theme-900 dark:text-theme-100">
-                                {item.shop_name}
-                              </div>
-                              <div className="shrink-0 text-sm font-semibold tabular-nums text-theme-800 dark:text-theme-100">
-                                {formatNumber(t, item.total_quantity)}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                        ))}
+                      </div>
                     </div>
                   );
                 })()
               ) : section.items.length === 0 ? (
-                section.emptyVariant === "compact" ? (
-                  <CompactEmptyState
-                    message={t(`uoshippingdashboard.${section.emptyMessageKey}`)}
-                    hint={section.emptyHintKey ? t(`uoshippingdashboard.${section.emptyHintKey}`) : null}
-                  />
-                ) : (
-                  <div className="p-2">
-                    <EmptyState compact message={t(`uoshippingdashboard.${section.emptyMessageKey}`)} />
-                  </div>
-                )
+                <EmptyState
+                  variant={section.emptyVariant}
+                  message={t(`uoshippingdashboard.${section.emptyMessageKey}`)}
+                  hint={section.emptyHintKey ? t(`uoshippingdashboard.${section.emptyHintKey}`) : null}
+                />
               ) : (
-                <div className="max-h-[232px] space-y-2 overflow-y-auto p-2.5 pr-3 scrollbar-thin scrollbar-thumb-theme-300/50 scrollbar-track-transparent dark:scrollbar-thumb-theme-600/50">
+                <div className={`${LIST_SCROLL} p-2.5 pr-3`}>
                   {section.items.map((item) => (
-                    <div
+                    <ItemRow
                       key={`${section.id}-${item.courier_id}`}
-                      className="flex items-center justify-between gap-2 rounded-xl border border-theme-200/20 bg-theme-200/15 px-3 py-2 dark:border-theme-700/30 dark:bg-theme-900/10"
-                    >
-                      <div className="min-w-0 truncate text-sm font-medium text-theme-900 dark:text-theme-100">
-                        {item.courier_name}
-                      </div>
-                      <div className="shrink-0 text-sm font-semibold tabular-nums text-theme-800 dark:text-theme-100">
-                        {formatNumber(t, item.total_quantity)}
-                      </div>
-                    </div>
+                      name={item.courier_name}
+                      value={formatNumber(t, item.total_quantity)}
+                    />
                   ))}
                 </div>
               )}
