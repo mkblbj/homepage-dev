@@ -1,256 +1,501 @@
 import Container from "components/services/widget/container";
 import { useTranslation } from "next-i18next/pages";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { buildDashboardModel, normalizeCategoryName } from "./dashboard-model.mjs";
+import { normalizeCategoryName, normalizeCouriers, normalizeShops } from "./dashboard-model.mjs";
 
 import useWidgetAPI from "utils/proxy/use-widget-api";
 
-
 const DEFAULT_REFRESH_INTERVAL = 30000;
+// 狭い幅では店舗リストを6行に畳み、残りはフッターへ(広い幅は全件2列表示)。
+const NARROW_SHOP_LIMIT = 6;
 
-// 列表滚动区的共享样式:单列堆叠时可高一些,多列并排时封顶,避免参差。
-const LIST_SCROLL =
-  "space-y-2 overflow-y-auto scrollbar-thin scrollbar-thumb-theme-300/50 scrollbar-track-transparent dark:scrollbar-thumb-theme-600/50 max-h-[60vh] @2xl:max-h-[232px]";
+// チャンネルはブランド連想色(固定)。
+const CHANNEL_COLOR = {
+  楽天: "#D4537E",
+  Amazon: "#EF9F27",
+  メルカリ: "#ED93B1",
+  auShop: "#D85A30",
+  Q10: "#7F77DD",
+  TikTok: "#C7518F",
+  TEMU: "#378ADD",
+  その他: "#888780",
+};
+const FALLBACK_CHANNEL_COLOR = "#888780";
+
+// 配送方法は固定マップ(表示順やデータ有無で色が漂流しないように)。
+const COURIER_COLOR = {
+  "ゆうパケット (2CM)": "#4C93E0",
+  "ゆうパケット (1CM)": "#5DCAA5",
+  "クリップポスト (3CM)": "#EFA23B",
+  ゆうパケットパフ: "#E0688C",
+  佐川急便: "#8B7FE8",
+  "ゆうパケット-未指定": "#8A94A0",
+};
+const COURIER_FALLBACK_PALETTE = ["#378ADD", "#5DCAA5", "#EF9F27", "#D4537E", "#7F77DD", "#888780"];
+
+const STATUS_TONE = {
+  live: "border-emerald-400/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300",
+  delayed: "border-amber-400/40 bg-amber-500/10 text-amber-600 dark:text-amber-300",
+  stale: "border-rose-400/40 bg-rose-500/10 text-rose-600 dark:text-rose-300",
+};
+const STATUS_DOT = {
+  live: "bg-emerald-500",
+  delayed: "bg-amber-500",
+  stale: "bg-rose-500",
+};
 
 function formatNumber(t, value) {
   return t("common.number", { value: Number(value) || 0 });
 }
 
-function getCategoryTone(categoryName, active = false) {
-  const category = normalizeCategoryName(categoryName);
-  const tones = {
-    楽天: active
-      ? "border-rose-400/70 bg-rose-500/20 text-rose-100"
-      : "border-rose-400/30 bg-rose-500/10 text-rose-200",
-    Amazon: active
-      ? "border-amber-400/70 bg-amber-500/20 text-amber-100"
-      : "border-amber-400/30 bg-amber-500/10 text-amber-200",
-    メルカリ: active
-      ? "border-pink-400/70 bg-pink-500/20 text-pink-100"
-      : "border-pink-400/30 bg-pink-500/10 text-pink-200",
-    auShop: active
-      ? "border-orange-400/70 bg-orange-500/20 text-orange-100"
-      : "border-orange-400/30 bg-orange-500/10 text-orange-200",
-    Q10: active
-      ? "border-violet-400/70 bg-violet-500/20 text-violet-100"
-      : "border-violet-400/30 bg-violet-500/10 text-violet-200",
-    TikTok: active
-      ? "border-fuchsia-400/70 bg-fuchsia-500/20 text-fuchsia-100"
-      : "border-fuchsia-400/30 bg-fuchsia-500/10 text-fuchsia-200",
-    TEMU: active
-      ? "border-sky-400/70 bg-sky-500/20 text-sky-100"
-      : "border-sky-400/30 bg-sky-500/10 text-sky-200",
-    その他: active
-      ? "border-slate-300/70 bg-slate-500/20 text-slate-100"
-      : "border-slate-300/30 bg-slate-500/10 text-slate-200",
-  };
-
-  return tones[category] ?? (active
-    ? "border-theme-300/70 bg-theme-400/20 text-theme-800 dark:text-theme-50"
-    : "border-theme-300/30 bg-theme-300/10 text-theme-700 dark:text-theme-200");
+function channelColor(name) {
+  return CHANNEL_COLOR[name] ?? FALLBACK_CHANNEL_COLOR;
 }
 
-function getSectionCategories(items) {
-  return [...new Set(items.map((item) => normalizeCategoryName(item.category_name)).filter(Boolean))];
-}
-
-function filterItemsByCategory(items, category) {
-  return items.filter((item) => normalizeCategoryName(item.category_name) === category);
-}
-
-function getCategoryTotals(items, categories) {
-  return categories.map((category) => ({
-    name: category,
-    total: items
-      .filter((item) => normalizeCategoryName(item.category_name) === category)
-      .reduce((sum, item) => sum + Number(item?.total_quantity || 0), 0),
-  }));
-}
-
-function resolveActiveCategory(selectedCategory, categoryTotals) {
-  const categories = categoryTotals.map((category) => category.name);
-
-  if (selectedCategory && categories.includes(selectedCategory)) {
-    return selectedCategory;
+function courierColor(name) {
+  if (COURIER_COLOR[name]) {
+    return COURIER_COLOR[name];
   }
-
-  if (categories.includes("楽天")) {
-    return "楽天";
+  // 未知の配送方法にも安定した色を割り当てる(名前ハッシュ)。
+  let hash = 0;
+  for (let i = 0; i < String(name).length; i += 1) {
+    hash = (hash * 31 + String(name).charCodeAt(i)) % 997;
   }
-
-  return categories[0] ?? null;
+  return COURIER_FALLBACK_PALETTE[hash % COURIER_FALLBACK_PALETTE.length];
 }
 
-function HeroMetric({ label, primary = false, value }) {
+function shopChannel(shop) {
+  return normalizeCategoryName(shop.category_name) || "その他";
+}
+
+// 全体比のラベル(1%未満は "<1%")。
+function shareLabel(value, total) {
+  if (!total || total <= 0) {
+    return "";
+  }
+  const pct = (Number(value) / total) * 100;
+  return pct >= 1 ? `${Math.round(pct)}%` : "<1%";
+}
+
+function buildChannelSegments(shops) {
+  const totals = new Map();
+  shops.forEach((shop) => {
+    const name = shopChannel(shop);
+    totals.set(name, (totals.get(name) || 0) + Number(shop.total_quantity || 0));
+  });
+
+  return [...totals.entries()]
+    .map(([name, total]) => ({ name, total, color: channelColor(name) }))
+    .filter((segment) => segment.total > 0)
+    .sort((a, b) => b.total - a.total);
+}
+
+function relativeLabel(t, ageSec) {
+  if (ageSec < 5) {
+    return t("uoshippingdashboard.justNow");
+  }
+  if (ageSec < 60) {
+    return t("uoshippingdashboard.secondsAgo", { count: ageSec });
+  }
+  if (ageSec < 3600) {
+    return t("uoshippingdashboard.minutesAgo", { count: Math.floor(ageSec / 60) });
+  }
+  return t("uoshippingdashboard.hoursAgo", { count: Math.floor(ageSec / 3600) });
+}
+
+// updated_at と現在時刻の差から、データが生きているか(LIVE / 遅延 / 停止)を判定する。
+function useFreshness(updatedAt, refreshInterval) {
+  const [nowTs, setNowTs] = useState(null);
+
+  useEffect(() => {
+    setNowTs(Date.now());
+    const id = setInterval(() => setNowTs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  return useMemo(() => {
+    if (!updatedAt || nowTs == null) {
+      return null;
+    }
+    const parsed = Date.parse(String(updatedAt).replace(" ", "T"));
+    if (Number.isNaN(parsed)) {
+      return null;
+    }
+    const ageSec = Math.max(0, Math.round((nowTs - parsed) / 1000));
+    const liveMax = Math.max(60, (refreshInterval / 1000) * 2);
+    const staleMax = Math.max(300, (refreshInterval / 1000) * 6);
+    const state = ageSec <= liveMax ? "live" : ageSec <= staleMax ? "delayed" : "stale";
+    return { ageSec, state };
+  }, [updatedAt, nowTs, refreshInterval]);
+}
+
+function FreshnessPill({ freshness, t }) {
+  if (!freshness) {
+    return null;
+  }
+  const stateLabel =
+    freshness.state === "live"
+      ? t("uoshippingdashboard.statusLive")
+      : freshness.state === "delayed"
+        ? t("uoshippingdashboard.statusDelayed")
+        : t("uoshippingdashboard.statusStale");
+
   return (
-    <div
-      className={primary
-        ? "rounded-2xl border border-theme-200/35 bg-theme-200/50 px-4 py-3 text-left shadow-sm dark:border-theme-700/40 dark:bg-black/20"
-        : "rounded-2xl border border-theme-200/20 bg-theme-100/40 px-3 py-3 text-left dark:border-theme-700/30 dark:bg-white/5"
-      }
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${STATUS_TONE[freshness.state]}`}
     >
-      <div
-        className={primary
-          ? "text-[2rem] font-semibold leading-none tabular-nums text-theme-900 dark:text-theme-50"
-          : "text-xl font-semibold leading-none tabular-nums text-theme-900 dark:text-theme-50"
-        }
-      >
-        {value}
-      </div>
-      <div className="mt-1 text-[11px] font-medium text-theme-600 dark:text-theme-200/90">{label}</div>
-    </div>
+      <span className="relative flex h-1.5 w-1.5">
+        {freshness.state === "live" ? (
+          <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${STATUS_DOT.live}`} />
+        ) : null}
+        <span className={`relative inline-flex h-1.5 w-1.5 rounded-full ${STATUS_DOT[freshness.state]}`} />
+      </span>
+      <span>{stateLabel}</span>
+      <span className="font-medium tabular-nums opacity-90">· {relativeLabel(t, freshness.ageSec)}</span>
+    </span>
   );
 }
 
-function HeroHeader({ hero, onRefresh, t, updatedAt }) {
+function Header({ detailUrl, freshness, onRefresh, t, updatedAt }) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-theme-200/35 bg-gradient-to-br from-theme-200/20 via-theme-100/10 to-theme-300/10 p-3 shadow-sm dark:border-theme-700/40 dark:from-theme-900/35 dark:via-theme-900/10 dark:to-black/10">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-theme-600 dark:text-theme-300">
-            {t("uoshippingdashboard.updatedAt")}
-          </div>
-          <div className="mt-1 truncate text-sm font-medium tabular-nums text-theme-900 dark:text-theme-50">
-            {updatedAt || "-"}
-          </div>
-        </div>
+    <div className="flex items-center justify-between gap-2 px-0.5">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-theme-600 dark:text-theme-300">
+          {t("uoshippingdashboard.updatedAt")}
+        </span>
+        <span className="truncate text-sm font-medium tabular-nums text-theme-900 dark:text-theme-50">
+          {updatedAt || "-"}
+        </span>
+        <FreshnessPill freshness={freshness} t={t} />
+      </div>
+      <div className="flex shrink-0 items-center gap-1.5">
+        {detailUrl ? (
+          <a
+            href={detailUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 rounded-lg border border-theme-300/50 px-2 py-1 text-[11px] font-medium text-theme-700 transition-colors hover:bg-theme-200/40 hover:text-theme-900 dark:border-theme-600/50 dark:text-theme-200 dark:hover:bg-theme-700/40 dark:hover:text-theme-50"
+          >
+            {t("uoshippingdashboard.detail")}
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M14 5h5v5m0-5L10 14M9 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-3" />
+            </svg>
+          </a>
+        ) : null}
         <button
           type="button"
           onClick={onRefresh}
-          className="rounded-xl border border-theme-200/30 p-2 text-theme-600 transition-colors hover:bg-theme-200/40 hover:text-theme-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-400/60 dark:border-theme-700/40 dark:text-theme-300 dark:hover:bg-theme-700/40 dark:hover:text-theme-50"
+          className="rounded-lg border border-theme-300/50 p-1.5 text-theme-700 transition-colors hover:bg-theme-200/40 hover:text-theme-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-400/60 dark:border-theme-600/50 dark:text-theme-200 dark:hover:bg-theme-700/40 dark:hover:text-theme-50"
           title={t("uoshippingdashboard.refresh")}
           aria-label={t("uoshippingdashboard.refresh")}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-            />
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
         </button>
       </div>
-      <div className="mt-3 grid grid-cols-1 gap-2 @2xl:grid-cols-2 @5xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
-        <HeroMetric label={hero.primaryMetric.label} value={hero.primaryMetric.value} primary />
-        {hero.secondaryMetrics.map((metric) => (
-          <HeroMetric key={metric.id} label={metric.label} value={metric.value} />
-        ))}
-      </div>
-    </section>
+    </div>
   );
 }
 
-function Panel({ bodyClassName = "", children, date, statLabel, statValue, title }) {
+// KPI セルの小さな見出し(「今日出力 · 07-02」など)。
+function CellKicker({ label, scope }) {
   return (
-    <section className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-theme-200/25 bg-theme-200/20 dark:border-theme-700/30 dark:bg-white/5">
-      <div className="flex flex-wrap items-start justify-between gap-2 border-b border-theme-200/20 px-3 py-2.5 dark:border-theme-700/30">
-        <div className="min-w-0">
-          <div className="text-base font-semibold text-theme-900 dark:text-theme-50">{title}</div>
-          {date ? <div className="mt-1 text-[11px] tabular-nums text-theme-500 dark:text-theme-400">{date}</div> : null}
-        </div>
-        {statLabel && statValue ? (
-          <div className="rounded-full bg-theme-200/40 px-2.5 py-1 text-[10px] font-medium text-theme-700 dark:bg-theme-800/50 dark:text-theme-200">
-            {statLabel}: {statValue}
-          </div>
+    <span className="text-[11px] font-bold tracking-wide text-theme-700 dark:text-theme-100">
+      {label}
+      {scope ? <span className="ml-1 font-semibold text-theme-600 dark:text-theme-300"> · {scope}</span> : null}
+    </span>
+  );
+}
+
+// 100%積み上げの構成バー(細い・非対話・title でツールチップ)。
+function SegmentBar({ segments, t, total }) {
+  if (!total || total <= 0 || segments.length === 0) {
+    return null;
+  }
+  return (
+    <div className="flex h-1.5 w-full items-stretch gap-0.5 overflow-hidden rounded-full">
+      {segments.map((segment) => (
+        <span
+          key={segment.name}
+          title={`${segment.name} ${formatNumber(t, segment.total)} (${shareLabel(segment.total, total)})`}
+          className="block h-full min-w-[6px] first:rounded-l-full last:rounded-r-full"
+          style={{ width: `${(segment.total / total) * 100}%`, backgroundColor: segment.color }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function LegendRow({ segments, t }) {
+  if (segments.length === 0) {
+    return null;
+  }
+  return (
+    <div className="flex flex-wrap gap-x-3.5 gap-y-1">
+      {segments.map((segment) => (
+        <span key={segment.name} className="inline-flex items-center gap-1.5 text-[11px] font-medium text-theme-800 dark:text-theme-100">
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: segment.color }} />
+          {segment.name}
+          <span className="font-semibold tabular-nums text-theme-700 dark:text-theme-200">{formatNumber(t, segment.total)}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function AmberBadge({ children }) {
+  return (
+    <span className="inline-flex rounded-full border border-amber-400/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-300">
+      {children}
+    </span>
+  );
+}
+
+function GreenBadge({ children }) {
+  return (
+    <span className="inline-flex rounded-full border border-emerald-400/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-300">
+      {children}
+    </span>
+  );
+}
+
+// ===== KPI ストリップ(3セル) =====
+function KpiStrip({ shipping, t, todayOutput, tomorrowOutput }) {
+  const shops = useMemo(() => normalizeShops(todayOutput), [todayOutput]);
+  const channelSegments = useMemo(() => buildChannelSegments(shops), [shops]);
+  const outputTotal = Number(todayOutput?.total_quantity || 0);
+  const tomorrowTotal = Number(tomorrowOutput?.total_quantity || 0);
+
+  const tomorrowTop = useMemo(
+    () =>
+      normalizeShops(tomorrowOutput)
+        .filter((shop) => Number(shop.total_quantity || 0) > 0)
+        .slice(0, 3),
+    [tomorrowOutput],
+  );
+
+  const cellBorder = "border-theme-300/30 dark:border-white/10";
+
+  return (
+    <section className="grid grid-cols-2 rounded-2xl border border-theme-300/40 bg-theme-200/30 @xl:grid-cols-[1.55fr_1fr_1.25fr] dark:border-theme-600/40 dark:bg-white/10">
+      {/* 今日出力 — 主役 */}
+      <div className="col-span-2 flex min-w-0 flex-col gap-2.5 p-4 @xl:col-span-1 @xl:p-5">
+        <CellKicker label={t("uoshippingdashboard.todayOutput")} scope={todayOutput?.date} />
+        <span className="text-[40px] font-extrabold leading-none tracking-tight tabular-nums text-theme-900 @xl:text-[48px] dark:text-theme-50">
+          {formatNumber(t, outputTotal)}
+        </span>
+        <SegmentBar segments={channelSegments} t={t} total={outputTotal} />
+        <LegendRow segments={channelSegments} t={t} />
+      </div>
+
+      {/* 明日予定 */}
+      <div className={`flex min-w-0 flex-col gap-2.5 border-t p-4 @xl:border-l @xl:border-t-0 @xl:p-5 ${cellBorder}`}>
+        <CellKicker label={t("uoshippingdashboard.tomorrowOutput")} scope={tomorrowOutput?.date} />
+        <span className="text-[26px] font-bold leading-none tracking-tight tabular-nums text-amber-600 @xl:text-[30px] dark:text-amber-400">
+          {formatNumber(t, tomorrowTotal)}
+        </span>
+        {tomorrowTop.length > 0 ? (
+          <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px] leading-relaxed">
+            {tomorrowTop.map((shop, index) => (
+              <span key={shop.shop_id} className="inline-flex items-baseline gap-1">
+                {index > 0 ? <span className="mr-1 text-theme-400 dark:text-theme-500">·</span> : null}
+                <span className="text-theme-600 dark:text-theme-300">{shop.shop_name}</span>
+                <span className="font-semibold tabular-nums text-theme-900 dark:text-theme-50">
+                  {formatNumber(t, shop.total_quantity)}
+                </span>
+              </span>
+            ))}
+          </span>
         ) : null}
       </div>
-      <div className={`grow ${bodyClassName}`}>{children}</div>
+
+      {/* 出荷 — データ駆動で 今日/昨日 を切替 */}
+      <div className={`flex min-w-0 flex-col gap-2.5 border-l border-t p-4 @xl:border-t-0 @xl:p-5 ${cellBorder}`}>
+        {shipping.showingYesterday ? (
+          <>
+            <CellKicker
+              label={t("uoshippingdashboard.shipping")}
+              scope={`${t("uoshippingdashboard.yesterdayActual")} ${shipping.yesterdayDate || ""}`}
+            />
+            <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+              <span className="text-[26px] font-bold leading-none tracking-tight tabular-nums text-theme-900 @xl:text-[30px] dark:text-theme-50">
+                {formatNumber(t, shipping.yesterdayTotal)}
+              </span>
+              <span className="text-[11px] font-medium text-theme-600 dark:text-theme-300">
+                {t("uoshippingdashboard.yesterdayShipping")}
+              </span>
+            </span>
+            <span className="flex flex-wrap items-center gap-1.5">
+              <AmberBadge>{t("uoshippingdashboard.todayNotTallied")}</AmberBadge>
+            </span>
+          </>
+        ) : (
+          <>
+            <CellKicker label={t("uoshippingdashboard.shipping")} scope={shipping.todayDate} />
+            <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+              <span className="text-[26px] font-bold leading-none tracking-tight tabular-nums text-theme-900 @xl:text-[30px] dark:text-theme-50">
+                {formatNumber(t, shipping.todayTotal)}
+              </span>
+              <span className="text-[11px] font-medium text-theme-600 dark:text-theme-300">
+                {t("uoshippingdashboard.todayShipping")}
+              </span>
+            </span>
+            <span className="flex flex-wrap items-center gap-1.5">
+              <GreenBadge>{t("uoshippingdashboard.accruing")}</GreenBadge>
+              <span className="text-[11px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
+                {t("uoshippingdashboard.yesterdayShipping")} {formatNumber(t, shipping.yesterdayTotal)}
+              </span>
+            </span>
+          </>
+        )}
+      </div>
     </section>
   );
 }
 
-function EmptyState({ hint = null, message, variant = "default" }) {
-  const compact = variant === "compact";
+// ===== 店舗別出力パネル =====
+function ShopPanel({ t, todayOutput }) {
+  const shops = useMemo(() => normalizeShops(todayOutput), [todayOutput]);
+  const outputTotal = Number(todayOutput?.total_quantity || 0);
+  const shopsCount = Number(todayOutput?.shops_count || 0);
+  const activeCount = Number(todayOutput?.active_shops_count || 0);
+
+  const rest = shops.slice(NARROW_SHOP_LIMIT);
+  const restTotal = rest.reduce((total, shop) => total + Number(shop.total_quantity || 0), 0);
+
   return (
-    <div className={`flex h-full flex-col items-center justify-center text-center ${compact ? "px-4 py-6" : "px-3 py-6"}`}>
-      <div className={compact ? "text-xs font-medium text-theme-800 dark:text-theme-100" : "text-xs text-theme-500 dark:text-theme-400"}>
-        {message}
+    <section className="flex min-w-0 flex-col gap-3 rounded-2xl border border-theme-300/40 bg-theme-200/30 p-4 dark:border-theme-600/40 dark:bg-white/10">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[13px] font-bold text-theme-800 dark:text-theme-100">
+          {t("uoshippingdashboard.shopBreakdown")}
+        </span>
+        {shopsCount > 0 ? (
+          <span className="text-[10.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
+            {t("uoshippingdashboard.activeShops")} {formatNumber(t, activeCount)}/{formatNumber(t, shopsCount)}
+            {t("uoshippingdashboard.shopsUnit")}
+          </span>
+        ) : null}
       </div>
-      {hint ? <div className="mt-1 text-[10px] text-theme-500 dark:text-theme-400">{hint}</div> : null}
-    </div>
+
+      {shops.length > 0 ? (
+        <>
+          <div className="grid grid-cols-1 gap-x-8 gap-y-2.5 @xl:grid-cols-2">
+            {shops.map((shop, index) => (
+              <div
+                key={shop.shop_id}
+                className={`min-w-0 items-center gap-2 ${index >= NARROW_SHOP_LIMIT ? "hidden @xl:flex" : "flex"}`}
+              >
+                <span
+                  className="h-3.5 w-[3px] shrink-0 rounded-full"
+                  style={{ backgroundColor: channelColor(shopChannel(shop)) }}
+                />
+                <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-theme-900 dark:text-theme-50">
+                  {shop.shop_name}
+                </span>
+                <span className="text-[13px] font-bold tabular-nums text-theme-900 dark:text-theme-50">
+                  {formatNumber(t, shop.total_quantity)}
+                </span>
+                <span className="min-w-[2.1rem] text-right text-[10.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
+                  {shareLabel(shop.total_quantity, outputTotal)}
+                </span>
+              </div>
+            ))}
+          </div>
+          {rest.length > 0 ? (
+            <div className="flex items-center justify-between border-t border-theme-300/30 pt-2 text-[11px] font-medium text-theme-600 @xl:hidden dark:border-theme-600/30 dark:text-theme-300">
+              <span>{t("uoshippingdashboard.moreShops", { count: rest.length })}</span>
+              <span className="tabular-nums">
+                {t("uoshippingdashboard.totalShort")} {formatNumber(t, restTotal)}
+              </span>
+            </div>
+          ) : null}
+        </>
+      ) : (
+        <div className="py-3 text-center text-xs text-theme-600 dark:text-theme-300">
+          {t("uoshippingdashboard.noOutputData")}
+        </div>
+      )}
+    </section>
   );
 }
 
-function CategoryTabs({ activeCategory, categories, onChange, t }) {
-  return (
-    <div className="mb-2 flex flex-wrap gap-1">
-      {categories.map((category) => {
-        const isActive = activeCategory === category.name;
+// ===== 配送方法別パネル =====
+function CourierPanel({ shipping, t }) {
+  const { couriers, scopeLabel, showingYesterday } = shipping;
+  const total = couriers.reduce((sum, courier) => sum + Number(courier.total_quantity || 0), 0);
+  const max = couriers.length > 0 ? Number(couriers[0].total_quantity || 0) : 0;
 
-        return (
-          <button
-            key={category.name}
-            type="button"
-            aria-pressed={isActive}
-            onClick={() => onChange(category.name)}
-            className={`inline-flex cursor-pointer items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors ${
-              isActive
-                ? `${getCategoryTone(category.name, true)} ring-1 ring-inset ring-current`
-                : "border-theme-300/30 bg-theme-200/10 text-theme-600 hover:bg-theme-200/30 dark:border-theme-700/40 dark:bg-theme-800/30 dark:text-theme-300 dark:hover:bg-theme-700/40"
-            }`}
-          >
-            <span>{category.name}</span>
-            <span className="tabular-nums opacity-80">{t("common.number", { value: category.total })}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function ItemRow({ name, value }) {
   return (
-    <div className="flex items-center justify-between gap-2 rounded-xl border border-theme-200/20 bg-theme-200/15 px-3 py-2 dark:border-theme-700/30 dark:bg-theme-900/10">
-      <div className="min-w-0 truncate text-sm font-medium text-theme-900 dark:text-theme-100">{name}</div>
-      <div className="shrink-0 text-sm font-semibold tabular-nums text-theme-800 dark:text-theme-100">{value}</div>
-    </div>
+    <section className="flex min-w-0 flex-col gap-3 rounded-2xl border border-theme-300/40 bg-theme-200/30 p-4 dark:border-theme-600/40 dark:bg-white/10">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[13px] font-bold text-theme-800 dark:text-theme-100">
+          {t("uoshippingdashboard.courierBreakdown")}
+        </span>
+        <span className="shrink-0 rounded-full border border-theme-300/50 bg-theme-200/50 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-theme-600 dark:border-theme-600/50 dark:bg-theme-800/50 dark:text-theme-300">
+          {scopeLabel}
+        </span>
+      </div>
+
+      {couriers.length > 0 ? (
+        <div className="grid grid-cols-[minmax(0,max-content)_minmax(2.5rem,1fr)_max-content_max-content] items-center gap-x-2.5 gap-y-2.5">
+          {couriers.map((courier) => (
+            <div key={courier.courier_id} className="contents">
+              <span className="inline-flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[12.5px] font-medium text-theme-900 dark:text-theme-50">
+                <span className="h-1.5 w-1.5 shrink-0 rounded-sm" style={{ backgroundColor: courierColor(courier.courier_name) }} />
+                {courier.courier_name}
+              </span>
+              <div className="h-1.5 overflow-hidden rounded-full bg-theme-300/40 dark:bg-white/10">
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${max > 0 ? Math.max(2, (Number(courier.total_quantity || 0) / max) * 100) : 0}%`,
+                    backgroundColor: courierColor(courier.courier_name),
+                  }}
+                />
+              </div>
+              <span className="text-right text-[13px] font-bold tabular-nums text-theme-900 dark:text-theme-50">
+                {formatNumber(t, courier.total_quantity)}
+              </span>
+              <span className="min-w-[2.1rem] text-right text-[10.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
+                {shareLabel(courier.total_quantity, total)}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="py-3 text-center text-xs text-theme-600 dark:text-theme-300">
+          {t("uoshippingdashboard.noShippingData")}
+        </div>
+      )}
+
+      <div className="mt-auto border-t border-theme-300/30 pt-2 text-[10.5px] font-medium text-theme-700 dark:border-theme-600/30 dark:text-theme-200">
+        {showingYesterday ? t("uoshippingdashboard.shippingIdleNote") : t("uoshippingdashboard.shippingLiveNote")}
+      </div>
+    </section>
   );
 }
 
 function LoadingSkeleton() {
   return (
     <div className="@container flex w-full min-w-0 flex-col gap-3 p-1.5">
-      <div className="overflow-hidden rounded-2xl border border-theme-200/35 bg-theme-200/15 p-3 dark:border-theme-700/40 dark:bg-theme-900/20">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="h-3 w-20 animate-pulse rounded bg-theme-300/40 dark:bg-theme-700/40" />
-            <div className="mt-2 h-4 w-32 animate-pulse rounded bg-theme-300/30 dark:bg-theme-700/30" />
-          </div>
-          <div className="h-9 w-9 animate-pulse rounded-xl bg-theme-300/30 dark:bg-theme-700/30" />
-        </div>
-        <div className="mt-3 grid grid-cols-1 gap-2 @2xl:grid-cols-2 @5xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
-          <div className="rounded-2xl border border-theme-200/30 bg-theme-200/20 p-4 dark:border-theme-700/30 dark:bg-theme-900/20">
-            <div className="h-8 w-20 animate-pulse rounded bg-theme-300/40 dark:bg-theme-700/40" />
-            <div className="mt-2 h-3 w-16 animate-pulse rounded bg-theme-300/30 dark:bg-theme-700/30" />
-          </div>
-          {[...Array(3)].map((_, index) => (
-            <div key={index} className="rounded-2xl border border-theme-200/20 bg-theme-200/15 p-4 dark:border-theme-700/30 dark:bg-theme-900/15">
-              <div className="h-6 w-12 animate-pulse rounded bg-theme-300/40 dark:bg-theme-700/40" />
-              <div className="mt-2 h-3 w-14 animate-pulse rounded bg-theme-300/30 dark:bg-theme-700/30" />
-            </div>
-          ))}
-        </div>
+      <div className="flex items-center justify-between px-0.5">
+        <div className="h-4 w-40 animate-pulse rounded bg-theme-300/30 dark:bg-theme-700/30" />
+        <div className="h-7 w-7 animate-pulse rounded-lg bg-theme-300/30 dark:bg-theme-700/30" />
       </div>
-
-      <div className="grid grid-cols-1 gap-3 @2xl:grid-cols-2 @5xl:grid-cols-4">
-        {[...Array(4)].map((_, panelIndex) => (
-          <div key={panelIndex} className="overflow-hidden rounded-2xl border border-theme-200/25 bg-theme-200/20 dark:border-theme-700/30 dark:bg-white/5">
-            <div className="flex items-center justify-between border-b border-theme-200/20 px-3 py-2.5 dark:border-theme-700/30">
-              <div>
-                <div className="h-4 w-20 animate-pulse rounded bg-theme-300/40 dark:bg-theme-700/40" />
-                <div className="mt-2 h-3 w-16 animate-pulse rounded bg-theme-300/30 dark:bg-theme-700/30" />
-              </div>
-              <div className="h-5 w-16 animate-pulse rounded-full bg-theme-300/30 dark:bg-theme-700/30" />
-            </div>
-            <div className="space-y-2 p-3">
-              {[...Array(3)].map((__, itemIndex) => (
-                <div key={itemIndex} className="rounded-xl border border-theme-200/20 bg-theme-200/15 px-3 py-2 dark:border-theme-700/30 dark:bg-theme-900/10">
-                  <div className="h-3.5 w-2/3 animate-pulse rounded bg-theme-300/40 dark:bg-theme-700/40" />
-                  <div className="mt-2 h-3 w-1/3 animate-pulse rounded bg-theme-300/30 dark:bg-theme-700/30" />
-                </div>
-              ))}
-            </div>
+      <div className="flex flex-col gap-3 rounded-2xl border border-theme-300/40 bg-theme-200/30 p-4 dark:border-theme-600/40 dark:bg-white/10">
+        <div className="h-3 w-20 animate-pulse rounded bg-theme-300/40 dark:bg-theme-700/40" />
+        <div className="h-10 w-32 animate-pulse rounded bg-theme-300/40 dark:bg-theme-700/40" />
+        <div className="h-2 w-full animate-pulse rounded bg-theme-300/30 dark:bg-theme-700/30" />
+      </div>
+      <div className="grid grid-cols-1 gap-3 @2xl:grid-cols-2">
+        {[...Array(2)].map((_, cardIndex) => (
+          <div key={cardIndex} className="flex flex-col gap-3 rounded-2xl border border-theme-300/40 bg-theme-200/30 p-4 dark:border-theme-600/40 dark:bg-white/10">
+            <div className="h-3 w-16 animate-pulse rounded bg-theme-300/40 dark:bg-theme-700/40" />
+            {[...Array(5)].map((__, rowIndex) => (
+              <div key={rowIndex} className="h-2.5 w-full animate-pulse rounded bg-theme-300/25 dark:bg-theme-700/25" />
+            ))}
           </div>
         ))}
       </div>
@@ -261,8 +506,6 @@ function LoadingSkeleton() {
 export default function Component({ service }) {
   const { t } = useTranslation();
   const { widget } = service;
-  const [todayCategory, setTodayCategory] = useState(null);
-  const [tomorrowCategory, setTomorrowCategory] = useState(null);
   const refreshInterval = Number(widget.refreshInterval) || DEFAULT_REFRESH_INTERVAL;
 
   const { data, error, mutate } = useWidgetAPI(widget, null, {
@@ -278,22 +521,30 @@ export default function Component({ service }) {
     [mutate],
   );
 
-  const dashboard = useMemo(
-    () =>
-      buildDashboardModel({
-        data,
-        formatNumber: (value) => formatNumber(t, value),
-        labels: {
-          activeShops: t("uoshippingdashboard.activeShops"),
-          courierCount: t("uoshippingdashboard.courierCount"),
-          todayOutput: t("uoshippingdashboard.todayOutput"),
-          yesterdayShipping: t("uoshippingdashboard.yesterdayShipping"),
-          todayShipping: t("uoshippingdashboard.todayShipping"),
-          tomorrowOutput: t("uoshippingdashboard.tomorrowOutput"),
-        },
-      }),
-    [data, t],
-  );
+  const updatedAt = data?.updated_at ?? "";
+  const freshness = useFreshness(updatedAt, Math.max(1000, refreshInterval));
+
+  // 出荷の表示ソースをデータ駆動で決定:
+  // 今日の計上が1件でも入れば今日、それまでは昨日実績を主役に据える。
+  const shipping = useMemo(() => {
+    const todayShipping = data?.today_shipping;
+    const yesterdayShipping = data?.yesterday_shipping;
+    const todayTotal = Number(todayShipping?.total_quantity || 0);
+    const yesterdayTotal = Number(yesterdayShipping?.total_quantity || 0);
+    const showingYesterday = todayTotal === 0;
+    const source = showingYesterday ? yesterdayShipping : todayShipping;
+    return {
+      showingYesterday,
+      todayTotal,
+      yesterdayTotal,
+      todayDate: todayShipping?.date || "",
+      yesterdayDate: yesterdayShipping?.date || "",
+      couriers: normalizeCouriers(source),
+      scopeLabel: showingYesterday
+        ? `${t("uoshippingdashboard.yesterdayActual")} · ${yesterdayShipping?.date || ""}`
+        : todayShipping?.date || "",
+    };
+  }, [data, t]);
 
   if (error) {
     return <Container service={service} error={error} />;
@@ -310,76 +561,24 @@ export default function Component({ service }) {
   return (
     <Container service={service}>
       <div className="@container flex w-full min-w-0 flex-col gap-3 p-1.5">
-        <HeroHeader hero={dashboard.hero} onRefresh={handleRefresh} t={t} updatedAt={dashboard.updatedAt} />
+        <Header
+          detailUrl={widget.detailUrl}
+          freshness={freshness}
+          onRefresh={handleRefresh}
+          t={t}
+          updatedAt={updatedAt}
+        />
 
-        <div className="grid grid-cols-1 gap-3 @2xl:grid-cols-2 @5xl:grid-cols-4">
-          {dashboard.sections.map((section) => (
-            <Panel
-              key={section.id}
-              date={section.date}
-              statLabel={section.statLabel}
-              statValue={section.statValue}
-              title={section.title}
-            >
-              {section.kind === "shop" ? (
-                (() => {
-                  const categoryTotals = getCategoryTotals(section.items, getSectionCategories(section.items));
-                  const rawActiveCategory = section.id === "today-output" ? todayCategory : tomorrowCategory;
-                  const activeCategory = resolveActiveCategory(rawActiveCategory, categoryTotals);
-                  const visibleItems = filterItemsByCategory(section.items, activeCategory);
+        <KpiStrip
+          shipping={shipping}
+          t={t}
+          todayOutput={data.today_output}
+          tomorrowOutput={data.tomorrow_output}
+        />
 
-                  if (visibleItems.length === 0) {
-                    return (
-                      <EmptyState
-                        variant={section.emptyVariant}
-                        message={t(`uoshippingdashboard.${section.emptyMessageKey}`)}
-                        hint={section.emptyHintKey ? t(`uoshippingdashboard.${section.emptyHintKey}`) : null}
-                      />
-                    );
-                  }
-
-                  return (
-                    <div className="p-2.5">
-                      {categoryTotals.length > 1 ? (
-                        <CategoryTabs
-                          activeCategory={activeCategory}
-                          categories={categoryTotals}
-                          onChange={section.id === "today-output" ? setTodayCategory : setTomorrowCategory}
-                          t={t}
-                        />
-                      ) : null}
-
-                      <div className={`${LIST_SCROLL} pr-1`}>
-                        {visibleItems.map((item) => (
-                          <ItemRow
-                            key={`${section.id}-${item.shop_id}`}
-                            name={item.shop_name}
-                            value={formatNumber(t, item.total_quantity)}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })()
-              ) : section.items.length === 0 ? (
-                <EmptyState
-                  variant={section.emptyVariant}
-                  message={t(`uoshippingdashboard.${section.emptyMessageKey}`)}
-                  hint={section.emptyHintKey ? t(`uoshippingdashboard.${section.emptyHintKey}`) : null}
-                />
-              ) : (
-                <div className={`${LIST_SCROLL} p-2.5 pr-3`}>
-                  {section.items.map((item) => (
-                    <ItemRow
-                      key={`${section.id}-${item.courier_id}`}
-                      name={item.courier_name}
-                      value={formatNumber(t, item.total_quantity)}
-                    />
-                  ))}
-                </div>
-              )}
-            </Panel>
-          ))}
+        <div className="grid grid-cols-1 gap-3 @2xl:grid-cols-[1.55fr_1fr]">
+          <ShopPanel t={t} todayOutput={data.today_output} />
+          <CourierPanel shipping={shipping} t={t} />
         </div>
       </div>
     </Container>
