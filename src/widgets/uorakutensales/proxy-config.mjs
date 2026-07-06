@@ -49,5 +49,20 @@ export function buildSalesProxyRequest({ endpoint, baseUrl, token }) {
     };
   }
 
+  if (endpoint === "campaigns-current") {
+    const url = new URL(`${serviceUrl}/api/campaigns/current`);
+    url.searchParams.set("shopName", "3911");
+    url.searchParams.set("months", "2");
+    url.searchParams.set("capital", "shop");
+
+    return {
+      url,
+      params: {
+        method: "GET",
+        headers,
+      },
+    };
+  }
+
   throw new Error(`Unsupported Rakuten sales endpoint: ${endpoint}`);
 }
