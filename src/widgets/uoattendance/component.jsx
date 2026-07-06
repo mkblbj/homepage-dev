@@ -14,12 +14,14 @@ import useWidgetAPI from "utils/proxy/use-widget-api";
  *   working       → 部署カラーのバー(右ラベル: 出勤打刻時刻)
  *   not_checked_in → 現在 < 始業なら「これから」、始業以降なら「未打刻」
  *                    (どちらもグレーの破線バー。区別は右ラベルのみ)
- *   off_work      → グレーの実線バー(右ラベル: 退勤済)
+ *   off_work      → 部署カラーのバー(右ラベル: 退勤済。氏名・ドット・淡色で退勤を示す)
  * 緑(emerald)は「現在」を示すシグナル専用: 出勤中の人数 / LIVE / 現在ライン。
  */
 
 // ---- palette (accent hex used inline; neutrals via theme tokens) ----
 const GREEN = "#34C98E";
+// GREEN at low alpha — the vertical "now" spine that runs down through every row.
+const NOW_LINE = "rgba(52,201,142,0.45)";
 const DEPT_STYLES = {
   Office: {
     solid: "#5EB3E4",
@@ -192,7 +194,8 @@ const ROW_STYLE = {
     rightCls: "text-theme-600 dark:text-theme-300",
   },
   done: {
-    bg: "rgba(126,140,150,0.42)",
+    // bar uses the department color (same as working); off_work stays
+    // distinguished by the faded name, grey dot and 退勤済 label only.
     border: "none",
     dot: DONE_SEG,
     nameCls: "text-theme-500 dark:text-theme-400",
@@ -220,7 +223,13 @@ function buildRow(employee, dept, domain, nowH) {
   }
 
   const base = ROW_STYLE[state];
-  const style = state === "working" ? { ...base, bg: dept.bar, dot: dept.dot } : base;
+  // working & off_work both render the department-colored shift bar.
+  const style =
+    state === "working"
+      ? { ...base, bg: dept.bar, dot: dept.dot }
+      : state === "done"
+        ? { ...base, bg: dept.bar }
+        : base;
 
   const rightLabel = {
     working: employee.displayTime || fmtClock(startH),
@@ -274,28 +283,32 @@ function DeptTimeline({ dept, label, working, scheduled, fteText, rows, domain, 
         ) : null}
       </div>
 
-      {/* time axis */}
-      <div
-        className="grid items-center"
-        style={{ gridTemplateColumns: "104px 1fr 64px", columnGap: "10px", height: "14px" }}
-      >
+      {/* time axis — a single line of hour ticks. "Now" is a green playhead: a
+          small triangle here plus a line continuing down through every row, so it
+          costs no extra line and never collides with a tick label (the exact time
+          already lives in the header "現在 HH:MM"). */}
+      <div className="grid" style={{ gridTemplateColumns: "104px 1fr 64px", columnGap: "10px", height: "16px" }}>
         <span />
-        <span className="relative block h-3.5">
+        <span className="relative block h-full">
           {domain.ticks.map((tick) => (
             <span
               key={tick.h}
-              className="absolute bottom-0 -translate-x-1/2 text-[9.5px] font-bold tabular-nums text-theme-600 dark:text-theme-200"
+              className="absolute top-0 -translate-x-1/2 whitespace-nowrap text-[9.5px] font-bold tabular-nums text-theme-600 dark:text-theme-200"
               style={{ left: `${tick.pct}%` }}
             >
               {tick.label}
             </span>
           ))}
           <span
-            className="absolute bottom-0 -translate-x-1/2 text-[8.5px] font-extrabold tabular-nums"
-            style={{ left: `${nowPct}%`, color: GREEN }}
-          >
-            ▾ {fmtClock(nowH)}
-          </span>
+            className="absolute bottom-0 h-0 w-0"
+            style={{
+              left: `${nowPct}%`,
+              marginLeft: "-3.5px",
+              borderLeft: "3.5px solid transparent",
+              borderRight: "3.5px solid transparent",
+              borderTop: `5px solid ${GREEN}`,
+            }}
+          />
         </span>
         <span />
       </div>
@@ -328,10 +341,7 @@ function DeptTimeline({ dept, label, working, scheduled, fteText, rows, domain, 
                   border: row.style.border,
                 }}
               />
-              <span
-                className="absolute -inset-y-0.5 w-px bg-theme-500/30 dark:bg-white/25"
-                style={{ left: `${nowPct}%` }}
-              />
+              <span className="absolute -inset-y-0.5 w-px" style={{ left: `${nowPct}%`, backgroundColor: NOW_LINE }} />
             </span>
             <span
               className={`whitespace-nowrap text-right text-[10px] font-semibold tabular-nums ${row.style.rightCls}`}
