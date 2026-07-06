@@ -1,3 +1,5 @@
+import { isTakadaEmployee, normalizeTakadaManualStatus } from "./takada-manual-status.mjs";
+
 export const DEPARTMENT_CATEGORY_ORDER = ["Office", "Production"];
 
 export const DEPARTMENT_CATEGORY_LABELS = {
@@ -282,6 +284,24 @@ function makeScheduledEmployee(employee) {
   };
 }
 
+function applyTakadaManualStatus(employee, manualStatus, todayDate) {
+  const normalizedStatus = normalizeTakadaManualStatus(manualStatus);
+  if (!normalizedStatus || normalizedStatus.date !== todayDate || !isTakadaEmployee(employee)) {
+    return employee;
+  }
+
+  const statusMeta = getStatusMeta(normalizedStatus.status);
+  return {
+    ...employee,
+    attendance_status: normalizedStatus.status,
+    attendance_status_label: statusMeta.label,
+    last_log_type:
+      normalizedStatus.status === "working" ? "IN" : normalizedStatus.status === "off_work" ? "OUT" : null,
+    last_checkin_time: normalizedStatus.time,
+    manual_attendance: true,
+  };
+}
+
 function makeCurrentWorkingEmployee(employee) {
   const lastCheckinTime = formatCheckinTime(employee.checkin_time || employee.last_checkin_time);
 
@@ -466,7 +486,7 @@ function countEmployeesByStatus(employees, status) {
   return employees.filter((employee) => employee.attendance_status === status).length;
 }
 
-export function buildTodayAttendanceModel({ todaySnapshot, actualEmployees = [] }) {
+export function buildTodayAttendanceModel({ todaySnapshot, actualEmployees = [], takadaManualStatus = null }) {
   const hasRoster = Boolean(todaySnapshot?.attendance_status_basis && Array.isArray(todaySnapshot?.employees));
 
   if (!hasRoster) {
@@ -486,7 +506,9 @@ export function buildTodayAttendanceModel({ todaySnapshot, actualEmployees = [] 
     };
   }
 
-  const scheduledEmployees = (todaySnapshot.employees || []).map(makeScheduledEmployee);
+  const scheduledEmployees = (todaySnapshot.employees || [])
+    .map((employee) => applyTakadaManualStatus(employee, takadaManualStatus, todaySnapshot.date || null))
+    .map(makeScheduledEmployee);
   const scheduledGroups = buildScheduledTodayGroups({
     ...todaySnapshot,
     employees: scheduledEmployees,

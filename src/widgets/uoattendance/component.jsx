@@ -2,6 +2,7 @@ import Container from "components/services/widget/container";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { buildTodayAttendanceModel, buildTomorrowScheduleModel, formatScheduledFte } from "./attendance-model.mjs";
+import { getNextTakadaManualStatus, isTakadaEmployee } from "./takada-manual-status.mjs";
 
 import useWidgetAPI from "utils/proxy/use-widget-api";
 
@@ -246,6 +247,8 @@ function buildRow(employee, dept, domain, nowH) {
     name: employee.employee_name,
     unscheduled,
     state,
+    attendanceStatus: employee.attendance_status,
+    canManualToggle: isTakadaEmployee(employee),
     geom,
     style,
     rightLabel,
@@ -262,7 +265,7 @@ function buildRow(employee, dept, domain, nowH) {
 }
 
 // ---- department timeline card ----
-function DeptTimeline({ dept, label, working, scheduled, fteText, rows, domain, nowH }) {
+function DeptTimeline({ dept, label, working, scheduled, fteText, rows, domain, nowH, onTakadaManualToggle }) {
   const nowPct = Math.max(0, Math.min(100, ((nowH - domain.start) / (domain.end - domain.start)) * 100));
 
   return (
@@ -324,8 +327,26 @@ function DeptTimeline({ dept, label, working, scheduled, fteText, rows, domain, 
           >
             <span className="inline-flex min-w-0 items-center gap-1.5">
               <span className="h-[5.5px] w-[5.5px] shrink-0 rounded-full" style={{ backgroundColor: row.style.dot }} />
-              <span className={`truncate text-[11.5px] font-semibold ${row.style.nameCls}`}>
-                {row.name}
+              <span className="min-w-0">
+                {row.canManualToggle ? (
+                  <button
+                    type="button"
+                    className={`block max-w-full cursor-pointer appearance-none truncate rounded-sm border-0 bg-transparent p-0 text-left text-[11.5px] font-semibold transition-colors hover:text-amber-500 focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-amber-400 ${row.style.nameCls}`}
+                    title="表示打刻を切り替え"
+                    aria-label={`${row.name}の表示打刻を切り替え`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onTakadaManualToggle(row);
+                    }}
+                  >
+                    {row.name}
+                  </button>
+                ) : (
+                  <span className={`block max-w-full truncate text-[11.5px] font-semibold ${row.style.nameCls}`}>
+                    {row.name}
+                  </span>
+                )}
                 {row.unscheduled ? (
                   <span className="ml-1 text-[8.5px] font-bold text-theme-500 dark:text-theme-400">予定外</span>
                 ) : null}
@@ -572,6 +593,7 @@ function buildTomorrowView(tomorrowModel, todayRosterIds, tomorrowSnapshot) {
 export default function Component({ service }) {
   const { widget } = service;
   const [refreshKey, setRefreshKey] = useState(0);
+  const [takadaManualStatus, setTakadaManualStatus] = useState(null);
   const now = useNow();
   const nowH = now.getHours() + now.getMinutes() / 60;
 
@@ -608,6 +630,31 @@ export default function Component({ service }) {
 
   const actualEmployees = useMemo(() => actualData?.message?.employees || [], [actualData]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadTakadaManualStatus() {
+      try {
+        const response = await fetch("/api/uoattendance/takada");
+        if (!response.ok) {
+          return;
+        }
+        const payload = await response.json();
+        if (!cancelled) {
+          setTakadaManualStatus(payload?.status || null);
+        }
+      } catch (e) {
+        // The widget still works from HRMS data if local display state is unavailable.
+      }
+    }
+
+    loadTakadaManualStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const todaySnapshot = useMemo(
     () => todayScheduleData?.message?.today ?? todayScheduleData?.message ?? null,
     [todayScheduleData],
@@ -618,8 +665,8 @@ export default function Component({ service }) {
   );
 
   const todayModel = useMemo(
-    () => buildTodayAttendanceModel({ todaySnapshot, actualEmployees }),
-    [todaySnapshot, actualEmployees],
+    () => buildTodayAttendanceModel({ todaySnapshot, actualEmployees, takadaManualStatus }),
+    [todaySnapshot, actualEmployees, takadaManualStatus],
   );
   const tomorrowModel = useMemo(() => buildTomorrowScheduleModel(tomorrowSnapshot), [tomorrowSnapshot]);
 
@@ -684,6 +731,36 @@ export default function Component({ service }) {
       }
     },
     [mutateActual, mutateTodaySchedule, mutateTomorrowSchedule, widget.scheduleUrl],
+  );
+
+  const handleTakadaManualToggle = useCallback(
+    async (row) => {
+      const nextStatus = getNextTakadaManualStatus(row.attendanceStatus, new Date(), todayModel.date || undefined);
+
+      try {
+        if (!nextStatus) {
+          const response = await fetch("/api/uoattendance/takada", { method: "DELETE" });
+          if (response.ok) {
+            setTakadaManualStatus(null);
+          }
+          return;
+        }
+
+        const response = await fetch("/api/uoattendance/takada", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(nextStatus),
+        });
+        if (!response.ok) {
+          return;
+        }
+        const payload = await response.json();
+        setTakadaManualStatus(payload?.status || nextStatus);
+      } catch (e) {
+        // Keep the current display rather than surfacing a dashboard-level error.
+      }
+    },
+    [todayModel.date],
   );
 
   if (actualError) {
@@ -789,6 +866,7 @@ export default function Component({ service }) {
                 rows={group.rows}
                 domain={domain}
                 nowH={nowH}
+                onTakadaManualToggle={handleTakadaManualToggle}
               />
             ))}
           </section>

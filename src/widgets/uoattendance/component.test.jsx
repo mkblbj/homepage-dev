@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { screen } from "@testing-library/react";
+import { act, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithProviders } from "test-utils/render-with-providers";
@@ -131,6 +131,11 @@ const service = {
   widget: { type: "uoattendance", scheduleUrl: "http://example/schedule", refreshInterval: 3600000 },
 };
 
+async function flushPromises() {
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
 function mockApi({ actual, today, tomorrow } = {}) {
   useWidgetAPI.mockImplementation((_widget, endpoint, params) => {
     if (endpoint === "actual") {
@@ -152,10 +157,29 @@ describe("widgets/uoattendance/component", () => {
     // Fix "now" to the early afternoon so not-checked-in people read as 未打刻.
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-07-06T14:30:00"));
+    global.fetch = vi.fn(async (_url, options = {}) => {
+      if (options.method === "PUT") {
+        return {
+          ok: true,
+          json: async () => ({ status: JSON.parse(options.body) }),
+        };
+      }
+      if (options.method === "DELETE") {
+        return {
+          ok: true,
+          json: async () => ({ status: null }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({ status: null }),
+      };
+    });
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    delete global.fetch;
   });
 
   it("renders the loading skeleton before the actual API resolves", () => {
@@ -201,6 +225,66 @@ describe("widgets/uoattendance/component", () => {
     // tomorrow panel collapsed line
     expect(screen.getByText("明日予定")).toBeInTheDocument();
     expect(screen.getByText("2 名")).toBeInTheDocument();
+  });
+
+  it("cycles only Takada's display attendance by clicking his name", async () => {
+    mockApi({
+      actual: { message: { employees: actualEmployees } },
+      today: { message: { today: todaySnapshot } },
+      tomorrow: { message: { tomorrow: tomorrowSnapshot } },
+    });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+    await act(async () => {
+      await flushPromises();
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith("/api/uoattendance/takada");
+    global.fetch.mockClear();
+
+    fireEvent.click(screen.getByText("温 剛"));
+    expect(global.fetch).not.toHaveBeenCalled();
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("高田 健治"));
+      await flushPromises();
+    });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(global.fetch.mock.calls[0][0]).toBe("/api/uoattendance/takada");
+    expect(global.fetch.mock.calls[0][1]).toMatchObject({
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toMatchObject({
+      employee: "70",
+      employee_name: "高田 健治",
+      date: "2026-07-06",
+      status: "working",
+      time: "14:30",
+    });
+    expect(screen.getByText("14:30")).toBeInTheDocument();
+
+    global.fetch.mockClear();
+    await act(async () => {
+      fireEvent.click(screen.getByText("高田 健治"));
+      await flushPromises();
+    });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toMatchObject({
+      status: "off_work",
+      time: "14:30",
+    });
+    expect(screen.getAllByText("退勤済").length).toBeGreaterThan(0);
+
+    global.fetch.mockClear();
+    await act(async () => {
+      fireEvent.click(screen.getByText("高田 健治"));
+      await flushPromises();
+    });
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/uoattendance/takada",
+      expect.objectContaining({ method: "DELETE" }),
+    );
   });
 
   it("shows the empty state when there is a roster but nobody is scheduled", () => {

@@ -167,6 +167,71 @@ test("buildTodayAttendanceModel exposes visible attendance times for working and
   assert.equal(model.groups[1].employees[1].displayTime, null);
 });
 
+test("buildTodayAttendanceModel applies Takada manual display status for the matching day only", () => {
+  const takadaSnapshot = {
+    ...todaySnapshot,
+    count: 1,
+    date: "2026-07-06",
+    employees: [
+      {
+        employee: "70",
+        employee_name: "高田 健治",
+        department_category: "Office",
+        shift_label: "9-18",
+        scheduled_time: "09:00-18:00",
+        attendance_status: "not_checked_in",
+        attendance_status_label: "未打刻",
+        last_log_type: null,
+        last_checkin_time: null,
+      },
+    ],
+    departments: {
+      Office: { count: 1, employees: [] },
+    },
+  };
+
+  const model = buildTodayAttendanceModel({
+    todaySnapshot: takadaSnapshot,
+    actualEmployees: [],
+    takadaManualStatus: {
+      employee: "70",
+      employee_name: "高田 健治",
+      date: "2026-07-06",
+      status: "working",
+      time: "08:58",
+    },
+  });
+
+  const takada = model.groups[0].employees[0];
+  assert.equal(takada.attendance_status, "working");
+  assert.equal(takada.attendance_status_label, "出勤中");
+  assert.equal(takada.last_log_type, "IN");
+  assert.equal(takada.displayTime, "08:58");
+  assert.equal(takada.manual_attendance, true);
+  assert.deepEqual(model.summary, {
+    scheduledCount: 1,
+    workingCount: 1,
+    offWorkCount: 0,
+    notCheckedInCount: 0,
+    unscheduledWorkingCount: 0,
+  });
+
+  const staleModel = buildTodayAttendanceModel({
+    todaySnapshot: takadaSnapshot,
+    actualEmployees: [],
+    takadaManualStatus: {
+      employee: "70",
+      employee_name: "高田 健治",
+      date: "2026-07-05",
+      status: "working",
+      time: "08:58",
+    },
+  });
+
+  assert.equal(staleModel.groups[0].employees[0].attendance_status, "not_checked_in");
+  assert.equal(staleModel.groups[0].employees[0].displayTime, null);
+});
+
 test("buildTodayAttendanceModel groups unrecognized unscheduled employees by their department label", () => {
   const model = buildTodayAttendanceModel({
     todaySnapshot,
