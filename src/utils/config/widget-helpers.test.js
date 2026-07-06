@@ -63,6 +63,17 @@ describe("utils/config/widget-helpers", () => {
     expect(cleaned[2].options.apiKey).toBeUndefined();
   });
 
+  it("cleanWidgetGroups omits widgets explicitly disabled in config", async () => {
+    const cleaned = await cleanWidgetGroups([
+      { type: "greeting", options: { index: 0, text: "hello" } },
+      { type: "promotion-calendar", options: { index: 1, enabled: false } },
+      { type: "datetime", options: { index: 2, locale: "ja" } },
+    ]);
+
+    expect(cleaned.map((widget) => widget.type)).toEqual(["greeting", "datetime"]);
+    expect(cleaned[1].options.index).toBe(2);
+  });
+
   it("getPrivateWidgetOptions returns private options for a specific widget", async () => {
     fs.readFile.mockResolvedValueOnce("ignored");
     yaml.load.mockReturnValueOnce([{ search: { url: "http://x", username: "u", password: "p", key: "k" } }]);

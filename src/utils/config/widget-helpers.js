@@ -27,8 +27,9 @@ export async function widgetsFromConfig() {
 }
 
 export async function cleanWidgetGroups(widgets) {
-  return widgets.map((widget, index) => {
-    const sanitizedOptions = widget.options;
+  return widgets.filter((widget) => widget?.options?.enabled !== false).map((widget, index) => {
+    const sanitizedOptions = { ...widget.options };
+    const sanitizedIndex = sanitizedOptions.index ?? index;
     const optionKeys = Object.keys(sanitizedOptions);
 
     // delete private options from the sanitized options
@@ -46,8 +47,8 @@ export async function cleanWidgetGroups(widgets) {
     return {
       type: widget.type,
       options: {
-        index,
         ...sanitizedOptions,
+        index: sanitizedIndex,
       },
     };
   });
