@@ -37,17 +37,14 @@ test("buildSalesProxyRequest creates authenticated query request", () => {
   assert.equal(request.params.body, JSON.stringify({ all: true }));
 });
 
-test("buildSalesProxyRequest creates authenticated current campaigns request", () => {
+test("buildSalesProxyRequest creates authenticated campaigns snapshot request", () => {
   const request = buildSalesProxyRequest({
-    endpoint: "campaigns-current",
+    endpoint: "campaigns",
     baseUrl: "http://127.0.0.1:3912/",
     token: "secret-token",
   });
 
-  assert.equal(
-    request.url.toString(),
-    "http://127.0.0.1:3912/api/campaigns/current?shopName=3911&months=2&capital=shop",
-  );
+  assert.equal(request.url.toString(), "http://127.0.0.1:3912/api/campaigns");
   assert.equal(request.params.method, "GET");
   assert.equal(request.params.headers.Authorization, "Bearer secret-token");
   assert.equal(request.params.headers.Accept, "application/json");

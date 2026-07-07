@@ -5,10 +5,33 @@ import vm from "node:vm";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+function createFixedDate(isoString) {
+  const timestamp = Date.parse(isoString);
+
+  return class FixedDate extends Date {
+    constructor(...args) {
+      super(...(args.length ? args : [timestamp]));
+    }
+
+    static now() {
+      return timestamp;
+    }
+
+    static parse(value) {
+      return Date.parse(value);
+    }
+
+    static UTC(...args) {
+      return Date.UTC(...args);
+    }
+  };
+}
+
 function loadCustomScript() {
   const source = readFileSync("config/custom.js", "utf8");
   const context = vm.createContext({
     console,
+    Date: createFixedDate("2026-07-07T12:00:00+09:00"),
     document,
     fetch: vi.fn(() => new Promise(() => {})),
     setInterval: vi.fn(),
@@ -46,9 +69,8 @@ describe("config/custom.js sale reminder", () => {
         campaigns: [
           {
             name: "20260704_お買い物マラソン＆ジャンルSALE×ポイントアップ",
-            status: "開催中",
-            startAtJST: "2026-07-04T20:00:00+09:00",
-            endAtJST: "2026-07-11T01:59:00+09:00",
+            startAtText: "2026/07/04(土) 20:00",
+            endAtText: "2026/07/11(土) 01:59",
           },
         ],
       },

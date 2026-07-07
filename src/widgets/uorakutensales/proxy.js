@@ -9,7 +9,7 @@ const logger = createLogger("uorakutensalesProxyHandler");
 const EXPECTED_METHOD_BY_ENDPOINT = {
   snapshot: "GET",
   query: "POST",
-  "campaigns-current": "GET",
+  campaigns: "GET",
 };
 
 function parseResponseData(data) {
