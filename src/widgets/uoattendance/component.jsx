@@ -51,6 +51,8 @@ const FALLBACK_DEPT = {
 };
 const NEUTRAL_SEG = "#8A94A0";
 const DONE_SEG = "#66757F";
+const DONE_BAR = "rgba(102,117,127,0.82)";
+const DONE_BAR_BORDER = "1px solid rgba(226,232,240,0.28)";
 
 function deptStyle(key) {
   return DEPT_STYLES[key] || FALLBACK_DEPT;
@@ -195,9 +197,8 @@ const ROW_STYLE = {
     rightCls: "text-theme-600 dark:text-theme-300",
   },
   done: {
-    // bar uses the department color (same as working); off_work stays
-    // distinguished by the faded name, grey dot and 退勤済 label only.
-    border: "none",
+    bg: DONE_BAR,
+    border: DONE_BAR_BORDER,
     dot: DONE_SEG,
     nameCls: "text-theme-500 dark:text-theme-400",
     rightCls: "text-theme-500 dark:text-theme-400",
@@ -224,13 +225,7 @@ function buildRow(employee, dept, domain, nowH) {
   }
 
   const base = ROW_STYLE[state];
-  // working & off_work both render the department-colored shift bar.
-  const style =
-    state === "working"
-      ? { ...base, bg: dept.bar, dot: dept.dot }
-      : state === "done"
-        ? { ...base, bg: dept.bar }
-        : base;
+  const style = state === "working" ? { ...base, bg: dept.bar, dot: dept.dot } : base;
 
   const rightLabel = {
     working: employee.displayTime || fmtClock(startH),

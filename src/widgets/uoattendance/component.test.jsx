@@ -227,6 +227,24 @@ describe("widgets/uoattendance/component", () => {
     expect(screen.getByText("2 名")).toBeInTheDocument();
   });
 
+  it("renders off-work timeline bars in distinguishable grey instead of department color", () => {
+    mockApi({
+      actual: { message: { employees: actualEmployees } },
+      today: { message: { today: todaySnapshot } },
+      tomorrow: { message: { tomorrow: tomorrowSnapshot } },
+    });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+
+    const offWorkRow = screen.getByTitle("周 阔 / 9-17 / 退勤済 / OUT 17:02");
+    const track = offWorkRow.children[1];
+    const bar = track.firstElementChild;
+
+    expect(bar.style.background).toBe("rgba(102, 117, 127, 0.82)");
+    expect(bar.style.border).toBe("1px solid rgba(226, 232, 240, 0.28)");
+    expect(bar.style.background).not.toBe("rgba(232, 168, 104, 0.6)");
+  });
+
   it("cycles only Takada's display attendance by clicking his name", async () => {
     mockApi({
       actual: { message: { employees: actualEmployees } },
