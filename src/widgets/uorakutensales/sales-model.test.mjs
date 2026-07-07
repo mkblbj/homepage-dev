@@ -2,184 +2,178 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  buildSalesModel,
-  REFRESH_INTERVAL_OPTIONS,
-  resolveRefreshIntervalOption,
+  buildModel,
+  computeFreshness,
+  DEFAULT_REFRESH_INTERVAL,
+  man,
+  mdLabel,
+  pointX,
+  spark,
+  timeFromJST,
+  weekdayJp,
 } from "./sales-model.mjs";
 
-const formatCurrency = (value) => `¥${Number(value || 0).toLocaleString("ja-JP")}`;
-const formatNumber = (value) => Number(value || 0).toLocaleString("ja-JP");
-
-const fixture = {
-  ok: true,
-  generatedAtJST: "2026-04-30 16:18 JST",
-  shopCount: 7,
-  updatedShopCount: 7,
-  totals: {
-    salesYen: 533044,
-    orderCount: 514,
-  },
+const sales = {
+  generatedAtJST: "2026-07-07 13:30 JST",
+  totals: { salesYen: 30000, orderCount: 12 },
   shops: [
-    {
-      shopName: "0406",
-      status: "authenticated",
-      salesYen: 132344,
-      orderCount: 164,
-      updated: "2026/04/30 16:00",
-      lastQueryJST: "2026-04-30 15:43 JST",
-      lastHeartbeatJST: "2026-04-30 16:00 JST",
-      lastError: null,
-    },
-    {
-      shopName: "3911",
-      status: "authenticated",
-      salesYen: 216300,
-      orderCount: 184,
-      updated: "2026/04/30 16:01",
-      lastQueryJST: "2026-04-30 15:43 JST",
-      lastHeartbeatJST: "2026-04-30 16:02 JST",
-      lastError: null,
-    },
-    {
-      shopName: "松田",
-      status: "authenticated",
-      salesYen: 20438,
-      orderCount: 13,
-      updated: "2026/04/30 16:02",
-      lastQueryJST: "2026-04-30 15:43 JST",
-      lastHeartbeatJST: "2026-04-30 16:02 JST",
-      lastError: null,
-    },
-    {
-      shopName: "松武",
-      status: "authenticated",
-      salesYen: 111851,
-      orderCount: 102,
-      updated: "2026/04/30 16:05",
-      lastQueryJST: "2026-04-30 15:43 JST",
-      lastHeartbeatJST: "2026-04-30 16:06 JST",
-      lastError: null,
-    },
-    {
-      shopName: "天海",
-      status: "authenticated",
-      salesYen: 35615,
-      orderCount: 38,
-      updated: "2026/04/30 16:00",
-      lastQueryJST: "2026-04-30 15:43 JST",
-      lastHeartbeatJST: "2026-04-30 16:00 JST",
-      lastError: null,
-    },
-    {
-      shopName: "allcase",
-      status: "authenticated",
-      salesYen: 0,
-      orderCount: 0,
-      updated: "2026/04/30 16:07",
-      lastQueryJST: "2026-04-30 15:43 JST",
-      lastHeartbeatJST: "2026-04-30 16:07 JST",
-      lastError: null,
-    },
-    {
-      shopName: "hagumi",
-      status: "authenticated",
-      salesYen: 16496,
-      orderCount: 13,
-      updated: "2026/04/30 16:07",
-      lastQueryJST: "2026-04-30 15:43 JST",
-      lastHeartbeatJST: "2026-04-30 16:07 JST",
-      lastError: null,
-    },
+    { shopName: "3911", salesYen: 20000, orderCount: 8, status: "authenticated" },
+    { shopName: "0406", salesYen: 10000, orderCount: 4, status: "authenticated" },
+    { shopName: "allcase", salesYen: 0, orderCount: 0, status: "authenticated" },
   ],
-  lastError: null,
 };
 
-test("buildSalesModel formats summary totals and snapshot metadata", () => {
-  const model = buildSalesModel({ data: fixture, formatCurrency, formatNumber });
+const history = {
+  generatedAtJST: "2026-07-07 06:30 JST",
+  range: { dates: ["2026-06-30", "2026-07-01", "2026-07-02"] },
+  totals: { salesYen: 90000, orderCount: 60, conversionRate: 2.35 },
+  shops: [
+    {
+      shopName: "3911",
+      totals: { salesYen: 60000, orderCount: 40, conversionRate: 2.1 },
+      daily: [
+        { date: "2026-06-30", salesYen: 10000, orderCount: 6 },
+        { date: "2026-07-01", salesYen: 20000, orderCount: 14 },
+        { date: "2026-07-02", salesYen: 30000, orderCount: 20 },
+      ],
+    },
+    {
+      shopName: "0406",
+      totals: { salesYen: 30000, orderCount: 20, conversionRate: 1.8 },
+      daily: [
+        { date: "2026-06-30", salesYen: 5000, orderCount: 3 },
+        { date: "2026-07-01", salesYen: 10000, orderCount: 7 },
+        { date: "2026-07-02", salesYen: 15000, orderCount: 10 },
+      ],
+    },
+  ],
+};
 
-  assert.equal(model.ok, true);
-  assert.equal(model.generatedAt, "2026-04-30 16:18 JST");
-  assert.equal(model.summary.totalSalesDisplay, "¥533,044");
-  assert.equal(model.summary.totalOrdersDisplay, "514");
-  assert.equal(model.summary.shopCoverageDisplay, "7/7");
-  assert.equal(model.summary.hasErrors, false);
+test("buildModel returns null without a realtime snapshot", () => {
+  assert.equal(buildModel(null, history), null);
+  assert.equal(buildModel(undefined, undefined), null);
 });
 
-test("buildSalesModel sorts shops by sales descending then shop name", () => {
-  const data = {
-    ...fixture,
-    shops: [
-      ...fixture.shops,
-      {
-        shopName: "A-shop",
-        status: "authenticated",
-        salesYen: 111851,
-        orderCount: 1,
-        updated: "2026/04/30 16:05",
-        lastError: null,
-      },
-    ],
-  };
-
-  const model = buildSalesModel({ data, formatCurrency, formatNumber });
-
-  assert.deepEqual(
-    model.shops.map((shop) => shop.shopName),
-    ["3911", "0406", "A-shop", "松武", "天海", "松田", "hagumi", "allcase"],
-  );
+test("buildModel derives realtime totals, AOV and freshness timestamp", () => {
+  const model = buildModel(sales, history);
+  assert.equal(model.rtTotal, 30000);
+  assert.equal(model.rtOrders, 12);
+  assert.equal(model.aov, Math.round(30000 / 12));
+  assert.equal(model.generatedAtJST, "2026-07-07 13:30 JST");
+  assert.equal(model.time, "13:30");
 });
 
-test("buildSalesModel surfaces shop and snapshot errors without dropping rows", () => {
-  const data = {
-    ...fixture,
-    lastError: "snapshot stale",
-    shops: [
-      ...fixture.shops,
-      {
-        shopName: "要確認",
-        status: "error",
-        salesYen: 0,
-        orderCount: 0,
-        updated: null,
-        lastError: "ログイン失敗",
-      },
-    ],
-  };
+test("buildModel sorts rows by today's sales and merges 7-day context", () => {
+  const model = buildModel(sales, history);
+  assert.deepEqual(model.rows.map((r) => r.name), ["3911", "0406", "allcase"]);
 
-  const model = buildSalesModel({ data, formatCurrency, formatNumber });
-  const errorShop = model.shops.find((shop) => shop.shopName === "要確認");
+  const top = model.rows[0];
+  assert.equal(top.rtSales, 20000);
+  assert.equal(top.rtBarPct, 100); // biggest realtime shop → full bar
+  assert.equal(Math.round(top.rtShare), 67); // 20000 / 30000
+  assert.equal(top.h7Total, 60000);
+  assert.equal(top.h7Orders, 40);
+  assert.equal(top.cvr, 2.1);
+  // per-shop daily is now enriched with date/md/wd/orders for the hover mini chart
+  assert.deepEqual(top.daily.map((d) => d.sales), [10000, 20000, 30000]);
+  assert.equal(top.daily[0].md, "6/30");
+  assert.equal(top.daily[0].orders, 6);
+  assert.equal(top.daily[0].wd, "火"); // 2026-06-30 is a Tuesday
 
-  assert.equal(model.summary.hasErrors, true);
-  assert.equal(model.lastError, "snapshot stale");
-  assert.equal(errorShop.lastError, "ログイン失敗");
-  assert.equal(errorShop.statusLabel, "要確認");
-  assert.equal(errorShop.statusTone, "danger");
+  const idle = model.rows[2];
+  assert.equal(idle.name, "allcase");
+  assert.equal(idle.rtSales, 0);
+  assert.equal(idle.rtShare, 0);
+  assert.deepEqual(idle.daily, []); // no history row → empty context
 });
 
-test("buildSalesModel prepares compact shop card display fields", () => {
-  const model = buildSalesModel({ data: fixture, formatCurrency, formatNumber });
-  const topShop = model.shops[0];
-
-  assert.equal(topShop.shopName, "3911");
-  assert.equal(topShop.salesDisplay, "¥216,300");
-  assert.equal(topShop.orderCountDisplay, "184");
-  assert.equal(topShop.updatedDisplay, "更新 2026/04/30 16:01");
-  assert.equal(topShop.activityDisplay, "2026-04-30 16:02 JST");
+test("buildModel computes the 7-day share baseline and a shared bullet scale", () => {
+  const model = buildModel(sales, history);
+  assert.equal(Math.round(model.rows[0].h7Share), 67); // 3911: 60000 / 90000
+  assert.equal(Math.round(model.rows[1].h7Share), 33); // 0406: 30000 / 90000
+  assert.equal(model.rows[2].h7Share, 0); // allcase: no history row
+  // scale is the largest share across today/7-day so bullet lengths stay comparable
+  assert.equal(Number(model.shareScale.toFixed(2)), 66.67);
 });
 
-test("refresh interval options are fixed and default to 15 minutes", () => {
-  assert.deepEqual(
-    REFRESH_INTERVAL_OPTIONS.map(({ id, label, milliseconds }) => [id, label, milliseconds]),
-    [
-      ["5m", "5分", 300000],
-      ["10m", "10分", 600000],
-      ["15m", "15分", 900000],
-    ],
-  );
+test("buildModel falls back to a safe bullet scale without history", () => {
+  const model = buildModel(sales, null);
+  assert.equal(model.rows[0].h7Share, 0); // no baseline → tick is hidden by the component
+  assert.ok(model.shareScale >= 1); // never divides by zero
+});
 
-  assert.equal(resolveRefreshIntervalOption().id, "15m");
-  assert.equal(resolveRefreshIntervalOption(900000).id, "15m");
-  assert.equal(resolveRefreshIntervalOption("600000").id, "10m");
-  assert.equal(resolveRefreshIntervalOption(300000).id, "5m");
-  assert.equal(resolveRefreshIntervalOption(12345).id, "15m");
+test("buildModel aggregates daily totals across shops for the trend chart", () => {
+  const model = buildModel(sales, history);
+  assert.equal(model.nDays, 3);
+  assert.deepEqual(model.days.map((d) => d.sales), [15000, 30000, 45000]);
+  assert.deepEqual(model.days.map((d) => d.md), ["6/30", "7/1", "7/2"]);
+  assert.equal(model.maxDaily, 45000);
+  assert.equal(model.avg, 90000 / 3);
+  assert.equal(model.grandTotal, 90000);
+  assert.equal(model.grandCvr, 2.35);
+  assert.equal(model.hasHistory, true);
+  // xPct uses segment centers (i+0.5)/n so the chart, hover zones and axis
+  // labels (equal-width flex tracks) all line up. For 3 days: 16.67 / 50 / 83.33.
+  assert.equal(Number(model.days[0].xPct.toFixed(2)), 16.67);
+  assert.equal(model.days[1].xPct, 50);
+  assert.equal(Number(model.days[2].xPct.toFixed(2)), 83.33);
+});
+
+test("buildModel tolerates a missing history snapshot", () => {
+  const model = buildModel(sales, null);
+  assert.equal(model.hasHistory, false);
+  assert.equal(model.grandTotal, 0);
+  assert.equal(model.nDays, 7); // falls back to a week when no dates
+  assert.equal(model.rows.length, 3);
+  assert.equal(model.rows[0].h7Total, 0);
+});
+
+test("weekdayJp is timezone-stable (UTC based)", () => {
+  assert.equal(weekdayJp("2026-07-07"), "火"); // Tuesday
+  assert.equal(weekdayJp("2026-07-05"), "日"); // Sunday
+  assert.equal(weekdayJp(""), "");
+  assert.equal(weekdayJp("not-a-date"), "");
+});
+
+test("mdLabel and timeFromJST format compact labels", () => {
+  assert.equal(mdLabel("2026-07-06"), "7/6");
+  assert.equal(mdLabel(""), "");
+  assert.equal(timeFromJST("2026-07-07 13:30 JST"), "13:30");
+  assert.equal(timeFromJST(""), "");
+});
+
+test("man converts yen to a 万 figure with one decimal", () => {
+  assert.equal(man(123456), "12.3");
+  assert.equal(man(0), "0.0");
+  assert.equal(man(null), "0.0");
+});
+
+test("spark produces a smooth path and a closed area, empty for no data", () => {
+  const { line, area } = spark([1, 5, 3, 8], 100, 40, true);
+  assert.match(line, /^M /);
+  assert.match(line, / C /);
+  assert.ok(area.endsWith("Z"));
+  assert.deepEqual(spark([], 100, 40, true), { line: "", area: "" });
+});
+
+test("pointX places points edge-to-edge or at segment centers", () => {
+  // edge-to-edge: first at 0, last at w
+  assert.equal(pointX(0, 4, 100, false), 0);
+  assert.equal(pointX(3, 4, 100, false), 100);
+  // centered: each at the middle of its 1/n-wide track (aligns with flex zones/labels)
+  assert.equal(pointX(0, 4, 100, true), 12.5);
+  assert.equal(pointX(3, 4, 100, true), 87.5);
+  // single point → centered regardless
+  assert.equal(pointX(0, 1, 100, false), 50);
+});
+
+test("computeFreshness classifies live / delayed / stale by snapshot age", () => {
+  const base = Date.parse("2026-07-07T13:30:00+09:00");
+  const ri = DEFAULT_REFRESH_INTERVAL; // 60s → liveMax 180s, staleMax 1800s
+
+  assert.equal(computeFreshness("2026-07-07 13:30 JST", base + 60_000, ri).state, "live");
+  assert.equal(computeFreshness("2026-07-07 13:30 JST", base + 600_000, ri).state, "delayed");
+  assert.equal(computeFreshness("2026-07-07 13:30 JST", base + 3_600_000, ri).state, "stale");
+  assert.equal(computeFreshness(null, base, ri), null);
+  assert.equal(computeFreshness("2026-07-07 13:30 JST", null, ri), null);
 });

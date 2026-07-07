@@ -8,9 +8,9 @@ test("normalizeSalesServiceUrl trims trailing slashes and defaults to local sale
   assert.equal(normalizeSalesServiceUrl(), "http://127.0.0.1:3912");
 });
 
-test("buildSalesProxyRequest creates authenticated snapshot request", () => {
+test("buildSalesProxyRequest creates an authenticated realtime sales snapshot request", () => {
   const request = buildSalesProxyRequest({
-    endpoint: "snapshot",
+    endpoint: "sales",
     baseUrl: "http://127.0.0.1:3912/",
     token: "secret-token",
   });
@@ -22,43 +22,43 @@ test("buildSalesProxyRequest creates authenticated snapshot request", () => {
   assert.equal(request.params.body, undefined);
 });
 
-test("buildSalesProxyRequest creates authenticated query request", () => {
+test("buildSalesProxyRequest creates an authenticated 7-day history snapshot request", () => {
   const request = buildSalesProxyRequest({
-    endpoint: "query",
+    endpoint: "history",
     baseUrl: "http://127.0.0.1:3912/",
     token: "secret-token",
   });
 
-  assert.equal(request.url.toString(), "http://127.0.0.1:3912/api/query");
-  assert.equal(request.params.method, "POST");
-  assert.equal(request.params.headers.Authorization, "Bearer secret-token");
-  assert.equal(request.params.headers.Origin, "http://127.0.0.1:3912");
-  assert.equal(request.params.headers["Content-Type"], "application/json");
-  assert.equal(request.params.body, JSON.stringify({ all: true }));
-});
-
-test("buildSalesProxyRequest creates authenticated campaigns snapshot request", () => {
-  const request = buildSalesProxyRequest({
-    endpoint: "campaigns",
-    baseUrl: "http://127.0.0.1:3912/",
-    token: "secret-token",
-  });
-
-  assert.equal(request.url.toString(), "http://127.0.0.1:3912/api/campaigns");
+  assert.equal(request.url.toString(), "http://127.0.0.1:3912/api/history/sales");
   assert.equal(request.params.method, "GET");
   assert.equal(request.params.headers.Authorization, "Bearer secret-token");
   assert.equal(request.params.headers.Accept, "application/json");
   assert.equal(request.params.body, undefined);
 });
 
-test("buildSalesProxyRequest rejects missing token and unsupported endpoints", () => {
-  assert.throws(
-    () => buildSalesProxyRequest({ endpoint: "snapshot", token: "" }),
-    /Missing Rakuten sales token/,
-  );
+test("buildSalesProxyRequest creates an authenticated campaigns snapshot request", () => {
+  const request = buildSalesProxyRequest({
+    endpoint: "campaigns",
+    baseUrl: "http://127.0.0.1:3912/",
+    token: "secret-token",
+  });
 
-  assert.throws(
-    () => buildSalesProxyRequest({ endpoint: "other", token: "secret-token" }),
-    /Unsupported Rakuten sales endpoint/,
-  );
+  // GET /api/campaigns is read-only and allowed; GET /api/campaigns/current is not exposed.
+  assert.equal(request.url.toString(), "http://127.0.0.1:3912/api/campaigns");
+  assert.equal(request.params.method, "GET");
+  assert.equal(request.params.headers.Authorization, "Bearer secret-token");
+  assert.equal(request.params.body, undefined);
+});
+
+test("buildSalesProxyRequest rejects missing token and forbidden/unknown endpoints", () => {
+  assert.throws(() => buildSalesProxyRequest({ endpoint: "sales", token: "" }), /Missing Rakuten sales token/);
+
+  // The dashboard must never reach the forbidden refresh/query endpoints.
+  for (const endpoint of ["query", "refresh", "current", "other"]) {
+    assert.throws(
+      () => buildSalesProxyRequest({ endpoint, token: "secret-token" }),
+      /Unsupported Rakuten sales endpoint/,
+      `endpoint "${endpoint}" should be rejected`,
+    );
+  }
 });

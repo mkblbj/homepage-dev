@@ -7,8 +7,8 @@ import { httpProxy } from "utils/proxy/http";
 const logger = createLogger("uorakutensalesProxyHandler");
 
 const EXPECTED_METHOD_BY_ENDPOINT = {
-  snapshot: "GET",
-  query: "POST",
+  sales: "GET",
+  history: "GET",
   campaigns: "GET",
 };
 
