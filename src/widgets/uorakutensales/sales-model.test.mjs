@@ -102,6 +102,22 @@ test("buildModel falls back to a safe bullet scale without history", () => {
   assert.ok(model.shareScale >= 1); // never divides by zero
 });
 
+test("buildModel merges shop logos by shopName, null when absent", () => {
+  const logos = {
+    shops: [
+      { shopName: "3911", logoUrl: "https://cdn.example/3911.jpg" },
+      { shopName: "0406", logoUrl: "" }, // empty → treated as no logo
+    ],
+  };
+  const model = buildModel(sales, history, logos);
+  assert.equal(model.rows[0].logoUrl, "https://cdn.example/3911.jpg"); // 3911
+  assert.equal(model.rows[1].logoUrl, null); // 0406 — empty string normalized to null
+  assert.equal(model.rows[2].logoUrl, null); // allcase — not in logos payload
+
+  // logos are optional — model still builds without them
+  assert.equal(buildModel(sales, history).rows[0].logoUrl, null);
+});
+
 test("buildModel aggregates daily totals across shops for the trend chart", () => {
   const model = buildModel(sales, history);
   assert.equal(model.nDays, 3);

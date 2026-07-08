@@ -11,6 +11,8 @@
 export const DEFAULT_REFRESH_INTERVAL = 60000; // 60s
 // history snapshot changes ~daily → never poll it faster than every 10min
 export const HISTORY_MIN_INTERVAL = 600000;
+// shop logos change very rarely → never poll faster than every 30min
+export const LOGO_MIN_INTERVAL = 1800000;
 
 // 楽天アクセント(緋). data-viz uses blue; neutrals use theme-* tokens in the component.
 export const ACCENT = "#C6362B";
@@ -103,10 +105,13 @@ export function computeFreshness(jst, nowTs, refreshInterval = DEFAULT_REFRESH_I
   return { ageSec, state };
 }
 
-// Build the full view model from the realtime + history snapshots.
+// Build the full view model from the realtime + history + logo snapshots.
 // Returns null when there is no realtime payload yet (loading state).
-export function buildModel(sales, history) {
+export function buildModel(sales, history, logos) {
   if (!sales) return null;
+
+  // logos are optional context, merged by shopName (empty → component falls back).
+  const logoByName = new Map((logos?.shops || []).map((s) => [s.shopName, s.logoUrl || null]));
 
   const rtTotal = toNumber(sales?.totals?.salesYen);
   const rtOrders = toNumber(sales?.totals?.orderCount);
@@ -183,6 +188,7 @@ export function buildModel(sales, history) {
         h7Orders: h.orders,
         cvr: h.cvr,
         daily: h.daily,
+        logoUrl: logoByName.get(s.name) || null,
       };
     });
 

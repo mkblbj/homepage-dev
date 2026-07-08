@@ -10,6 +10,7 @@ const EXPECTED_METHOD_BY_ENDPOINT = {
   sales: "GET",
   history: "GET",
   campaigns: "GET",
+  logos: "GET",
 };
 
 function parseResponseData(data) {

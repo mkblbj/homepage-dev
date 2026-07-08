@@ -8,6 +8,7 @@ const ENDPOINT_PATHS = {
   sales: "/api/sales",
   history: "/api/history/sales",
   campaigns: "/api/campaigns",
+  logos: "/api/shops/logos",
 };
 
 export function normalizeSalesServiceUrl(baseUrl = DEFAULT_SALES_SERVICE_URL) {

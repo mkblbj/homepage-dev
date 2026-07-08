@@ -21,6 +21,7 @@ import {
   computeFreshness,
   DEFAULT_REFRESH_INTERVAL,
   HISTORY_MIN_INTERVAL,
+  LOGO_MIN_INTERVAL,
   man,
   spark,
 } from "./sales-model.mjs";
@@ -104,6 +105,34 @@ function ShopIcon() {
         <path d="M4 9.5h16v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5Z" />
         <path d="M9 13h6" />
       </svg>
+    </span>
+  );
+}
+
+// per-shop logo with a first-char fallback when the URL is empty or fails to load.
+// Rakuten logos vary (some white-bg) → bg-white + object-contain keeps them clean.
+function ShopLogo({ name, url, size = 16 }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [url]);
+  if (url && !failed) {
+    return (
+      <img
+        src={url}
+        alt={name}
+        loading="lazy"
+        onError={() => setFailed(true)}
+        className="shrink-0 rounded-[5px] bg-white object-contain"
+        style={{ width: size, height: size }}
+      />
+    );
+  }
+  return (
+    <span
+      aria-hidden="true"
+      className="inline-flex shrink-0 items-center justify-center rounded-[5px] font-bold"
+      style={{ width: size, height: size, fontSize: size * 0.58, color: ACCENT, backgroundColor: "rgba(198,54,43,.14)" }}
+    >
+      {String(name || "?").trim().charAt(0) || "?"}
     </span>
   );
 }
@@ -262,9 +291,11 @@ function DailyChart({ model, t }) {
 
   return (
     <div className="flex min-w-0 flex-col gap-2">
-      <div className="flex items-baseline justify-between">
-        <span className="text-[10.5px] font-bold tracking-wide text-theme-600 dark:text-theme-300">{t(`${NS}.dailyTrend`)}</span>
-        <span className="text-[9.5px] font-medium text-theme-600 dark:text-theme-300">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="min-w-0 truncate text-[10.5px] font-bold tracking-wide text-theme-600 dark:text-theme-300">
+          {t(`${NS}.dailyTrend`)} <span className="text-[9px] font-medium text-theme-500 dark:text-theme-400">· {t(`${NS}.excludesToday`)}</span>
+        </span>
+        <span className="shrink-0 text-[9.5px] font-medium text-theme-600 dark:text-theme-300">
           <span className="mr-1 inline-block w-3 border-t-[1.5px] border-dashed align-middle" style={{ borderColor: ACCENT }} />
           {t(`${NS}.avgLabel`)}
         </span>
@@ -353,9 +384,12 @@ export default function Component({ service }) {
   const { data: history, mutate: mutateHistory } = useWidgetAPI(widget, "history", {
     refreshInterval: Math.max(refreshInterval, HISTORY_MIN_INTERVAL),
   });
+  const { data: logos } = useWidgetAPI(widget, "logos", {
+    refreshInterval: Math.max(refreshInterval, LOGO_MIN_INTERVAL),
+  });
 
   const freshness = useFreshness(sales?.generatedAtJST, refreshInterval);
-  const model = useMemo(() => buildModel(sales, history), [sales, history]);
+  const model = useMemo(() => buildModel(sales, history, logos), [sales, history, logos]);
 
   const handleRefresh = useCallback(
     (e) => {
@@ -467,12 +501,15 @@ export default function Component({ service }) {
               ) : null}
             </div>
             {/* name + numbers cluster on the left (no cross-row eye travel); bullet trails right */}
-            <div className="grid grid-cols-[minmax(0,96px)_100px_48px_46px_minmax(56px,1fr)] items-center gap-x-2.5 gap-y-2">
+            <div className="grid grid-cols-[minmax(0,120px)_100px_48px_46px_minmax(56px,1fr)] items-center gap-x-2.5 gap-y-2">
               {model.rows.map((r) => {
                 const overIndex = r.rtShare >= r.h7Share;
                 return (
                   <div key={r.name} className="contents">
-                    <span className="min-w-0 truncate text-[12.5px] font-semibold text-theme-900 dark:text-theme-50">{r.name}</span>
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <ShopLogo name={r.name} url={r.logoUrl} size={16} />
+                      <span className="truncate text-[12.5px] font-semibold text-theme-900 dark:text-theme-50">{r.name}</span>
+                    </span>
                     <span className={`text-right text-[13px] font-bold tabular-nums ${r.rtSales > 0 ? ACCENT_TEXT : "text-theme-400 dark:text-theme-500"}`}>
                       {r.rtSales > 0 ? `¥${fmt(t, r.rtSales)}` : "¥0"}
                     </span>
@@ -515,13 +552,6 @@ export default function Component({ service }) {
           </div>
         </section>
 
-        {/* 7-day context header (totals now live in the hero summary above) */}
-        <div className="flex items-baseline justify-between gap-2 px-0.5">
-          <span className="text-[12px] font-bold text-theme-700 dark:text-theme-200">
-            {t(`${NS}.sevenDay`)} <span className="text-[10px] font-medium text-theme-600 dark:text-theme-300">· {t(`${NS}.excludesToday`)}</span>
-          </span>
-        </div>
-
         {model.hasHistory ? (
           <section className={`grid grid-cols-1 gap-x-5 gap-y-4 p-4 @4xl:grid-cols-[300px_1fr] ${cardCls}`}>
             <div className="min-w-0 @4xl:border-r @4xl:border-theme-300/30 dark:@4xl:border-white/10 @4xl:pr-5">
@@ -529,23 +559,40 @@ export default function Component({ service }) {
             </div>
             <div className="flex min-w-0 flex-col gap-2.5">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[10.5px] font-bold tracking-wide text-theme-600 dark:text-theme-300">{t(`${NS}.shopTrend`)}</span>
+                <span className="min-w-0 truncate text-[10.5px] font-bold tracking-wide text-theme-600 dark:text-theme-300">
+                  {t(`${NS}.shopTrend`)} <span className="text-[9px] font-medium text-theme-500 dark:text-theme-400">· {t(`${NS}.excludesToday`)}</span>
+                </span>
                 <ChartModeToggle mode={chartMode} onChange={setChartMode} t={t} />
               </div>
               <div className="grid grid-cols-[repeat(auto-fit,minmax(104px,1fr))] gap-2.5">
                 {model.rows.map((r) => (
-                  <div key={r.name} className="flex min-w-0 flex-col gap-1.5 rounded-xl border border-theme-300/30 bg-theme-100/60 p-2.5 dark:border-white/[0.06] dark:bg-white/[0.03]">
-                    <span className="truncate text-[11px] font-semibold text-theme-900 dark:text-theme-50">{r.name}</span>
-                    <span className="flex items-baseline gap-0.5">
-                      <span className="text-[9px] font-bold text-theme-600 dark:text-theme-300">¥</span>
-                      <span className="text-[15px] font-bold leading-none tabular-nums text-theme-900 dark:text-theme-50">{man(r.h7Total)}</span>
-                      <span className="text-[9px] font-medium text-theme-600 dark:text-theme-300">{t(`${NS}.manUnit`)}</span>
-                    </span>
-                    <ShopMiniChart points={r.daily} mode={chartMode} t={t} />
-                    <span className="border-t border-theme-300/30 pt-1.5 text-[9px] font-medium tabular-nums text-theme-600 dark:border-white/10 dark:text-theme-300">
-                      {fmt(t, r.h7Orders)}
-                      {t(`${NS}.ordersUnit`)} · CVR {r.cvr.toFixed(2)}%
-                    </span>
+                  <div key={r.name} className="relative flex min-w-0 flex-col rounded-xl border border-theme-300/30 bg-theme-100/60 p-2.5 dark:border-white/[0.06] dark:bg-white/[0.03]">
+                    {/* corner-bleed logo watermark — clipped by its OWN layer so the mini-chart
+                        hover tooltip can still escape the (unclipped) card */}
+                    {r.logoUrl ? (
+                      <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl">
+                        <img
+                          src={r.logoUrl}
+                          alt=""
+                          aria-hidden="true"
+                          loading="lazy"
+                          className="absolute -top-2 -right-2 h-[68px] w-[68px] object-contain opacity-[0.12] blur-[4px] dark:opacity-[0.15]"
+                        />
+                      </span>
+                    ) : null}
+                    <div className="relative flex min-w-0 flex-col gap-1.5">
+                      <span className="truncate text-[11px] font-semibold text-theme-900 dark:text-theme-50">{r.name}</span>
+                      <span className="flex items-baseline gap-0.5">
+                        <span className="text-[9px] font-bold text-theme-600 dark:text-theme-300">¥</span>
+                        <span className="text-[15px] font-bold leading-none tabular-nums text-theme-900 dark:text-theme-50">{man(r.h7Total)}</span>
+                        <span className="text-[9px] font-medium text-theme-600 dark:text-theme-300">{t(`${NS}.manUnit`)}</span>
+                      </span>
+                      <ShopMiniChart points={r.daily} mode={chartMode} t={t} />
+                      <span className="border-t border-theme-300/30 pt-1.5 text-[9px] font-medium tabular-nums text-theme-600 dark:border-white/10 dark:text-theme-300">
+                        {fmt(t, r.h7Orders)}
+                        {t(`${NS}.ordersUnit`)} · CVR {r.cvr.toFixed(2)}%
+                      </span>
+                    </div>
                   </div>
                 ))}
               </div>
