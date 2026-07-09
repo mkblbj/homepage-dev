@@ -12,10 +12,13 @@ import useWidgetAPI from "utils/proxy/use-widget-api";
  * データ層は attendance-model.mjs をそのまま利用し(サーバ側で算出した
  * attendance_status: working / off_work / not_checked_in が正)、ここでは
  * 見た目だけをタイムラインに刷新する。
- *   working       → 部署カラーのバー(右ラベル: 出勤打刻時刻)
- *   not_checked_in → 現在 < 始業なら「これから」、始業以降なら「未打刻」
- *                    (どちらもグレーの破線バー。区別は右ラベルのみ)
- *   off_work      → 部署カラーのバー(右ラベル: 退勤済。氏名・ドット・淡色で退勤を示す)
+ *
+ * 各行は「予定(薄)＋実績(濃)」の二層バー。打刻は1人1件(last_checkin_time)
+ * しか無いため、確実に言える範囲だけを濃いバーで描く:
+ *   working       → 濃: 出勤打刻 → 現在。予定より遅い出勤は左側の薄い帯で可視化。
+ *   off_work      → 濃: 予定開始 → 退勤打刻。早退は右側の薄い帯で可視化。
+ *                    (出勤打刻は残らないため、退勤済の「遅い出勤」は再現不可)
+ *   not_checked_in → 薄い破線の予定帯のみ(右ラベルで これから / 未打刻 を区別)
  * 緑(emerald)は「現在」を示すシグナル専用: 出勤中の人数 / LIVE / 現在ライン。
  */
 
@@ -31,6 +34,7 @@ const DEPT_STYLES = {
     soft: "rgba(94,179,228,0.12)",
     softBorder: "rgba(94,179,228,0.34)",
     seg: "#5EB3E4",
+    plan: "rgba(94,179,228,0.2)",
   },
   Production: {
     solid: "#E8A868",
@@ -39,6 +43,7 @@ const DEPT_STYLES = {
     soft: "rgba(232,168,104,0.12)",
     softBorder: "rgba(232,168,104,0.34)",
     seg: "#E8A868",
+    plan: "rgba(232,168,104,0.22)",
   },
 };
 const FALLBACK_DEPT = {
@@ -48,11 +53,15 @@ const FALLBACK_DEPT = {
   soft: "rgba(138,148,160,0.12)",
   softBorder: "rgba(138,148,160,0.34)",
   seg: "#8A94A0",
+  plan: "rgba(138,148,160,0.2)",
 };
 const NEUTRAL_SEG = "#8A94A0";
 const DONE_SEG = "#66757F";
 const DONE_BAR = "rgba(102,117,127,0.82)";
 const DONE_BAR_BORDER = "1px solid rgba(226,232,240,0.28)";
+// 予定(薄い下地)— scheduled window drawn faint behind the solid "actual" bar.
+const PLAN_DASH_BORDER = "1.5px dashed rgba(148,163,175,0.5)";
+const DONE_PLAN = "rgba(102,117,127,0.2)";
 
 function deptStyle(key) {
   return DEPT_STYLES[key] || FALLBACK_DEPT;
@@ -206,14 +215,11 @@ const ROW_STYLE = {
 };
 
 function buildRow(employee, dept, domain, nowH) {
-  let { start, end } = scheduledBounds(employee);
+  const { start: schedStart, end: schedEnd } = scheduledBounds(employee);
+  const hasSchedule = schedStart != null && schedEnd != null;
   const unscheduled = employee.shiftText === "予定外";
-  // walk-ins have no roster window: draw from check-in to the axis end.
-  if (start == null && employee.displayTime) {
-    start = hm(employee.displayTime);
-  }
-  const startH = start ?? domain.start;
-  const endH = end ?? domain.end;
+  // one punch per person: IN time when working, OUT time when off_work.
+  const punch = hm(employee.displayTime);
 
   let state;
   if (employee.attendance_status === "working") {
@@ -221,21 +227,50 @@ function buildRow(employee, dept, domain, nowH) {
   } else if (employee.attendance_status === "off_work") {
     state = "done";
   } else {
-    state = nowH < startH ? "upcoming" : "missing";
+    const scheduleStartH = schedStart ?? domain.start;
+    state = nowH < scheduleStartH ? "upcoming" : "missing";
   }
 
   const base = ROW_STYLE[state];
-  const style = state === "working" ? { ...base, bg: dept.bar, dot: dept.dot } : base;
 
-  const rightLabel = {
-    working: employee.displayTime || fmtClock(startH),
-    upcoming: `${fmtClock(startH)}〜`,
-    missing: "未打刻",
-    done: "退勤済",
-  }[state];
+  const clamp = (h) => Math.max(domain.start, Math.min(domain.end, h));
+  const pct = (h) => ((clamp(h) - domain.start) / (domain.end - domain.start)) * 100;
+  const band = (s, e) => {
+    if (s == null || e == null || e <= s) {
+      return null;
+    }
+    const left = pct(s);
+    return { left, width: Math.max(1.5, pct(e) - left) };
+  };
 
-  const pct = (h) => Math.max(0, Math.min(100, ((h - domain.start) / (domain.end - domain.start)) * 100));
-  const geom = { left: pct(startH), width: Math.max(1.5, pct(endH) - pct(startH)) };
+  // 予定(薄い下地): rostered window. Walk-ins have no roster window.
+  const plannedGeom = hasSchedule ? band(schedStart, schedEnd) : null;
+
+  // 実績(濃いバー): only the span the single punch can actually prove.
+  let actualGeom = null;
+  let rightLabel;
+  if (state === "working") {
+    const s = punch ?? schedStart ?? domain.start; // 出勤打刻(なければ予定開始で代用)
+    const e = Math.max(s + 1 / 12, Math.min(nowH, domain.end)); // 〜現在(ライブに伸びる)
+    actualGeom = band(s, e);
+    rightLabel = employee.displayTime || fmtClock(s);
+  } else if (state === "done") {
+    const e = punch ?? schedEnd ?? domain.end; // 退勤打刻
+    const s = schedStart ?? Math.max(domain.start, e - 1 / 12); // 出勤打刻は残らない→予定開始で代用
+    actualGeom = band(Math.min(s, e), e);
+    rightLabel = "退勤済";
+  } else {
+    rightLabel = state === "upcoming" ? `${fmtClock(schedStart ?? domain.start)}〜` : "未打刻";
+  }
+
+  const style = {
+    ...base,
+    dot: state === "working" ? dept.dot : base.dot,
+    plannedFill: state === "working" ? dept.plan : state === "done" ? DONE_PLAN : "transparent",
+    plannedBorder: state === "upcoming" || state === "missing" ? PLAN_DASH_BORDER : "none",
+    actualFill: state === "working" ? dept.bar : state === "done" ? DONE_BAR : "none",
+    actualBorder: state === "done" ? DONE_BAR_BORDER : "none",
+  };
 
   return {
     id: employee.employee,
@@ -244,7 +279,8 @@ function buildRow(employee, dept, domain, nowH) {
     state,
     attendanceStatus: employee.attendance_status,
     canManualToggle: isTakadaEmployee(employee),
-    geom,
+    plannedGeom,
+    actualGeom,
     style,
     rightLabel,
     title: [
@@ -347,17 +383,32 @@ function DeptTimeline({ dept, label, working, scheduled, fteText, rows, domain, 
                 ) : null}
               </span>
             </span>
-            <span className="relative block h-[9px] rounded-full bg-theme-300/50 dark:bg-white/[0.08]">
-              <span
-                className="absolute inset-y-0 box-border rounded-full"
-                style={{
-                  left: `${row.geom.left}%`,
-                  width: `${row.geom.width}%`,
-                  background: row.style.bg,
-                  border: row.style.border,
-                }}
-              />
-              <span className="absolute -inset-y-0.5 w-px" style={{ left: `${nowPct}%`, backgroundColor: NOW_LINE }} />
+            <span className="relative block h-[9px] rounded-full bg-theme-300/40 dark:bg-white/[0.06]">
+              {/* 実績(濃): keep first in the DOM so it stays the row's primary bar; z-index lifts it above 予定. */}
+              {row.actualGeom ? (
+                <span
+                  className="absolute inset-y-0 z-10 box-border rounded-full"
+                  style={{
+                    left: `${row.actualGeom.left}%`,
+                    width: `${row.actualGeom.width}%`,
+                    background: row.style.actualFill,
+                    border: row.style.actualBorder,
+                  }}
+                />
+              ) : null}
+              {/* 予定(薄): scheduled window behind the actual bar; the exposed part = 予定なのに未稼働(遅刻/早退)。 */}
+              {row.plannedGeom ? (
+                <span
+                  className="absolute inset-y-0 z-0 box-border rounded-full"
+                  style={{
+                    left: `${row.plannedGeom.left}%`,
+                    width: `${row.plannedGeom.width}%`,
+                    background: row.style.plannedFill,
+                    border: row.style.plannedBorder,
+                  }}
+                />
+              ) : null}
+              <span className="absolute -inset-y-0.5 z-20 w-px" style={{ left: `${nowPct}%`, backgroundColor: NOW_LINE }} />
             </span>
             <span
               className={`whitespace-nowrap text-right text-[10px] font-semibold tabular-nums ${row.style.rightCls}`}
