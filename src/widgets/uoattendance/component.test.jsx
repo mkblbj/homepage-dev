@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, fireEvent, screen } from "@testing-library/react";
+import { act, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithProviders } from "test-utils/render-with-providers";
@@ -243,6 +243,24 @@ describe("widgets/uoattendance/component", () => {
     expect(bar.style.background).toBe("rgba(102, 117, 127, 0.82)");
     expect(bar.style.border).toBe("1px solid rgba(226, 232, 240, 0.28)");
     expect(bar.style.background).not.toBe("rgba(232, 168, 104, 0.6)");
+  });
+
+  it("keeps the unscheduled badge on the employee name line", () => {
+    mockApi({
+      actual: { message: { employees: actualEmployees } },
+      today: { message: { today: todaySnapshot } },
+      tomorrow: { message: { tomorrow: tomorrowSnapshot } },
+    });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+
+    const unscheduledRow = screen.getByTitle(
+      "予定外 太郎 / 予定外 / 出勤中 / IN 10:15 / 予定外",
+    );
+    const badge = within(unscheduledRow).getByText("予定外");
+
+    expect(badge.parentElement).toHaveClass("inline-flex", "whitespace-nowrap");
+    expect(badge).toHaveClass("shrink-0");
   });
 
   it("cycles only Takada's display attendance by clicking his name", async () => {

@@ -358,11 +358,11 @@ function DeptTimeline({ dept, label, working, scheduled, fteText, rows, domain, 
           >
             <span className="inline-flex min-w-0 items-center gap-1.5">
               <span className="h-[5.5px] w-[5.5px] shrink-0 rounded-full" style={{ backgroundColor: row.style.dot }} />
-              <span className="min-w-0">
+              <span className="inline-flex min-w-0 max-w-full items-baseline whitespace-nowrap">
                 {row.canManualToggle ? (
                   <button
                     type="button"
-                    className={`block max-w-full cursor-pointer appearance-none truncate rounded-sm border-0 bg-transparent p-0 text-left text-[11.5px] font-semibold transition-colors hover:text-amber-500 focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-amber-400 ${row.style.nameCls}`}
+                    className={`block min-w-0 max-w-full cursor-pointer appearance-none truncate rounded-sm border-0 bg-transparent p-0 text-left text-[11.5px] font-semibold transition-colors hover:text-amber-500 focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-amber-400 ${row.style.nameCls}`}
                     title="表示打刻を切り替え"
                     aria-label={`${row.name}の表示打刻を切り替え`}
                     onClick={(e) => {
@@ -374,12 +374,12 @@ function DeptTimeline({ dept, label, working, scheduled, fteText, rows, domain, 
                     {row.name}
                   </button>
                 ) : (
-                  <span className={`block max-w-full truncate text-[11.5px] font-semibold ${row.style.nameCls}`}>
+                  <span className={`block min-w-0 max-w-full truncate text-[11.5px] font-semibold ${row.style.nameCls}`}>
                     {row.name}
                   </span>
                 )}
                 {row.unscheduled ? (
-                  <span className="ml-1 text-[8.5px] font-bold text-theme-500 dark:text-theme-400">予定外</span>
+                  <span className="ml-1 shrink-0 text-[8.5px] font-bold text-theme-500 dark:text-theme-400">予定外</span>
                 ) : null}
               </span>
             </span>
