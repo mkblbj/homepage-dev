@@ -207,6 +207,7 @@ export function buildModel(sales, history, logos) {
     grandOrders,
     grandCvr,
     avg,
+    avgOrders: grandOrders / nDays,
     nDays,
     days,
     maxDaily,

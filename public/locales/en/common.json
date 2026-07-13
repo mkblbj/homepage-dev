@@ -1233,6 +1233,7 @@
         "excludesToday": "excludes today",
         "dailyTrend": "Daily sales trend",
         "avgLabel": "Avg",
+        "perDay": "/day",
         "shopTrend": "7-day trend by shop",
         "chartLine": "Line",
         "chartBar": "Bars",
@@ -1280,7 +1281,11 @@
         "shippingIdleNote": "Switches automatically once today's shipments are tallied",
         "shippingLiveNote": "Accruing · updates until the last dispatch",
         "totalShort": "Total",
-        "shopsUnit": " shops"
+        "shopsUnit": " shops",
+        "yesterdayOutput": "Yesterday's output",
+        "tomorrowPending": "Confirmed in the afternoon",
+        "forecast": "Forecast",
+        "collapse": "Collapse"
     },
     "arcane": {
         "containers": "Containers",

@@ -262,19 +262,14 @@ function GreenBadge({ children }) {
 }
 
 // ===== KPI ストリップ(3セル) =====
-function KpiStrip({ shipping, t, todayOutput, tomorrowOutput }) {
+function KpiStrip({ shipping, t, todayOutput, tomorrow }) {
   const shops = useMemo(() => normalizeShops(todayOutput), [todayOutput]);
   const channelSegments = useMemo(() => buildChannelSegments(shops), [shops]);
   const outputTotal = Number(todayOutput?.total_quantity || 0);
-  const tomorrowTotal = Number(tomorrowOutput?.total_quantity || 0);
-
-  const tomorrowTop = useMemo(
-    () =>
-      normalizeShops(tomorrowOutput)
-        .filter((shop) => Number(shop.total_quantity || 0) > 0)
-        .slice(0, 3),
-    [tomorrowOutput],
-  );
+  const tomorrowIsYesterday = tomorrow.mode === "yesterday";
+  // 店舗リストの「他 N 店」をその場で全量展開できる。
+  const [tomorrowOpen, setTomorrowOpen] = useState(false);
+  const tomorrowShownShops = tomorrowOpen ? tomorrow.shops : tomorrow.topShops;
 
   const cellBorder = "border-theme-300/30 dark:border-white/10";
 
@@ -290,15 +285,31 @@ function KpiStrip({ shipping, t, todayOutput, tomorrowOutput }) {
         <LegendRow segments={channelSegments} t={t} />
       </div>
 
-      {/* 明日予定 */}
+      {/* 明日予定 — 明日実績 > 予測 > 昨日出力 でフォールバック(午後まで明日は 0 のことが多い) */}
       <div className={`flex min-w-0 flex-col gap-2.5 border-t p-4 @xl:border-l @xl:border-t-0 @xl:p-5 ${cellBorder}`}>
-        <CellKicker label={t("uoshippingdashboard.tomorrowOutput")} scope={tomorrowOutput?.date} />
-        <span className="text-[26px] font-bold leading-none tracking-tight tabular-nums text-amber-600 @xl:text-[30px] dark:text-amber-400">
-          {formatNumber(t, tomorrowTotal)}
+        <CellKicker
+          label={tomorrowIsYesterday ? t("uoshippingdashboard.yesterdayOutput") : t("uoshippingdashboard.tomorrowOutput")}
+          scope={tomorrow.date}
+        />
+        <span
+          className={`text-[26px] font-bold leading-none tracking-tight tabular-nums @xl:text-[30px] ${
+            tomorrowIsYesterday ? "text-theme-900 dark:text-theme-50" : "text-amber-600 dark:text-amber-400"
+          }`}
+        >
+          {formatNumber(t, tomorrow.total)}
         </span>
-        {tomorrowTop.length > 0 ? (
+        {tomorrowIsYesterday ? (
+          <span className="flex flex-wrap items-center gap-1.5">
+            <AmberBadge>{t("uoshippingdashboard.tomorrowPending")}</AmberBadge>
+          </span>
+        ) : tomorrow.mode === "predicted" ? (
+          <span className="flex flex-wrap items-center gap-1.5">
+            <AmberBadge>{t("uoshippingdashboard.forecast")}</AmberBadge>
+          </span>
+        ) : null}
+        {tomorrow.topShops.length > 0 ? (
           <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px] leading-relaxed">
-            {tomorrowTop.map((shop, index) => (
+            {tomorrowShownShops.map((shop, index) => (
               <span key={shop.shop_id} className="inline-flex items-baseline gap-1">
                 {index > 0 ? <span className="mr-1 text-theme-400 dark:text-theme-500">·</span> : null}
                 <span className="text-theme-600 dark:text-theme-300">{shop.shop_name}</span>
@@ -307,6 +318,25 @@ function KpiStrip({ shipping, t, todayOutput, tomorrowOutput }) {
                 </span>
               </span>
             ))}
+            {tomorrow.restCount > 0 ? (
+              <span className="inline-flex items-baseline gap-1">
+                <span className="mr-1 text-theme-400 dark:text-theme-500">·</span>
+                <button
+                  type="button"
+                  aria-expanded={tomorrowOpen}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setTomorrowOpen((value) => !value);
+                  }}
+                  className="cursor-pointer appearance-none border-0 bg-transparent p-0 text-[11px] font-medium tabular-nums text-theme-500 underline decoration-dotted underline-offset-2 transition-colors hover:text-theme-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-400/60 dark:text-theme-400 dark:hover:text-theme-100"
+                >
+                  {tomorrowOpen
+                    ? t("uoshippingdashboard.collapse")
+                    : `${t("uoshippingdashboard.moreShops", { count: tomorrow.restCount })} ${t("uoshippingdashboard.totalShort")} ${formatNumber(t, tomorrow.restTotal)}`}
+                </button>
+              </span>
+            ) : null}
           </span>
         ) : null}
       </div>
@@ -546,6 +576,32 @@ export default function Component({ service }) {
     };
   }, [data, t]);
 
+  // 明日予定は「明日実績 > 予測 > 昨日出力」でフォールバック(午後まで明日は 0 のことが多いため)。
+  const tomorrow = useMemo(() => {
+    const to = data?.tomorrow_output;
+    const yo = data?.yesterday_output;
+    const actual = Number(to?.total_quantity || 0);
+    const predicted = Number(to?.total_predicted_quantity || 0);
+    const mode = actual > 0 ? "actual" : predicted > 0 ? "predicted" : "yesterday";
+    const source = mode === "yesterday" ? yo : to;
+    const total = mode === "predicted" ? predicted : Number(source?.total_quantity || 0);
+    const activeShops =
+      mode === "predicted"
+        ? []
+        : normalizeShops(source).filter((shop) => Number(shop.total_quantity || 0) > 0);
+    const topShops = activeShops.slice(0, 3);
+    const restShops = activeShops.slice(3);
+    return {
+      mode,
+      total,
+      date: source?.date || "",
+      shops: activeShops,
+      topShops,
+      restCount: restShops.length,
+      restTotal: restShops.reduce((sum, shop) => sum + Number(shop.total_quantity || 0), 0),
+    };
+  }, [data]);
+
   if (error) {
     return <Container service={service} error={error} />;
   }
@@ -573,7 +629,7 @@ export default function Component({ service }) {
           shipping={shipping}
           t={t}
           todayOutput={data.today_output}
-          tomorrowOutput={data.tomorrow_output}
+          tomorrow={tomorrow}
         />
 
         <div className="grid grid-cols-1 gap-3 @2xl:grid-cols-[1.55fr_1fr]">

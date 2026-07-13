@@ -197,8 +197,11 @@ function ChartModeToggle({ mode, onChange, t }) {
 // per-shop 7-day mini chart: line (sparkline) or bars, both with hover detail.
 // points = [{ md, wd, sales, orders }]. x uses segment centers so the hover dot
 // / highlighted bar / tooltip all line up with the equal-width hover zones.
-function ShopMiniChart({ points, mode, t, height = 32 }) {
+// A dashed line marks the shop's daily average; the ⌀ tag (hover) reveals the
+// average sales / orders / CVR. cvr is the shop's trailing-7d conversion rate.
+function ShopMiniChart({ points, mode, cvr = 0, t, height = 32 }) {
   const [hover, setHover] = useState(null);
+  const [avgHover, setAvgHover] = useState(false);
   const n = points.length;
   const vals = useMemo(() => points.map((p) => p.sales), [points]);
   const minV = n ? Math.min(...vals) : 0;
@@ -207,7 +210,15 @@ function ShopMiniChart({ points, mode, t, height = 32 }) {
   const barMax = Math.max(1, maxV);
   const { line, area } = useMemo(() => spark(vals, 100, height, false, true), [vals, height]);
 
-  const hp = hover != null ? points[hover] : null;
+  const avgSales = n ? vals.reduce((s, v) => s + v, 0) / n : 0;
+  const avgOrders = n ? points.reduce((s, p) => s + p.orders, 0) / n : 0;
+  // avg line y matches the active scale: sparkline is min..max, bars are 0..max
+  const avgTopPct =
+    mode === "bar"
+      ? (1 - avgSales / barMax) * 100
+      : ((5 + (1 - (avgSales - minV) / span) * (height - 10)) / height) * 100;
+
+  const hp = hover != null && !avgHover ? points[hover] : null;
   const on = hp != null;
   const xPct = on ? ((hover + 0.5) / n) * 100 : 0;
   const dotYPct = on ? ((5 + (1 - (hp.sales - minV) / span) * (height - 10)) / height) * 100 : 0;
@@ -245,12 +256,41 @@ function ShopMiniChart({ points, mode, t, height = 32 }) {
         </svg>
       )}
 
-      {/* hover zones */}
-      <div className="absolute inset-0 flex" onMouseLeave={() => setHover(null)}>
+      {/* daily-average line */}
+      <span className="pointer-events-none absolute inset-x-0 z-[2] border-t border-dashed" style={{ top: `${avgTopPct}%`, borderColor: "rgba(198,54,43,.55)" }} />
+
+      {/* hover zones (per day) */}
+      <div className="absolute inset-0 z-[3] flex" onMouseLeave={() => setHover(null)}>
         {points.map((p, i) => (
           <div key={p.date ?? i} className="flex-1 cursor-crosshair" onMouseEnter={() => setHover(i)} />
         ))}
       </div>
+
+      {/* ⌀ average tag — always shows daily avg; hover reveals full averages */}
+      <span
+        className="absolute right-0 z-[4] flex -translate-y-1/2 cursor-help items-center rounded-[3px] bg-slate-900/75 px-1 text-[7px] font-bold leading-[1.4] text-white/90 tabular-nums"
+        style={{ top: `${avgTopPct}%` }}
+        onMouseEnter={() => setAvgHover(true)}
+        onMouseLeave={() => setAvgHover(false)}
+      >
+        ⌀{man(avgSales)}
+        {t(`${NS}.manUnit`)}
+      </span>
+
+      {avgHover ? (
+        <div className="pointer-events-none absolute bottom-full right-0 z-20 mb-1 whitespace-nowrap rounded-[6px] bg-slate-900 px-2 py-1 text-right shadow-lg">
+          <span className="block text-[8.5px] font-bold text-slate-300">{t(`${NS}.avgLabel`)}</span>
+          <span className="block text-[11px] font-extrabold tabular-nums text-white">
+            ¥{fmt(t, Math.round(avgSales))}
+            {t(`${NS}.perDay`)}
+          </span>
+          <span className="block text-[8.5px] font-medium tabular-nums text-slate-400">
+            {fmt(t, Math.round(avgOrders))}
+            {t(`${NS}.ordersUnit`)}
+            {t(`${NS}.perDay`)} · CVR {cvr.toFixed(2)}%
+          </span>
+        </div>
+      ) : null}
 
       {on ? (
         <>
@@ -282,9 +322,11 @@ function ShopMiniChart({ points, mode, t, height = 32 }) {
 // ---- daily area chart with hover (aggregate across shops) ----
 function DailyChart({ model, t }) {
   const [hover, setHover] = useState(null);
+  const [avgHover, setAvgHover] = useState(false);
   // hover is an index into model.days; a background refresh can shrink model.days
   // below a stale index, so guard on the resolved element, not just the index.
-  const hd = hover != null ? model.days[hover] : null;
+  // Suppressed while hovering the ⌀ average tag (mutually exclusive tooltips).
+  const hd = hover != null && !avgHover ? model.days[hover] : null;
   const on = hd != null;
   const tipTx = hover === 0 ? "0%" : hover === model.nDays - 1 ? "-100%" : "-50%";
   const avgTopPct = ((5 + (1 - model.avg / model.maxDaily) * 30) / 40) * 100;
@@ -302,6 +344,30 @@ function DailyChart({ model, t }) {
       </div>
       <div className="relative h-[112px]">
         <div className="pointer-events-none absolute inset-x-0 z-[3] border-t-[1.5px] border-dashed" style={{ top: `${avgTopPct}%`, borderColor: "rgba(198,54,43,.7)" }} />
+        {/* ⌀ average tag on the line — same affordance as the per-shop mini charts */}
+        <span
+          className="absolute right-0 z-[9] flex -translate-y-1/2 cursor-help items-center rounded-[3px] bg-slate-900/75 px-1.5 text-[8px] font-bold leading-[1.5] tabular-nums text-white/90"
+          style={{ top: `${avgTopPct}%` }}
+          onMouseEnter={() => setAvgHover(true)}
+          onMouseLeave={() => setAvgHover(false)}
+        >
+          ⌀{man(model.avg)}
+          {t(`${NS}.manUnit`)}
+          {avgHover ? (
+            <span className="pointer-events-none absolute bottom-full right-0 z-20 mb-1 whitespace-nowrap rounded-[6px] bg-slate-900 px-2 py-1 text-right shadow-lg">
+              <span className="block text-[8.5px] font-bold text-slate-300">{t(`${NS}.avgLabel`)}</span>
+              <span className="block text-[11px] font-extrabold tabular-nums text-white">
+                ¥{fmt(t, Math.round(model.avg))}
+                {t(`${NS}.perDay`)}
+              </span>
+              <span className="block text-[8.5px] font-medium tabular-nums text-slate-400">
+                {fmt(t, Math.round(model.avgOrders))}
+                {t(`${NS}.ordersUnit`)}
+                {t(`${NS}.perDay`)} · CVR {model.grandCvr.toFixed(2)}%
+              </span>
+            </span>
+          ) : null}
+        </span>
         <svg viewBox="0 0 100 40" preserveAspectRatio="none" width="100%" height="100%" className="absolute inset-0 block overflow-visible">
           <path d={model.heroChart.area} fill="url(#uors-area)" />
           <path
@@ -475,16 +541,33 @@ export default function Component({ service }) {
                 <span className="block h-full rounded-full" style={{ width: `${model.avg > 0 ? Math.min(100, (model.rtTotal / model.avg) * 100) : 0}%`, backgroundColor: ACCENT }} />
               </span>
             </div>
-            {/* 7-day context summary — fills the hero's spare height, anchors the pace bar */}
+            {/* 7-day context summary — totals + per-day averages fill the hero's spare height */}
             {model.hasHistory ? (
-              <div className="mt-auto flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-theme-300/30 pt-3 dark:border-white/10">
+              <div className="mt-auto flex flex-col gap-1.5 border-t border-theme-300/30 pt-3 dark:border-white/10">
                 <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-theme-600 dark:text-theme-300">{t(`${NS}.sevenDay`)}</span>
-                <span className="text-[13px] font-bold tabular-nums text-theme-800 dark:text-theme-100">¥{fmt(t, model.grandTotal)}</span>
-                <span className="text-[12px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
-                  {fmt(t, model.grandOrders)}
-                  {t(`${NS}.ordersUnit`)}
-                </span>
-                <span className="text-[12px] font-medium tabular-nums text-theme-600 dark:text-theme-300">CVR {model.grandCvr.toFixed(2)}%</span>
+                <div className="grid grid-cols-[max-content_1fr] items-baseline gap-x-3 gap-y-1">
+                  <span className="text-[10px] font-medium text-theme-500 dark:text-theme-400">{t(`${NS}.total`)}</span>
+                  <span className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
+                    <span className="text-[13px] font-bold tabular-nums text-theme-800 dark:text-theme-100">¥{fmt(t, model.grandTotal)}</span>
+                    <span className="text-[11.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
+                      {fmt(t, model.grandOrders)}
+                      {t(`${NS}.ordersUnit`)}
+                    </span>
+                  </span>
+                  <span className="text-[10px] font-medium text-theme-500 dark:text-theme-400">{t(`${NS}.avgLabel`)}</span>
+                  <span className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
+                    <span className="text-[13px] font-bold tabular-nums text-theme-800 dark:text-theme-100">
+                      ¥{fmt(t, Math.round(model.avg))}
+                      <span className="text-[10px] font-medium text-theme-500 dark:text-theme-400">{t(`${NS}.perDay`)}</span>
+                    </span>
+                    <span className="text-[11.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
+                      {fmt(t, Math.round(model.avgOrders))}
+                      {t(`${NS}.ordersUnit`)}
+                      {t(`${NS}.perDay`)}
+                    </span>
+                    <span className="text-[11.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">CVR {model.grandCvr.toFixed(2)}%</span>
+                  </span>
+                </div>
               </div>
             ) : null}
           </div>
@@ -587,7 +670,7 @@ export default function Component({ service }) {
                         <span className="text-[15px] font-bold leading-none tabular-nums text-theme-900 dark:text-theme-50">{man(r.h7Total)}</span>
                         <span className="text-[9px] font-medium text-theme-600 dark:text-theme-300">{t(`${NS}.manUnit`)}</span>
                       </span>
-                      <ShopMiniChart points={r.daily} mode={chartMode} t={t} />
+                      <ShopMiniChart points={r.daily} mode={chartMode} cvr={r.cvr} t={t} />
                       <span className="border-t border-theme-300/30 pt-1.5 text-[9px] font-medium tabular-nums text-theme-600 dark:border-white/10 dark:text-theme-300">
                         {fmt(t, r.h7Orders)}
                         {t(`${NS}.ordersUnit`)} · CVR {r.cvr.toFixed(2)}%

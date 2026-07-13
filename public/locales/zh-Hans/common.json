@@ -1246,6 +1246,7 @@
         "excludesToday": "不含今天",
         "dailyTrend": "每日销售趋势",
         "avgLabel": "平均",
+        "perDay": "/日",
         "shopTrend": "各店铺 7 日趋势",
         "chartLine": "折线",
         "chartBar": "柱状",
@@ -1293,6 +1294,10 @@
         "shippingIdleNote": "今日出荷数据一经计入将自动切换",
         "shippingLiveNote": "计入中 · 持续更新至最后一班",
         "totalShort": "计",
-        "shopsUnit": "店"
+        "shopsUnit": "店",
+        "yesterdayOutput": "昨日出力",
+        "tomorrowPending": "明日午后确定",
+        "forecast": "预测",
+        "collapse": "收起"
     }
 }

@@ -25,6 +25,7 @@ const REQUIRED_KEYS = [
   "excludesToday",
   "dailyTrend",
   "avgLabel",
+  "perDay",
   "shopTrend",
   "chartLine",
   "chartBar",

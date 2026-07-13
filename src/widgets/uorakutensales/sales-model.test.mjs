@@ -125,6 +125,7 @@ test("buildModel aggregates daily totals across shops for the trend chart", () =
   assert.deepEqual(model.days.map((d) => d.md), ["6/30", "7/1", "7/2"]);
   assert.equal(model.maxDaily, 45000);
   assert.equal(model.avg, 90000 / 3);
+  assert.equal(model.avgOrders, 60 / 3); // per-day average orders
   assert.equal(model.grandTotal, 90000);
   assert.equal(model.grandCvr, 2.35);
   assert.equal(model.hasHistory, true);

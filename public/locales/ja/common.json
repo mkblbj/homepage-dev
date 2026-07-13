@@ -1233,6 +1233,7 @@
         "excludesToday": "今日を含まない",
         "dailyTrend": "日別売上推移",
         "avgLabel": "平均",
+        "perDay": "/日",
         "shopTrend": "店舗別 7日推移",
         "chartLine": "折れ線",
         "chartBar": "棒グラフ",
@@ -1280,7 +1281,11 @@
         "shippingIdleNote": "今日の出荷が計上され次第、自動的に切り替わります",
         "shippingLiveNote": "計上中 · 最終便まで随時更新されます",
         "totalShort": "計",
-        "shopsUnit": "店"
+        "shopsUnit": "店",
+        "yesterdayOutput": "昨日出力",
+        "tomorrowPending": "明日は午後に確定",
+        "forecast": "予測",
+        "collapse": "閉じる"
     },
     "arcane": {
         "containers": "Containers",
