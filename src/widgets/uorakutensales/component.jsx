@@ -18,11 +18,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ACCENT,
   buildModel,
+  buildRanking,
   computeFreshness,
   DEFAULT_REFRESH_INTERVAL,
   HISTORY_MIN_INTERVAL,
   LOGO_MIN_INTERVAL,
   man,
+  RANKING_MIN_INTERVAL,
+  RANKING_STEPS,
   spark,
 } from "./sales-model.mjs";
 
@@ -423,6 +426,257 @@ function DailyChart({ model, t }) {
   );
 }
 
+// ---- item ranking: podium (top 3) + list, per shop or aggregated ----
+
+// gold / silver / bronze get genuinely different weight, not just a number
+const MEDAL = {
+  1: {
+    card: "border-amber-300/45 bg-gradient-to-br from-amber-400/[0.16] to-[rgba(214,72,61,0.10)] dark:border-amber-300/40",
+    crown: "text-[19px] text-amber-500 dark:text-amber-300",
+    amount: "text-[20px] text-amber-700 dark:text-amber-200",
+    mno: "text-[12px]",
+    img: 76,
+  },
+  2: {
+    card: "border-slate-400/35 bg-slate-400/[0.10] dark:border-slate-300/30 dark:bg-slate-300/[0.09]",
+    crown: "text-[16px] text-slate-500 dark:text-slate-300",
+    amount: "text-[17px] text-slate-700 dark:text-slate-200",
+    mno: "text-[11.5px]",
+    img: 62,
+  },
+  3: {
+    card: "border-orange-700/35 bg-orange-700/[0.10] dark:border-orange-400/30 dark:bg-orange-400/[0.09]",
+    crown: "text-[16px] text-orange-700 dark:text-orange-300",
+    amount: "text-[17px] text-orange-800 dark:text-orange-200",
+    mno: "text-[11.5px]",
+    img: 62,
+  },
+};
+
+// product thumbnail — same white-bg/contain treatment as the shop logos.
+// Hovering pops a large preview (thumbnails alone are too small to identify a case).
+// `preview` picks the side it opens on so it stays inside the card.
+function ItemThumb({ item, size, preview = "below" }) {
+  const [failed, setFailed] = useState(false);
+  const [hover, setHover] = useState(false);
+  useEffect(() => {
+    setFailed(false);
+    setHover(false);
+  }, [item.imageUrl]);
+
+  if (!item.imageUrl || failed) {
+    return <span aria-hidden="true" className="block shrink-0 rounded-[7px] bg-theme-300/40 dark:bg-white/10" style={{ width: size, height: size }} />;
+  }
+
+  return (
+    <span
+      className="relative block shrink-0"
+      style={{ width: size, height: size }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
+      <img
+        src={item.imageUrl}
+        alt=""
+        loading="lazy"
+        onError={() => setFailed(true)}
+        className="h-full w-full rounded-[7px] bg-white object-contain"
+      />
+      {hover ? (
+        <span
+          // explicit width: an absolutely positioned box shrink-fits to the 40px
+          // thumbnail otherwise, and the base `img{max-width:100%}` then squashes
+          // the preview into a sliver. max-w-none defeats that rule as well.
+          className={`pointer-events-none absolute left-1/2 z-30 block w-[186px] -translate-x-1/2 rounded-xl border border-theme-300/60 bg-white p-2 shadow-2xl dark:border-white/20 ${
+            preview === "above" ? "bottom-full mb-2" : "top-full mt-2"
+          }`}
+        >
+          <img src={item.imageUrl} alt="" loading="lazy" className="block h-[170px] w-[170px] max-w-none object-contain" />
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+// neutral chip — the accent red washed out against the dark card
+function ShopBadge({ name }) {
+  if (!name) return null;
+  return (
+    <span className="ml-1.5 inline-block shrink-0 rounded border border-theme-400/40 bg-theme-300/40 px-1.5 py-px align-[1px] text-[9.5px] font-bold text-theme-700 dark:border-white/15 dark:bg-white/10 dark:text-theme-100">
+      {name}
+    </span>
+  );
+}
+
+// wraps in an <a> only when the API gave us an item URL
+function ItemLink({ item, className, children }) {
+  if (!item.url) return <div className={className}>{children}</div>;
+  return (
+    <a href={item.url} target="_blank" rel="noopener noreferrer" className={className} onClick={(e) => e.stopPropagation()}>
+      {children}
+    </a>
+  );
+}
+
+function PodiumCard({ item, showShop, t }) {
+  const m = MEDAL[item.rank] ?? MEDAL[3];
+  return (
+    <ItemLink
+      item={item}
+      className={`relative flex min-w-0 items-center gap-3 rounded-xl border p-3 transition-colors hover:brightness-110 ${m.card}`}
+    >
+      <span className={`absolute right-2.5 top-2 font-extrabold leading-none tabular-nums ${m.crown}`}>{item.rank}</span>
+      <ItemThumb item={item} size={m.img} preview="below" />
+      <span className="flex min-w-0 flex-1 flex-col gap-1">
+        <span className={`flex min-w-0 items-center pr-4 font-bold ${m.mno}`}>
+          <span className="truncate text-theme-900 dark:text-theme-50">{item.mno}</span>
+          {showShop ? <ShopBadge name={item.shopName} /> : null}
+        </span>
+        <span className={`font-extrabold leading-none tabular-nums ${m.amount}`}>¥{fmt(t, item.salesYen)}</span>
+        <span className="text-[9.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
+          {fmt(t, item.unitsSold)}
+          {t(`${NS}.unitsShort`)} · {fmt(t, item.orderCount)}
+          {t(`${NS}.ordersUnit`)} · @¥{fmt(t, item.avgPrice)}
+        </span>
+      </span>
+    </ItemLink>
+  );
+}
+
+// compact card — two of these sit side by side on a wide container
+function RankRow({ item, showShop, t }) {
+  return (
+    <ItemLink
+      item={item}
+      className="flex items-center gap-2.5 rounded-lg border border-theme-300/25 bg-theme-100/40 p-1.5 transition-colors hover:bg-theme-200/50 dark:border-white/[0.06] dark:bg-white/[0.02] dark:hover:bg-white/[0.06]"
+    >
+      <span className="w-[18px] shrink-0 text-center text-[11.5px] font-extrabold tabular-nums text-theme-500 dark:text-theme-400">{item.rank}</span>
+      <ItemThumb item={item} size={40} preview="above" />
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex min-w-0 items-center">
+          <span className="truncate text-[11.5px] font-semibold text-theme-900 dark:text-theme-50">{item.mno}</span>
+          {showShop ? <ShopBadge name={item.shopName} /> : null}
+        </span>
+        <span className="text-[9.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
+          {fmt(t, item.unitsSold)}
+          {t(`${NS}.unitsShort`)} · {fmt(t, item.orderCount)}
+          {t(`${NS}.ordersUnit`)} · @¥{fmt(t, item.avgPrice)}
+        </span>
+      </span>
+      <span className={`shrink-0 text-[12.5px] font-bold tabular-nums ${ACCENT_TEXT}`}>¥{fmt(t, item.salesYen)}</span>
+    </ItemLink>
+  );
+}
+
+function RankingSection({ ranking, cardCls, t }) {
+  const [shop, setShop] = useState("__all__");
+  // index into RANKING_STEPS — progressive reveal (11 → 20 → 50 → 100)
+  const [step, setStep] = useState(0);
+
+  const active = shop === "__all__" ? null : ranking.shops.find((s) => s.shopName === shop);
+  // a shop chip can outlive its data across refreshes → fall back to the overall board
+  const selectedShop = active ? shop : "__all__";
+  const isAll = selectedShop === "__all__";
+  const items = isAll ? ranking.overall : active?.items ?? [];
+  const shown = items.slice(0, RANKING_STEPS[step]);
+  // how many more the NEXT step would reveal (0 when this board has no more rows)
+  const nextStep = step + 1 < RANKING_STEPS.length ? step + 1 : null;
+  const nextCount = nextStep === null ? 0 : Math.min(RANKING_STEPS[nextStep], items.length) - shown.length;
+
+  const meta = isAll
+    ? t(`${NS}.shopsAggregated`, { count: ranking.shopCount })
+    : t(`${NS}.itemsCount`, { count: active?.itemCount ?? 0 });
+
+  const chip = (key, label) => (
+    <button
+      key={key}
+      type="button"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setShop(key);
+        setStep(0);
+      }}
+      className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold transition-colors ${
+        selectedShop === key
+          ? "border-theme-700 bg-theme-700 text-white dark:border-theme-100 dark:bg-theme-100 dark:text-theme-900"
+          : "border-theme-300/60 text-theme-600 hover:bg-theme-200/50 dark:border-theme-600/60 dark:text-theme-300 dark:hover:bg-theme-700/50"
+      }`}
+    >
+      {label}
+    </button>
+  );
+
+  return (
+    <section className={`flex flex-col gap-3 p-4 ${cardCls}`}>
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+        <span className="text-[12px] font-bold text-theme-700 dark:text-theme-200">{t(`${NS}.bestSellers`)}</span>
+        <span className="text-[10px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
+          {ranking.sourceDate} · {meta}
+        </span>
+        {ranking.partial || ranking.failedShopCount > 0 ? (
+          <span className="rounded border border-amber-400/40 bg-amber-500/10 px-1.5 py-px text-[9px] font-bold text-amber-600 dark:text-amber-300">
+            {t(`${NS}.partialData`)}
+          </span>
+        ) : null}
+        <div className="ml-auto flex flex-wrap gap-1">
+          {chip("__all__", t(`${NS}.allShops`))}
+          {ranking.shops.map((s) => chip(s.shopName, s.shopName))}
+        </div>
+      </div>
+
+      {shown.length === 0 ? (
+        <span className="py-4 text-center text-[11px] text-theme-500 dark:text-theme-400">{t(`${NS}.noData`)}</span>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 items-end gap-2 @lg:grid-cols-[1.25fr_1fr_1fr]">
+            {shown.slice(0, 3).map((it) => (
+              <PodiumCard key={`${it.rank}-${it.mno}`} item={it} showShop={isAll} t={t} />
+            ))}
+          </div>
+          {shown.length > 3 ? (
+            <div className="grid grid-cols-1 gap-1.5 @2xl:grid-cols-2 @2xl:gap-x-3">
+              {shown.slice(3).map((it) => (
+                <RankRow key={`${it.rank}-${it.mno}`} item={it} showShop={isAll} t={t} />
+              ))}
+            </div>
+          ) : null}
+          {nextCount > 0 || step > 0 ? (
+            <div className="flex gap-2">
+              {nextCount > 0 ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setStep(nextStep);
+                  }}
+                  className="flex-1 rounded-lg border border-theme-300/60 py-1.5 text-[11px] font-semibold text-theme-600 transition-colors hover:bg-theme-200/50 dark:border-theme-600/60 dark:text-theme-300 dark:hover:bg-theme-700/50"
+                >
+                  {t(`${NS}.showMore`, { count: nextCount })}
+                </button>
+              ) : null}
+              {step > 0 ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setStep(0);
+                  }}
+                  className="rounded-lg border border-theme-300/60 px-3 py-1.5 text-[11px] font-semibold text-theme-600 transition-colors hover:bg-theme-200/50 dark:border-theme-600/60 dark:text-theme-300 dark:hover:bg-theme-700/50"
+                >
+                  {t(`${NS}.showLess`)}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+        </>
+      )}
+    </section>
+  );
+}
+
 function LoadingSkeleton() {
   return (
     <div className="@container flex w-full min-w-0 flex-col gap-3 p-1.5">
@@ -453,9 +707,13 @@ export default function Component({ service }) {
   const { data: logos } = useWidgetAPI(widget, "logos", {
     refreshInterval: Math.max(refreshInterval, LOGO_MIN_INTERVAL),
   });
+  const { data: rankingData, mutate: mutateRanking } = useWidgetAPI(widget, "ranking", {
+    refreshInterval: Math.max(refreshInterval, RANKING_MIN_INTERVAL),
+  });
 
   const freshness = useFreshness(sales?.generatedAtJST, refreshInterval);
   const model = useMemo(() => buildModel(sales, history, logos), [sales, history, logos]);
+  const ranking = useMemo(() => buildRanking(rankingData), [rankingData]);
 
   const handleRefresh = useCallback(
     (e) => {
@@ -463,8 +721,9 @@ export default function Component({ service }) {
       e.stopPropagation();
       mutateSales();
       mutateHistory();
+      mutateRanking();
     },
-    [mutateSales, mutateHistory],
+    [mutateSales, mutateHistory, mutateRanking],
   );
 
   if (salesError) return <Container service={service} error={salesError} />;
@@ -682,6 +941,8 @@ export default function Component({ service }) {
             </div>
           </section>
         ) : null}
+
+        {ranking ? <RankingSection ranking={ranking} cardCls={cardCls} t={t} /> : null}
       </div>
     </Container>
   );

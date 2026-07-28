@@ -63,6 +63,19 @@ test("buildSalesProxyRequest creates an authenticated shop-logos request", () =>
   assert.equal(request.params.body, undefined);
 });
 
+test("buildSalesProxyRequest creates an authenticated item-ranking request", () => {
+  const request = buildSalesProxyRequest({
+    endpoint: "ranking",
+    baseUrl: "http://127.0.0.1:3912/",
+    token: "secret-token",
+  });
+
+  assert.equal(request.url.toString(), "http://127.0.0.1:3912/api/sales/ranking");
+  assert.equal(request.params.method, "GET");
+  assert.equal(request.params.headers.Authorization, "Bearer secret-token");
+  assert.equal(request.params.body, undefined);
+});
+
 test("buildSalesProxyRequest rejects missing token and forbidden/unknown endpoints", () => {
   assert.throws(() => buildSalesProxyRequest({ endpoint: "sales", token: "" }), /Missing Rakuten sales token/);
 

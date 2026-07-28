@@ -13,6 +13,16 @@ export const DEFAULT_REFRESH_INTERVAL = 60000; // 60s
 export const HISTORY_MIN_INTERVAL = 600000;
 // shop logos change very rarely → never poll faster than every 30min
 export const LOGO_MIN_INTERVAL = 1800000;
+// item ranking is a daily snapshot of today's sales → 5min is plenty
+export const RANKING_MIN_INTERVAL = 300000;
+
+// Progressive reveal: collapsed shows RANKING_STEPS[0] (3 podium cards + 8 list
+// cards = 4 rows × 2 columns on a wide container); each "show more" click moves
+// to the next step instead of dumping all 100 rows at once.
+export const RANKING_STEPS = Object.freeze([11, 20, 50, 100]);
+export const RANKING_TOP_COUNT = RANKING_STEPS[0];
+// the API returns at most 100 items per board — that is also our ceiling
+export const RANKING_MAX_COUNT = RANKING_STEPS[RANKING_STEPS.length - 1];
 
 // 楽天アクセント(緋). data-viz uses blue; neutrals use theme-* tokens in the component.
 export const ACCENT = "#C6362B";
@@ -22,6 +32,10 @@ const WEEKDAY_JP = ["日", "月", "火", "水", "木", "金", "土"];
 function toNumber(value) {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
+}
+
+function normalizeText(value) {
+  return String(value ?? "").trim();
 }
 
 // "2026-07-06" → JP weekday char. Computed in UTC so it is timezone-stable.
@@ -103,6 +117,60 @@ export function computeFreshness(jst, nowTs, refreshInterval = DEFAULT_REFRESH_I
   const staleMax = Math.max(1800, (refreshInterval / 1000) * 20);
   const state = ageSec <= liveMax ? "live" : ageSec <= staleMax ? "delayed" : "stale";
   return { ageSec, state };
+}
+
+// Normalize one ranked item. The management number is the display handle
+// (falls back to itemNumber, then a trimmed item name so a row is never blank).
+function normalizeRankedItem(item) {
+  const mno =
+    normalizeText(item?.itemManagementNumber) ||
+    normalizeText(item?.itemNumber) ||
+    normalizeText(item?.itemName).slice(0, 24) ||
+    "-";
+  const shops = (item?.shopBreakdown || []).map((s) => s.shopName).filter(Boolean);
+  return {
+    rank: toNumber(item?.rank),
+    mno,
+    name: normalizeText(item?.itemName),
+    url: normalizeText(item?.itemUrl) || null,
+    imageUrl: normalizeText(item?.imageUrl) || null,
+    salesYen: toNumber(item?.salesYen),
+    unitsSold: toNumber(item?.unitsSold),
+    orderCount: toNumber(item?.orderCount),
+    avgPrice: toNumber(item?.averageUnitPriceYen),
+    shopCount: toNumber(item?.shopCount),
+    shopName: shops[0] || null,
+    shops,
+  };
+}
+
+// Build the item-ranking view model: one "overall" board plus a per-shop board.
+// Items keep the API's own salesYen-descending order; only the head is retained.
+export function buildRanking(ranking) {
+  if (!ranking) return null;
+
+  const take = (items) => (items || []).slice(0, RANKING_MAX_COUNT).map(normalizeRankedItem);
+  const overall = take(ranking?.overall?.items);
+  const shops = (ranking?.shops || []).map((s) => ({
+    shopName: s.shopName,
+    itemCount: toNumber(s.itemCount),
+    ok: s.ok !== false,
+    stale: Boolean(s.stale),
+    items: take(s.items),
+  }));
+
+  if (!overall.length && !shops.some((s) => s.items.length)) return null;
+
+  return {
+    sourceDate: normalizeText(ranking?.sourceDateJST),
+    generatedAt: normalizeText(ranking?.generatedAtJST),
+    partial: Boolean(ranking?.partial),
+    shopCount: toNumber(ranking?.shopCount ?? shops.length),
+    staleShopCount: toNumber(ranking?.staleShopCount),
+    failedShopCount: toNumber(ranking?.failedShopCount),
+    overall,
+    shops,
+  };
 }
 
 // Build the full view model from the realtime + history + logo snapshots.

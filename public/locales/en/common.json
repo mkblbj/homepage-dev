@@ -1239,7 +1239,15 @@
         "chartBar": "Bars",
         "sevenDayAvgShare": "7-day avg share",
         "total": "Total",
-        "noData": "No data"
+        "noData": "No data",
+        "bestSellers": "Today's best sellers",
+        "allShops": "All",
+        "shopsAggregated": "{{count}} shops combined",
+        "itemsCount": "{{count}} items",
+        "showMore": "Show more (+{{count}})",
+        "showLess": "Show less",
+        "unitsShort": " pcs",
+        "partialData": "Partial data"
     },
     "uoshippingdashboard": {
         "allPlatforms": "All",

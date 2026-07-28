@@ -11,6 +11,7 @@ const EXPECTED_METHOD_BY_ENDPOINT = {
   history: "GET",
   campaigns: "GET",
   logos: "GET",
+  ranking: "GET",
 };
 
 function parseResponseData(data) {

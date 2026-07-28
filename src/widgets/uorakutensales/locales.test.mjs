@@ -32,6 +32,14 @@ const REQUIRED_KEYS = [
   "sevenDayAvgShare",
   "total",
   "noData",
+  "bestSellers",
+  "allShops",
+  "shopsAggregated",
+  "itemsCount",
+  "showMore",
+  "showLess",
+  "unitsShort",
+  "partialData",
 ];
 
 function loadNamespace(locale) {
