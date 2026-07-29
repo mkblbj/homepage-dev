@@ -5,6 +5,7 @@ import {
   buildModel,
   buildRanking,
   computeFreshness,
+  DEFAULT_RANKING_DIM,
   DEFAULT_REFRESH_INTERVAL,
   man,
   mdLabel,
@@ -200,105 +201,136 @@ test("computeFreshness classifies live / delayed / stale by snapshot age", () =>
 
 // ---- item ranking ----
 
-const rankingPayload = {
-  sourceDateJST: "2026-07-28",
-  generatedAtJST: "2026-07-28 16:41 JST",
+// one dimension block as GET /api/item-rankings returns it
+const dimBlock = (items, shops = []) => ({
+  ok: true,
   partial: false,
-  shopCount: 2,
+  shopCount: shops.length || 2,
+  updatedShopCount: shops.length || 2,
   staleShopCount: 0,
   failedShopCount: 0,
-  overall: {
-    items: [
-      {
-        rank: 1,
-        itemManagementNumber: "18crb01-libero5g",
-        itemName: "ArrowsWe2 スマホケース",
-        itemUrl: "https://item.rakuten.co.jp/0406colors/18crb01-libero5g",
-        imageUrl: "https://image.rakuten.co.jp/x.jpg",
-        averageUnitPriceYen: 717,
-        unitsSold: 12,
-        salesYen: 8600,
-        orderCount: 1,
-        shopCount: 1,
-        shopBreakdown: [{ shopName: "0406" }],
-      },
-      {
-        rank: 2,
-        itemManagementNumber: "",
-        itemNumber: "FALLBACK-NO",
-        itemName: "フォールバック商品",
-        salesYen: 4000,
-        unitsSold: 2,
-        orderCount: 1,
-        averageUnitPriceYen: 2000,
-        shopCount: 2,
-        shopBreakdown: [{ shopName: "3911" }, { shopName: "松武" }],
-      },
-    ],
-  },
-  shops: [
-    { shopName: "3911", itemCount: 100, ok: true, stale: false, items: [{ rank: 1, itemManagementNumber: "a-1", salesYen: 4620, unitsSold: 2, orderCount: 1, averageUnitPriceYen: 2310, shopCount: 1, shopBreakdown: [{ shopName: "3911" }] }] },
-    { shopName: "allcase", itemCount: 1, ok: true, stale: true, items: [] },
-  ],
-};
-
-test("buildRanking returns null without a payload or when every board is empty", () => {
-  assert.equal(buildRanking(null), null);
-  assert.equal(buildRanking({ overall: { items: [] }, shops: [] }), null);
+  overall: { itemCount: items.length, items },
+  shops,
+  lastError: null,
 });
 
-test("buildRanking normalizes items and keeps the API's sales order", () => {
-  const r = buildRanking(rankingPayload);
-  assert.equal(r.sourceDate, "2026-07-28");
-  assert.equal(r.partial, false);
-  assert.equal(r.shopCount, 2);
+const salesItems = [
+  {
+    rank: 1,
+    itemManagementNumber: "18crb01-libero5g",
+    itemName: "ArrowsWe2 スマホケース",
+    itemUrl: "https://item.rakuten.co.jp/0406colors/18crb01-libero5g",
+    imageUrl: "https://image.rakuten.co.jp/x.jpg",
+    averageUnitPriceYen: 717,
+    unitsSold: 12,
+    salesYen: 8600,
+    orderCount: 1,
+    shopCount: 1,
+    shopBreakdown: [{ shopName: "0406" }],
+  },
+  {
+    rank: 2,
+    itemManagementNumber: "",
+    itemNumber: "FALLBACK-NO",
+    itemName: "フォールバック商品",
+    salesYen: 4000,
+    unitsSold: 2,
+    orderCount: 1,
+    averageUnitPriceYen: 2000,
+    shopCount: 2,
+    shopBreakdown: [{ shopName: "3911" }, { shopName: "松武" }],
+  },
+];
 
-  const first = r.overall[0];
+// the orderCount board ranks the same catalogue differently
+const orderItems = [
+  { rank: 1, itemManagementNumber: "hot-seller", salesYen: 3450, unitsSold: 4, orderCount: 4, averageUnitPriceYen: 863, shopCount: 1, shopBreakdown: [{ shopName: "松武" }] },
+  { rank: 2, itemManagementNumber: "18crb01-libero5g", salesYen: 8600, unitsSold: 12, orderCount: 1, averageUnitPriceYen: 717, shopCount: 1, shopBreakdown: [{ shopName: "0406" }] },
+];
+
+const rankingPayload = {
+  ok: true,
+  partial: false,
+  sourceDateJST: "2026-07-29",
+  generatedAtJST: "2026-07-29 16:46 JST",
+  sourceLimitPerShop: 100,
+  lastError: null,
+  rankings: {
+    sales: dimBlock(salesItems, [
+      { shopName: "3911", itemCount: 100, ok: true, stale: false, items: [{ rank: 1, itemManagementNumber: "a-1", salesYen: 4620, unitsSold: 2, orderCount: 1, averageUnitPriceYen: 2310, shopCount: 1, shopBreakdown: [{ shopName: "3911" }] }] },
+      { shopName: "allcase", itemCount: 1, ok: true, stale: true, items: [] },
+    ]),
+    units: dimBlock(salesItems),
+    orderCount: dimBlock(orderItems),
+  },
+};
+
+test("buildRanking returns null without a payload or when every dimension is empty", () => {
+  assert.equal(buildRanking(null), null);
+  assert.equal(buildRanking({ rankings: {} }), null);
+  assert.equal(buildRanking({ rankings: { sales: dimBlock([]) } }), null);
+});
+
+test("buildRanking exposes the three dimensions in UI order", () => {
+  const r = buildRanking(rankingPayload);
+  assert.equal(r.sourceDate, "2026-07-29");
+  assert.equal(r.partial, false);
+  // orderCount leads: it is the default dimension
+  assert.deepEqual(r.available, ["orderCount", "sales", "units"]);
+  assert.equal(r.available[0], DEFAULT_RANKING_DIM);
+  assert.deepEqual(Object.keys(r.dims).sort(), ["orderCount", "sales", "units"]);
+});
+
+test("buildRanking keeps each dimension's own ordering", () => {
+  const r = buildRanking(rankingPayload);
+  // the sales board leads with the biggest yen figure...
+  assert.equal(r.dims.sales.overall[0].mno, "18crb01-libero5g");
+  assert.deepEqual(r.dims.sales.overall.map((i) => i.salesYen), [8600, 4000]);
+  // ...while the orderCount board leads with the item most people bought
+  assert.equal(r.dims.orderCount.overall[0].mno, "hot-seller");
+  assert.deepEqual(r.dims.orderCount.overall.map((i) => i.orderCount), [4, 1]);
+});
+
+test("buildRanking normalizes item fields and drops unused bulk", () => {
+  const first = buildRanking(rankingPayload).dims.sales.overall[0];
   assert.equal(first.mno, "18crb01-libero5g");
   assert.equal(first.url, "https://item.rakuten.co.jp/0406colors/18crb01-libero5g");
   assert.equal(first.salesYen, 8600);
   assert.equal(first.avgPrice, 717);
   assert.equal(first.shopName, "0406"); // overall rows carry their shop
-  assert.deepEqual(r.overall.map((i) => i.salesYen), [8600, 4000]); // order preserved
+  // the ~1MB payload's long name / full breakdown are not retained
+  assert.equal(first.name, undefined);
+  assert.equal(first.shops, undefined);
 });
 
 test("buildRanking falls back for a blank management number and missing url", () => {
-  const second = buildRanking(rankingPayload).overall[1];
+  const second = buildRanking(rankingPayload).dims.sales.overall[1];
   assert.equal(second.mno, "FALLBACK-NO"); // empty management number → itemNumber
   assert.equal(second.url, null); // no itemUrl → component renders a non-link row
   assert.equal(second.shopCount, 2);
-  assert.deepEqual(second.shops, ["3911", "松武"]);
+  assert.equal(second.shopName, "3911"); // first shop of the breakdown
 });
 
 test("buildRanking exposes per-shop boards including empty ones", () => {
-  const r = buildRanking(rankingPayload);
-  assert.deepEqual(r.shops.map((s) => s.shopName), ["3911", "allcase"]);
-  assert.equal(r.shops[0].items[0].mno, "a-1");
-  assert.equal(r.shops[0].itemCount, 100);
-  assert.equal(r.shops[1].items.length, 0); // empty board → section shows noData
-  assert.equal(r.shops[1].stale, true);
+  const sales = buildRanking(rankingPayload).dims.sales;
+  assert.deepEqual(sales.shops.map((s) => s.shopName), ["3911", "allcase"]);
+  assert.equal(sales.shops[0].items[0].mno, "a-1");
+  assert.equal(sales.shops[0].itemCount, 100);
+  assert.equal(sales.shops[1].items.length, 0); // empty board → section shows noData
+  assert.equal(sales.shops[1].stale, true);
 });
 
-test("buildRanking truncates each board to RANKING_MAX_COUNT", () => {
-  const many = Array.from({ length: 60 }, (_, i) => ({
-    rank: i + 1,
-    itemManagementNumber: "m" + i,
-    salesYen: 1000 - i,
-    unitsSold: 1,
-    orderCount: 1,
-    averageUnitPriceYen: 100,
-    shopCount: 1,
-    shopBreakdown: [{ shopName: "3911" }],
-  }));
-  const r = buildRanking({ overall: { items: many }, shops: [{ shopName: "3911", items: many }] });
-  assert.equal(r.overall.length, 60); // fewer than the cap → all kept
-  assert.equal(r.shops[0].items.length, 60);
+test("buildRanking skips a dimension the payload omits", () => {
+  const r = buildRanking({ rankings: { orderCount: dimBlock(orderItems) } });
+  assert.deepEqual(r.available, ["orderCount"]);
+  assert.equal(r.dims.sales, undefined); // toggle only renders available dims
 });
 
-test("buildRanking caps a board at 100 items", () => {
+test("buildRanking caps each board at 100 items", () => {
   const many = Array.from({ length: 140 }, (_, i) => ({ rank: i + 1, itemManagementNumber: "m" + i, salesYen: 1000 - i }));
-  const r = buildRanking({ overall: { items: many }, shops: [] });
-  assert.equal(r.overall.length, RANKING_MAX_COUNT);
+  const r = buildRanking({ rankings: { sales: dimBlock(many, [{ shopName: "3911", items: many }]) } });
+  assert.equal(r.dims.sales.overall.length, RANKING_MAX_COUNT);
+  assert.equal(r.dims.sales.shops[0].items.length, RANKING_MAX_COUNT);
   assert.equal(RANKING_MAX_COUNT, 100);
 });
 

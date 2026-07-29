@@ -2,19 +2,20 @@
  * 楽天売上 widget — framework-free view model (design "1b").
  *
  * The React component (component.jsx) owns rendering and locale formatting;
- * everything here is pure and unit-tested. Two read-only snapshots feed it:
- *   sales   → GET /api/sales          (realtime today, main body)
- *   history → GET /api/history/sales  (trailing 7 days excl. today, context)
+ * everything here is pure and unit-tested. Four read-only snapshots feed it:
+ *   sales    → GET /api/sales          (realtime today, main body)
+ *   history  → GET /api/history/sales  (trailing 7 days excl. today, context)
+ *   logos    → GET /api/shops/logos    (shop logo urls)
+ *   ranking  → GET /api/item-rankings  (today's item boards, 3 dimensions)
+ *
+ * uo-ec-manager owns the refresh schedule; this widget only reads the resulting
+ * snapshots, so every endpoint simply polls at the configured refreshInterval.
+ * Note: /api/item-rankings is ~1MB (3 dimensions × 8 boards × 100 items) while
+ * the other three total ~11KB — worth remembering before lowering the interval.
  */
 
-// realtime poll cadence (overridable via widget.refreshInterval)
+// poll cadence when the service config does not set one
 export const DEFAULT_REFRESH_INTERVAL = 60000; // 60s
-// history snapshot changes ~daily → never poll it faster than every 10min
-export const HISTORY_MIN_INTERVAL = 600000;
-// shop logos change very rarely → never poll faster than every 30min
-export const LOGO_MIN_INTERVAL = 1800000;
-// item ranking is a daily snapshot of today's sales → 5min is plenty
-export const RANKING_MIN_INTERVAL = 300000;
 
 // Progressive reveal: collapsed shows RANKING_STEPS[0] (3 podium cards + 8 list
 // cards = 4 rows × 2 columns on a wide container); each "show more" click moves
@@ -23,6 +24,10 @@ export const RANKING_STEPS = Object.freeze([11, 20, 50, 100]);
 export const RANKING_TOP_COUNT = RANKING_STEPS[0];
 // the API returns at most 100 items per board — that is also our ceiling
 export const RANKING_MAX_COUNT = RANKING_STEPS[RANKING_STEPS.length - 1];
+
+// ranking dimensions, in the order the UI offers them (default first)
+export const RANKING_DIMS = Object.freeze(["orderCount", "sales", "units"]);
+export const DEFAULT_RANKING_DIM = RANKING_DIMS[0];
 
 // 楽天アクセント(緋). data-viz uses blue; neutrals use theme-* tokens in the component.
 export const ACCENT = "#C6362B";
@@ -121,6 +126,8 @@ export function computeFreshness(jst, nowTs, refreshInterval = DEFAULT_REFRESH_I
 
 // Normalize one ranked item. The management number is the display handle
 // (falls back to itemNumber, then a trimmed item name so a row is never blank).
+// Only the fields the UI renders are kept — the raw payload is ~1MB and carries
+// long item names plus a full shopBreakdown we never show.
 function normalizeRankedItem(item) {
   const mno =
     normalizeText(item?.itemManagementNumber) ||
@@ -131,7 +138,6 @@ function normalizeRankedItem(item) {
   return {
     rank: toNumber(item?.rank),
     mno,
-    name: normalizeText(item?.itemName),
     url: normalizeText(item?.itemUrl) || null,
     imageUrl: normalizeText(item?.imageUrl) || null,
     salesYen: toNumber(item?.salesYen),
@@ -140,18 +146,17 @@ function normalizeRankedItem(item) {
     avgPrice: toNumber(item?.averageUnitPriceYen),
     shopCount: toNumber(item?.shopCount),
     shopName: shops[0] || null,
-    shops,
   };
 }
 
-// Build the item-ranking view model: one "overall" board plus a per-shop board.
-// Items keep the API's own salesYen-descending order; only the head is retained.
-export function buildRanking(ranking) {
-  if (!ranking) return null;
+// One ranking dimension: the aggregated board plus a board per shop.
+// Items keep the API's own ordering for that dimension; only the head is kept.
+function normalizeRankingDim(block) {
+  if (!block) return null;
 
   const take = (items) => (items || []).slice(0, RANKING_MAX_COUNT).map(normalizeRankedItem);
-  const overall = take(ranking?.overall?.items);
-  const shops = (ranking?.shops || []).map((s) => ({
+  const overall = take(block?.overall?.items ?? block?.overall);
+  const shops = (block?.shops || []).map((s) => ({
     shopName: s.shopName,
     itemCount: toNumber(s.itemCount),
     ok: s.ok !== false,
@@ -162,14 +167,37 @@ export function buildRanking(ranking) {
   if (!overall.length && !shops.some((s) => s.items.length)) return null;
 
   return {
+    partial: Boolean(block?.partial),
+    shopCount: toNumber(block?.shopCount ?? shops.length),
+    staleShopCount: toNumber(block?.staleShopCount),
+    failedShopCount: toNumber(block?.failedShopCount),
+    overall,
+    shops,
+  };
+}
+
+// Build the item-ranking view model from GET /api/item-rankings.
+// The payload carries three independently ranked dimensions (sales / units /
+// orderCount); each is normalized separately so the UI can switch between them.
+export function buildRanking(ranking) {
+  if (!ranking) return null;
+
+  const dims = {};
+  RANKING_DIMS.forEach((dim) => {
+    const built = normalizeRankingDim(ranking?.rankings?.[dim]);
+    if (built) dims[dim] = built;
+  });
+
+  const available = RANKING_DIMS.filter((d) => dims[d]);
+  if (!available.length) return null;
+
+  return {
     sourceDate: normalizeText(ranking?.sourceDateJST),
     generatedAt: normalizeText(ranking?.generatedAtJST),
     partial: Boolean(ranking?.partial),
-    shopCount: toNumber(ranking?.shopCount ?? shops.length),
-    staleShopCount: toNumber(ranking?.staleShopCount),
-    failedShopCount: toNumber(ranking?.failedShopCount),
-    overall,
-    shops,
+    dims,
+    // dimensions actually present, in UI order — the toggle renders from this
+    available,
   };
 }
 

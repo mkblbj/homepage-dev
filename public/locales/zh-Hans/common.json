@@ -1259,8 +1259,11 @@
         "itemsCount": "{{count}} 个商品",
         "showMore": "查看更多（+{{count}}）",
         "showLess": "收起",
-        "unitsShort": "件",
-        "partialData": "部分店铺"
+        "unitsShort": "个",
+        "partialData": "部分店铺",
+        "sortOrders": "订单数",
+        "sortSales": "销售额",
+        "sortUnits": "件数"
     },
     "uoshippingdashboard": {
         "allPlatforms": "全部",

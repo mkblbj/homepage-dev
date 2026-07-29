@@ -40,6 +40,9 @@ const REQUIRED_KEYS = [
   "showLess",
   "unitsShort",
   "partialData",
+  "sortOrders",
+  "sortSales",
+  "sortUnits",
 ];
 
 function loadNamespace(locale) {

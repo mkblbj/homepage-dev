@@ -1246,8 +1246,11 @@
         "itemsCount": "{{count}}商品",
         "showMore": "もっと見る（+{{count}}）",
         "showLess": "閉じる",
-        "unitsShort": "点",
-        "partialData": "一部店舗のみ"
+        "unitsShort": "個",
+        "partialData": "一部店舗のみ",
+        "sortOrders": "件数",
+        "sortSales": "売上",
+        "sortUnits": "個数"
     },
     "uoshippingdashboard": {
         "allPlatforms": "全部",
@@ -1291,7 +1294,7 @@
         "totalShort": "計",
         "shopsUnit": "店",
         "yesterdayOutput": "昨日出力",
-        "tomorrowPending": "明日は午後に確定",
+        "tomorrowPending": "午後に確定",
         "forecast": "予測",
         "collapse": "閉じる"
     },

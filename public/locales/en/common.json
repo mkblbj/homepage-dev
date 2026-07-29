@@ -1247,7 +1247,10 @@
         "showMore": "Show more (+{{count}})",
         "showLess": "Show less",
         "unitsShort": " pcs",
-        "partialData": "Partial data"
+        "partialData": "Partial data",
+        "sortOrders": "Orders",
+        "sortSales": "Sales",
+        "sortUnits": "Units"
     },
     "uoshippingdashboard": {
         "allPlatforms": "All",

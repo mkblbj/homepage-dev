@@ -13,18 +13,16 @@
  */
 import Container from "components/services/widget/container";
 import { useTranslation } from "next-i18next/pages";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ACCENT,
   buildModel,
   buildRanking,
   computeFreshness,
+  DEFAULT_RANKING_DIM,
   DEFAULT_REFRESH_INTERVAL,
-  HISTORY_MIN_INTERVAL,
-  LOGO_MIN_INTERVAL,
   man,
-  RANKING_MIN_INTERVAL,
   RANKING_STEPS,
   spark,
 } from "./sales-model.mjs";
@@ -453,16 +451,48 @@ const MEDAL = {
   },
 };
 
+const PREVIEW_WIDTH = 186;
+// Horizontal anchors. The widget shell (components/services/widget/container)
+// wraps every widget in `overflow-hidden`, so a centred preview gets clipped for
+// thumbnails near either edge — the hovered thumb picks the side that keeps the
+// whole preview inside that clipping box.
+const PREVIEW_ALIGN = {
+  center: "left-1/2 -translate-x-1/2",
+  left: "left-0",
+  right: "right-0",
+};
+const PREVIEW_CLIP_SELECTOR = ".service-container";
+
 // product thumbnail — same white-bg/contain treatment as the shop logos.
 // Hovering pops a large preview (thumbnails alone are too small to identify a case).
-// `preview` picks the side it opens on so it stays inside the card.
+// `preview` picks the vertical side it opens on so it stays inside the card.
 function ItemThumb({ item, size, preview = "below" }) {
   const [failed, setFailed] = useState(false);
   const [hover, setHover] = useState(false);
+  const [align, setAlign] = useState("center");
+  const anchorRef = useRef(null);
   useEffect(() => {
     setFailed(false);
     setHover(false);
   }, [item.imageUrl]);
+
+  const openPreview = useCallback(() => {
+    const anchor = anchorRef.current;
+    const rect = anchor?.getBoundingClientRect();
+    if (rect) {
+      // measure against the element that actually clips us, not the viewport
+      const clip = anchor.closest(PREVIEW_CLIP_SELECTOR)?.getBoundingClientRect();
+      const min = clip ? clip.left : 0;
+      const max = clip ? clip.right : window.innerWidth;
+      const centre = rect.left + rect.width / 2;
+      const half = PREVIEW_WIDTH / 2;
+      const margin = 6;
+      if (centre - half < min + margin) setAlign("left");
+      else if (centre + half > max - margin) setAlign("right");
+      else setAlign("center");
+    }
+    setHover(true);
+  }, []);
 
   if (!item.imageUrl || failed) {
     return <span aria-hidden="true" className="block shrink-0 rounded-[7px] bg-theme-300/40 dark:bg-white/10" style={{ width: size, height: size }} />;
@@ -470,9 +500,10 @@ function ItemThumb({ item, size, preview = "below" }) {
 
   return (
     <span
+      ref={anchorRef}
       className="relative block shrink-0"
       style={{ width: size, height: size }}
-      onMouseEnter={() => setHover(true)}
+      onMouseEnter={openPreview}
       onMouseLeave={() => setHover(false)}
     >
       <img
@@ -487,9 +518,9 @@ function ItemThumb({ item, size, preview = "below" }) {
           // explicit width: an absolutely positioned box shrink-fits to the 40px
           // thumbnail otherwise, and the base `img{max-width:100%}` then squashes
           // the preview into a sliver. max-w-none defeats that rule as well.
-          className={`pointer-events-none absolute left-1/2 z-30 block w-[186px] -translate-x-1/2 rounded-xl border border-theme-300/60 bg-white p-2 shadow-2xl dark:border-white/20 ${
-            preview === "above" ? "bottom-full mb-2" : "top-full mt-2"
-          }`}
+          className={`pointer-events-none absolute z-30 block w-[186px] rounded-xl border border-theme-300/60 bg-white p-2 shadow-2xl dark:border-white/20 ${
+            PREVIEW_ALIGN[align]
+          } ${preview === "above" ? "bottom-full mb-2" : "top-full mt-2"}`}
         >
           <img src={item.imageUrl} alt="" loading="lazy" className="block h-[170px] w-[170px] max-w-none object-contain" />
         </span>
@@ -518,7 +549,24 @@ function ItemLink({ item, className, children }) {
   );
 }
 
-function PodiumCard({ item, showShop, t }) {
+// the metric the board is ranked by leads; the other two trail as context
+function primaryMetric(item, dim, t) {
+  if (dim === "units") return `${fmt(t, item.unitsSold)}${t(`${NS}.unitsShort`)}`;
+  if (dim === "orderCount") return `${fmt(t, item.orderCount)}${t(`${NS}.ordersUnit`)}`;
+  return `¥${fmt(t, item.salesYen)}`;
+}
+
+function secondaryMetrics(item, dim, t) {
+  const sales = `¥${fmt(t, item.salesYen)}`;
+  const units = `${fmt(t, item.unitsSold)}${t(`${NS}.unitsShort`)}`;
+  const orders = `${fmt(t, item.orderCount)}${t(`${NS}.ordersUnit`)}`;
+  const price = `@¥${fmt(t, item.avgPrice)}`;
+  if (dim === "units") return [sales, orders, price];
+  if (dim === "orderCount") return [sales, units, price];
+  return [units, orders, price];
+}
+
+function PodiumCard({ item, showShop, dim, t }) {
   const m = MEDAL[item.rank] ?? MEDAL[3];
   return (
     <ItemLink
@@ -532,11 +580,9 @@ function PodiumCard({ item, showShop, t }) {
           <span className="truncate text-theme-900 dark:text-theme-50">{item.mno}</span>
           {showShop ? <ShopBadge name={item.shopName} /> : null}
         </span>
-        <span className={`font-extrabold leading-none tabular-nums ${m.amount}`}>¥{fmt(t, item.salesYen)}</span>
+        <span className={`font-extrabold leading-none tabular-nums ${m.amount}`}>{primaryMetric(item, dim, t)}</span>
         <span className="text-[9.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
-          {fmt(t, item.unitsSold)}
-          {t(`${NS}.unitsShort`)} · {fmt(t, item.orderCount)}
-          {t(`${NS}.ordersUnit`)} · @¥{fmt(t, item.avgPrice)}
+          {secondaryMetrics(item, dim, t).join(" · ")}
         </span>
       </span>
     </ItemLink>
@@ -544,7 +590,7 @@ function PodiumCard({ item, showShop, t }) {
 }
 
 // compact card — two of these sit side by side on a wide container
-function RankRow({ item, showShop, t }) {
+function RankRow({ item, showShop, dim, t }) {
   return (
     <ItemLink
       item={item}
@@ -558,34 +604,59 @@ function RankRow({ item, showShop, t }) {
           {showShop ? <ShopBadge name={item.shopName} /> : null}
         </span>
         <span className="text-[9.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
-          {fmt(t, item.unitsSold)}
-          {t(`${NS}.unitsShort`)} · {fmt(t, item.orderCount)}
-          {t(`${NS}.ordersUnit`)} · @¥{fmt(t, item.avgPrice)}
+          {secondaryMetrics(item, dim, t).join(" · ")}
         </span>
       </span>
-      <span className={`shrink-0 text-[12.5px] font-bold tabular-nums ${ACCENT_TEXT}`}>¥{fmt(t, item.salesYen)}</span>
+      <span className={`shrink-0 text-[12.5px] font-bold tabular-nums ${ACCENT_TEXT}`}>{primaryMetric(item, dim, t)}</span>
     </ItemLink>
   );
 }
 
+const DIM_LABEL = { orderCount: "sortOrders", sales: "sortSales", units: "sortUnits" };
+
 function RankingSection({ ranking, cardCls, t }) {
+  const [dim, setDim] = useState(DEFAULT_RANKING_DIM);
   const [shop, setShop] = useState("__all__");
   // index into RANKING_STEPS — progressive reveal (11 → 20 → 50 → 100)
   const [step, setStep] = useState(0);
 
-  const active = shop === "__all__" ? null : ranking.shops.find((s) => s.shopName === shop);
+  // a dimension can vanish across refreshes → fall back to the first available
+  const activeDim = ranking.dims[dim] ? dim : ranking.available[0];
+  const board = ranking.dims[activeDim];
+
+  const active = shop === "__all__" ? null : board.shops.find((s) => s.shopName === shop);
   // a shop chip can outlive its data across refreshes → fall back to the overall board
   const selectedShop = active ? shop : "__all__";
   const isAll = selectedShop === "__all__";
-  const items = isAll ? ranking.overall : active?.items ?? [];
+  const items = isAll ? board.overall : active?.items ?? [];
   const shown = items.slice(0, RANKING_STEPS[step]);
   // how many more the NEXT step would reveal (0 when this board has no more rows)
   const nextStep = step + 1 < RANKING_STEPS.length ? step + 1 : null;
   const nextCount = nextStep === null ? 0 : Math.min(RANKING_STEPS[nextStep], items.length) - shown.length;
 
   const meta = isAll
-    ? t(`${NS}.shopsAggregated`, { count: ranking.shopCount })
+    ? t(`${NS}.shopsAggregated`, { count: board.shopCount })
     : t(`${NS}.itemsCount`, { count: active?.itemCount ?? 0 });
+
+  const dimChip = (key) => (
+    <button
+      key={key}
+      type="button"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDim(key);
+        setStep(0);
+      }}
+      className={`rounded px-2 py-0.5 text-[10px] font-bold transition-colors ${
+        activeDim === key
+          ? "bg-theme-700 text-white dark:bg-theme-100 dark:text-theme-900"
+          : "text-theme-600 hover:bg-theme-200/60 dark:text-theme-300 dark:hover:bg-theme-700/60"
+      }`}
+    >
+      {t(`${NS}.${DIM_LABEL[key]}`)}
+    </button>
+  );
 
   const chip = (key, label) => (
     <button
@@ -614,14 +685,18 @@ function RankingSection({ ranking, cardCls, t }) {
         <span className="text-[10px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
           {ranking.sourceDate} · {meta}
         </span>
-        {ranking.partial || ranking.failedShopCount > 0 ? (
+        {ranking.partial || board.failedShopCount > 0 ? (
           <span className="rounded border border-amber-400/40 bg-amber-500/10 px-1.5 py-px text-[9px] font-bold text-amber-600 dark:text-amber-300">
             {t(`${NS}.partialData`)}
           </span>
         ) : null}
+        {/* which metric the board is ranked by */}
+        <div className="flex shrink-0 gap-0.5 rounded-md border border-theme-300/60 bg-theme-100/50 p-0.5 dark:border-theme-600/60 dark:bg-theme-900/30">
+          {ranking.available.map(dimChip)}
+        </div>
         <div className="ml-auto flex flex-wrap gap-1">
           {chip("__all__", t(`${NS}.allShops`))}
-          {ranking.shops.map((s) => chip(s.shopName, s.shopName))}
+          {board.shops.map((s) => chip(s.shopName, s.shopName))}
         </div>
       </div>
 
@@ -631,13 +706,13 @@ function RankingSection({ ranking, cardCls, t }) {
         <>
           <div className="grid grid-cols-1 items-end gap-2 @lg:grid-cols-[1.25fr_1fr_1fr]">
             {shown.slice(0, 3).map((it) => (
-              <PodiumCard key={`${it.rank}-${it.mno}`} item={it} showShop={isAll} t={t} />
+              <PodiumCard key={`${it.rank}-${it.mno}`} item={it} showShop={isAll} dim={activeDim} t={t} />
             ))}
           </div>
           {shown.length > 3 ? (
             <div className="grid grid-cols-1 gap-1.5 @2xl:grid-cols-2 @2xl:gap-x-3">
               {shown.slice(3).map((it) => (
-                <RankRow key={`${it.rank}-${it.mno}`} item={it} showShop={isAll} t={t} />
+                <RankRow key={`${it.rank}-${it.mno}`} item={it} showShop={isAll} dim={activeDim} t={t} />
               ))}
             </div>
           ) : null}
@@ -701,15 +776,11 @@ export default function Component({ service }) {
   const [chartMode, setChartMode] = useState("line");
 
   const { data: sales, error: salesError, mutate: mutateSales } = useWidgetAPI(widget, "sales", { refreshInterval });
-  const { data: history, mutate: mutateHistory } = useWidgetAPI(widget, "history", {
-    refreshInterval: Math.max(refreshInterval, HISTORY_MIN_INTERVAL),
-  });
-  const { data: logos } = useWidgetAPI(widget, "logos", {
-    refreshInterval: Math.max(refreshInterval, LOGO_MIN_INTERVAL),
-  });
-  const { data: rankingData, mutate: mutateRanking } = useWidgetAPI(widget, "ranking", {
-    refreshInterval: Math.max(refreshInterval, RANKING_MIN_INTERVAL),
-  });
+  // uo-ec-manager owns the refresh schedule; each board just re-reads its own
+  // snapshot on the single configured interval.
+  const { data: history, mutate: mutateHistory } = useWidgetAPI(widget, "history", { refreshInterval });
+  const { data: logos } = useWidgetAPI(widget, "logos", { refreshInterval });
+  const { data: rankingData, mutate: mutateRanking } = useWidgetAPI(widget, "ranking", { refreshInterval });
 
   const freshness = useFreshness(sales?.generatedAtJST, refreshInterval);
   const model = useMemo(() => buildModel(sales, history, logos), [sales, history, logos]);

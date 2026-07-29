@@ -9,7 +9,7 @@ const ENDPOINT_PATHS = {
   history: "/api/history/sales",
   campaigns: "/api/campaigns",
   logos: "/api/shops/logos",
-  ranking: "/api/sales/ranking",
+  ranking: "/api/item-rankings",
 };
 
 export function normalizeSalesServiceUrl(baseUrl = DEFAULT_SALES_SERVICE_URL) {

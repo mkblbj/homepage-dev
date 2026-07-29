@@ -70,7 +70,7 @@ test("buildSalesProxyRequest creates an authenticated item-ranking request", () 
     token: "secret-token",
   });
 
-  assert.equal(request.url.toString(), "http://127.0.0.1:3912/api/sales/ranking");
+  assert.equal(request.url.toString(), "http://127.0.0.1:3912/api/item-rankings");
   assert.equal(request.params.method, "GET");
   assert.equal(request.params.headers.Authorization, "Bearer secret-token");
   assert.equal(request.params.body, undefined);
