@@ -64,14 +64,14 @@ import komga from "./komga/widget";
 import komodo from "./komodo/widget";
 import kopia from "./kopia/widget";
 import lidarr from "./lidarr/widget";
-import linuxdo from "./linuxdo/widget";
 import linkwarden from "./linkwarden/widget";
+import linuxdo from "./linuxdo/widget";
 import lubelogger from "./lubelogger/widget";
 import mailcow from "./mailcow/widget";
 import mastodon from "./mastodon/widget";
 import mealie from "./mealie/widget";
-import memo from "./memo/widget";
 import medusa from "./medusa/widget";
+import memo from "./memo/widget";
 import mikrotik from "./mikrotik/widget";
 import minecraft from "./minecraft/widget";
 import miniflux from "./miniflux/widget";
@@ -141,14 +141,15 @@ import transmission from "./transmission/widget";
 import trilium from "./trilium/widget";
 import truenas from "./truenas/widget";
 import tubearchivist from "./tubearchivist/widget";
-import uoattendance from "./uoattendance/widget";
-import uoprinters from "./uoprinters/widget";
-import uorakutensales from "./uorakutensales/widget";
-import uoshippingdashboard from "./uoshippingdashboard/widget";
 import unifi from "./unifi/widget";
 import unifi_drive from "./unifi_drive/widget";
 import unmanic from "./unmanic/widget";
 import unraid from "./unraid/widget";
+import uoattendance from "./uoattendance/widget";
+import uoattention from "./uoattention/widget";
+import uoprinters from "./uoprinters/widget";
+import uorakutensales from "./uorakutensales/widget";
+import uoshippingdashboard from "./uoshippingdashboard/widget";
 import uptimekuma from "./uptimekuma/widget";
 import uptimerobot from "./uptimerobot/widget";
 import urbackup from "./urbackup/widget";
@@ -312,6 +313,7 @@ const widgets = {
   tubearchivist,
   truenas,
   uoattendance,
+  uoattention,
   uoprinters,
   uorakutensales,
   uoshippingdashboard,
