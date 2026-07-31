@@ -228,6 +228,17 @@ describe("widgets/uoperformance/component", () => {
     expect(screen.getAllByText("3").length).toBeGreaterThan(0);
   });
 
+  it("keeps the cross-shop de-duplication caveat reachable from the UU figure", () => {
+    mockData(snapshot());
+    render();
+
+    const mark = screen.getByRole("note", { name: "uoperformance.visitsCaveat" });
+
+    expect(mark).toHaveAttribute("title", "uoperformance.visitsCaveat");
+    // it rides along with the UU line rather than taking a line of its own
+    expect(mark.parentElement.textContent).toMatch(/^UU 14737 /);
+  });
+
   it("drops the endpoint-naming footnote", () => {
     mockData(snapshot());
     const { container } = render();

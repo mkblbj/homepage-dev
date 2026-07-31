@@ -1289,6 +1289,7 @@
         "sourceUnavailable": "取得不可",
         "fetchedAt": "取得",
         "visits": "訪問人数",
+        "visitsCaveat": "全社の訪問/UU は店舗間で重複排除しない（同一人物が2店舗を訪問すると2回計上）",
         "visitsUnit": "人次",
         "peopleUnit": "人",
         "perVisitor": "1人あたり {{n}} 回",

@@ -125,6 +125,21 @@ function ShopLogo({ name, url, size = 16 }) {
   );
 }
 
+// A caveat that matters but does not deserve a line of its own. Native title so it works
+// without a portal; aria-label carries the same text for screen readers.
+function InfoMark({ text }) {
+  return (
+    <span
+      title={text}
+      aria-label={text}
+      role="note"
+      className="inline-flex h-[13px] w-[13px] shrink-0 cursor-help items-center justify-center rounded-full border border-theme-400/50 text-[9px] font-bold leading-none text-theme-500 dark:border-theme-500/50 dark:text-theme-400"
+    >
+      ?
+    </span>
+  );
+}
+
 function ChartIcon() {
   return (
     <span
@@ -454,11 +469,16 @@ export default function Component({ service }) {
               </span>
               <span className="text-[13px] font-bold text-theme-500 dark:text-theme-400">{t(`${NS}.visitsUnit`)}</span>
             </span>
-            <span className="text-[11.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
-              UU {fmtNullable(t, model.uu)} {t(`${NS}.peopleUnit`)}
-              {!isNil(model.visit) && model.uu > 0
-                ? ` · ${t(`${NS}.perVisitor`, { n: (model.visit / model.uu).toFixed(2) })}`
-                : ""}
+            <span className="flex items-center gap-1 text-[11.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
+              <span>
+                UU {fmtNullable(t, model.uu)} {t(`${NS}.peopleUnit`)}
+                {!isNil(model.visit) && model.uu > 0
+                  ? ` · ${t(`${NS}.perVisitor`, { n: (model.visit / model.uu).toFixed(2) })}`
+                  : ""}
+              </span>
+              {/* company visits/UU are summed, never de-duplicated across shops — easy to
+                  misread as unique people, so the caveat rides along with the number */}
+              <InfoMark text={t(`${NS}.visitsCaveat`)} />
             </span>
             <div className="mt-1 flex flex-col gap-1.5">
               <div className="flex items-baseline justify-between gap-2">

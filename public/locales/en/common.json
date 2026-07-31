@@ -1289,6 +1289,7 @@
         "sourceUnavailable": "Unavailable",
         "fetchedAt": "Fetched",
         "visits": "Visits",
+        "visitsCaveat": "Company-wide visits and UU are not de-duplicated across shops — one person visiting two shops counts twice",
         "visitsUnit": "visits",
         "peopleUnit": "people",
         "perVisitor": "{{n}} per visitor",

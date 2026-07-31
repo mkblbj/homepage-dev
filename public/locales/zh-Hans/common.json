@@ -1302,6 +1302,7 @@
         "sourceUnavailable": "取得失败",
         "fetchedAt": "取得",
         "visits": "访问人数",
+        "visitsCaveat": "全公司访问/UU 不跨店铺去重（同一人访问两家店会计两次）",
         "visitsUnit": "人次",
         "peopleUnit": "人",
         "perVisitor": "人均 {{n}} 次",
