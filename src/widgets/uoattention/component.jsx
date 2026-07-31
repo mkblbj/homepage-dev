@@ -52,7 +52,7 @@ const TONE = {
     color: "#0E9F6E",
   },
   unknown: {
-    pill: "border-theme-400/40 bg-theme-500/10 text-theme-500 dark:text-theme-400",
+    pill: "border-theme-400/40 bg-theme-500/10 text-theme-600 dark:text-theme-300",
     dot: "bg-theme-400",
     color: "#64748B",
   },
@@ -61,7 +61,7 @@ const TONE = {
 const RATING_TONE = {
   1: "border-rose-400/40 bg-rose-500/10 text-rose-600 dark:text-rose-300",
   2: "border-amber-400/40 bg-amber-500/10 text-amber-600 dark:text-amber-300",
-  3: "border-theme-400/30 bg-theme-500/10 text-theme-600 dark:text-theme-300",
+  3: "border-theme-400/30 bg-theme-500/10 text-theme-700 dark:text-theme-200",
 };
 
 const toneOf = (status) => TONE[status] || TONE.unknown;
@@ -181,11 +181,11 @@ function SourceChip({ name, source, t }) {
   return (
     <span className="inline-flex flex-wrap items-center gap-2 rounded-[9px] border border-theme-300/40 bg-theme-200/30 py-1 pl-2.5 pr-3 dark:border-theme-600/40 dark:bg-white/[0.06]">
       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${tone.dot}`} />
-      <span className="text-[11px] font-bold text-theme-700 dark:text-theme-200">{name}</span>
+      <span className="text-[11px] font-bold text-theme-800 dark:text-theme-100">{name}</span>
       <span className="text-[10.5px] font-semibold" style={{ color: tone.color }}>
         {state}
       </span>
-      <span className="text-[10.5px] font-medium tabular-nums text-theme-500 dark:text-theme-400">
+      <span className="text-[10.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
         {t(`${NS}.fetchedAt`)} {source?.updatedAtJST || DASH}
         {source?.lastAttemptAtJST ? ` · ${t(`${NS}.attemptedAt`)} ${source.lastAttemptAtJST}` : ""}
         {isNil(source?.coveredShopCount) ? "" : ` · ${source.coveredShopCount}`}
@@ -200,15 +200,15 @@ function SourceChip({ name, source, t }) {
 function KpiCard({ label, hint, value, sub, subTone }) {
   return (
     <div className="flex min-w-0 flex-col gap-2 rounded-xl border border-theme-300/30 bg-theme-100/60 p-3.5 dark:border-white/[0.06] dark:bg-white/[0.03]">
-      <span className="flex items-center gap-1.5 text-[11px] font-bold text-theme-700 dark:text-theme-200">
+      <span className="flex items-center gap-1.5 text-[11px] font-bold text-theme-800 dark:text-theme-100">
         {label}
-        {hint ? <span className="font-medium text-theme-500 dark:text-theme-400">{hint}</span> : null}
+        {hint ? <span className="font-medium text-theme-600 dark:text-theme-300">{hint}</span> : null}
       </span>
       <span className="text-[30px] font-extrabold leading-[0.9] tabular-nums text-theme-900 dark:text-theme-50">
         {value}
       </span>
       <span className="text-[10.5px] font-medium tabular-nums" style={subTone ? { color: subTone } : undefined}>
-        <span className={subTone ? "" : "text-theme-500 dark:text-theme-400"}>{sub}</span>
+        <span className={subTone ? "" : "text-theme-600 dark:text-theme-300"}>{sub}</span>
       </span>
     </div>
   );
@@ -295,7 +295,7 @@ export default function Component({ service }) {
             <ClipboardIcon />
             <span className="flex min-w-0 flex-col">
               <span className="truncate text-sm font-bold text-theme-900 dark:text-theme-50">{t(`${NS}.title`)}</span>
-              <span className="text-[10px] font-semibold tracking-[0.06em] text-theme-500 dark:text-theme-400">
+              <span className="text-[10px] font-semibold tracking-[0.06em] text-theme-600 dark:text-theme-300">
                 {t(`${NS}.subtitle`, { count: model.shopCount })}
               </span>
             </span>
@@ -307,10 +307,10 @@ export default function Component({ service }) {
               </span>
             ) : null}
             <span className="flex flex-col items-end leading-tight">
-              <span className="text-[9px] font-bold tracking-[0.14em] text-theme-500 dark:text-theme-400">
+              <span className="text-[9px] font-bold tracking-[0.14em] text-theme-600 dark:text-theme-300">
                 {t(`${NS}.snapshot`)}
               </span>
-              <span className="text-[12px] font-semibold tabular-nums text-theme-700 dark:text-theme-200">
+              <span className="text-[12px] font-semibold tabular-nums text-theme-800 dark:text-theme-100">
                 {model.generatedAtJST || DASH}
               </span>
             </span>
@@ -333,14 +333,14 @@ export default function Component({ service }) {
         {/* hero + KPI */}
         <section className={`grid grid-cols-1 @2xl:grid-cols-[340px_1fr] ${cardCls}`}>
           <div className="flex min-w-0 flex-col justify-center gap-2.5 border-b border-theme-300/30 p-4 @2xl:border-b-0 @2xl:border-r dark:border-white/10">
-            <span className="text-[10.5px] font-bold tracking-wide text-theme-600 dark:text-theme-300">
+            <span className="text-[10.5px] font-bold tracking-wide text-theme-700 dark:text-theme-200">
               {t(`${NS}.openTotal`)}
             </span>
             <span className="flex items-baseline gap-1.5">
               <span className="text-[42px] font-extrabold leading-[0.9] tabular-nums text-theme-900 dark:text-theme-50">
                 {fmtNullable(t, model.total)}
               </span>
-              <span className="text-[13px] font-bold text-theme-500 dark:text-theme-400">{t(`${NS}.unit`)}</span>
+              <span className="text-[13px] font-bold text-theme-600 dark:text-theme-300">{t(`${NS}.unit`)}</span>
             </span>
             {model.totalPartial ? (
               <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-300">
@@ -352,7 +352,7 @@ export default function Component({ service }) {
               <span className="block rounded-full" style={{ width: pct(model.inquiry), backgroundColor: WARN }} />
               <span className="block rounded-full" style={{ width: pct(model.reviews), backgroundColor: INFO }} />
             </span>
-            <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium text-theme-600 dark:text-theme-300">
+            <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium text-theme-700 dark:text-theme-200">
               <span className="inline-flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-[3px]" style={{ backgroundColor: ACCENT }} />
                 {t(`${NS}.pendingOrders`)} {fmtNullable(t, model.pending)}
@@ -399,8 +399,8 @@ export default function Component({ service }) {
 
         {/* per-shop table */}
         <div className="flex items-baseline justify-between gap-2 px-0.5">
-          <span className="text-[12px] font-bold text-theme-700 dark:text-theme-200">{t(`${NS}.byShop`)}</span>
-          <span className="hidden text-[10px] font-medium text-theme-500 dark:text-theme-400 @lg:inline">
+          <span className="text-[12px] font-bold text-theme-800 dark:text-theme-100">{t(`${NS}.byShop`)}</span>
+          <span className="hidden text-[10px] font-medium text-theme-600 dark:text-theme-300 @lg:inline">
             {t(`${NS}.statusRule`)}
           </span>
         </div>
@@ -476,7 +476,7 @@ export default function Component({ service }) {
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-theme-300/50 px-2 pt-2.5 dark:border-white/15">
             <span className="min-w-0 flex-[1.5] text-[11.5px] font-bold text-theme-900 dark:text-theme-50">
               {t(`${NS}.total`)}{" "}
-              <span className="font-medium text-theme-500 dark:text-theme-400">
+              <span className="font-medium text-theme-600 dark:text-theme-300">
                 {t(`${NS}.covered`, { covered: model.coveredShopCount, total: model.shopCount })}
               </span>
             </span>
@@ -508,9 +508,9 @@ export default function Component({ service }) {
 
         {/* low-rating unreplied reviews (read-only; no outbound links by design) */}
         <div className="flex flex-wrap items-center justify-between gap-2 px-0.5">
-          <span className="text-[12px] font-bold text-theme-700 dark:text-theme-200">
+          <span className="text-[12px] font-bold text-theme-800 dark:text-theme-100">
             {t(`${NS}.reviewFeed`)}{" "}
-            <span className="text-[10px] font-medium text-theme-500 dark:text-theme-400">
+            <span className="text-[10px] font-medium text-theme-600 dark:text-theme-300">
               · {t(`${NS}.reviewFeedNote`)}
             </span>
           </span>
@@ -558,8 +558,8 @@ export default function Component({ service }) {
                     {t(`${NS}.reviewType.${rv.type === "product" ? "product" : "shop"}`)}
                   </span>
                   <ShopLogo name={rv.shop} url={rv.logoUrl} size={13} />
-                  <span className="truncate text-[11px] font-bold text-theme-700 dark:text-theme-200">{rv.shop}</span>
-                  <span className="ml-auto shrink-0 text-[9.5px] font-medium tabular-nums text-theme-500 dark:text-theme-400">
+                  <span className="truncate text-[11px] font-bold text-theme-800 dark:text-theme-100">{rv.shop}</span>
+                  <span className="ml-auto shrink-0 text-[9.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
                     {rv.postedAtJST}
                   </span>
                 </span>
@@ -568,7 +568,7 @@ export default function Component({ service }) {
                   {rv.itemNo || t(`${NS}.noItem`)}
                 </span>
                 <span
-                  className={`text-[11px] leading-relaxed text-theme-600 dark:text-theme-300 ${open ? "" : "line-clamp-2"}`}
+                  className={`text-[11px] leading-relaxed text-theme-700 dark:text-theme-200 ${open ? "" : "line-clamp-2"}`}
                 >
                   {rv.excerpt}
                 </span>
@@ -577,10 +577,10 @@ export default function Component({ service }) {
           })}
           {feed.length === 0 ? (
             <div className="col-span-full flex flex-col items-center gap-1.5 rounded-xl border border-dashed border-theme-300/60 bg-theme-200/20 p-6 dark:border-theme-600/60 dark:bg-white/[0.03]">
-              <span className="text-[12.5px] font-bold text-theme-600 dark:text-theme-300">
+              <span className="text-[12.5px] font-bold text-theme-700 dark:text-theme-200">
                 {model.sources?.reviews?.ok === false ? t(`${NS}.reviewsUnavailable`) : t(`${NS}.reviewsNone`)}
               </span>
-              <span className="text-[11px] font-medium text-theme-500 dark:text-theme-400">
+              <span className="text-[11px] font-medium text-theme-600 dark:text-theme-300">
                 {model.sources?.reviews?.ok === false ? t(`${NS}.reviewsUnavailableNote`) : t(`${NS}.reviewsNoneNote`)}
               </span>
             </div>
@@ -598,7 +598,7 @@ export default function Component({ service }) {
           ) : null}
           {/* without this the feed reads as the complete list once it is fully expanded */}
           {model.reviewsTruncated ? (
-            <span className="text-[10px] font-medium text-theme-500 dark:text-theme-400">
+            <span className="text-[10px] font-medium text-theme-600 dark:text-theme-300">
               {t(`${NS}.feedTruncated`, { shown: model.feedCount, total: fmtNullable(t, model.reviews) })}
             </span>
           ) : null}

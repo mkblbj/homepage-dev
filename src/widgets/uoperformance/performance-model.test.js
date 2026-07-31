@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildPerformanceModel, isNil, mdLabel, pctLabel, spark, weekdayJp } from "./performance-model.mjs";
+import { buildPerformanceModel, deltaBar, isNil, mdLabel, pctLabel, spark, weekdayJp } from "./performance-model.mjs";
 
 const daily = [
   { dateJST: "2026-07-24", visitCount: 17217, uniqueVisitorCount: 16178 },
@@ -200,6 +200,22 @@ describe("widgets/uoperformance/performance-model", () => {
     expect(weekdayJp("2026-07-30")).toBe("木");
     expect(weekdayJp("")).toBe("");
     expect(weekdayJp("not-a-date")).toBe("");
+  });
+
+  it("grows the delta bar left of centre for a shortfall and right for a gain", () => {
+    expect(deltaBar(-18.1)).toEqual({ left: 31.9, width: 18.1 });
+    expect(deltaBar(12)).toEqual({ left: 50, width: 12 });
+    expect(deltaBar(0)).toEqual({ left: 50, width: 0 });
+  });
+
+  it("clamps the delta bar to the track instead of letting it overflow", () => {
+    expect(deltaBar(-140)).toEqual({ left: 0, width: 50 });
+    expect(deltaBar(140)).toEqual({ left: 50, width: 50 });
+  });
+
+  it("draws no delta bar when the comparison is unknown", () => {
+    expect(deltaBar(null)).toEqual({ left: 50, width: 0 });
+    expect(deltaBar(undefined)).toEqual({ left: 50, width: 0 });
   });
 
   it("builds an empty spark path for an empty series", () => {

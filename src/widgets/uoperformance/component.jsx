@@ -17,7 +17,16 @@ import Container from "components/services/widget/container";
 import { useTranslation } from "next-i18next/pages";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { DASH, SPARK_PADDING, buildPerformanceModel, isNil, pctLabel, spark, weekdayJp } from "./performance-model.mjs";
+import {
+  DASH,
+  SPARK_PADDING,
+  buildPerformanceModel,
+  deltaBar,
+  isNil,
+  pctLabel,
+  spark,
+  weekdayJp,
+} from "./performance-model.mjs";
 
 import useWidgetAPI from "utils/proxy/use-widget-api";
 
@@ -53,7 +62,7 @@ const TONE = {
     color: "#0E9F6E",
   },
   unknown: {
-    pill: "border-theme-400/40 bg-theme-500/10 text-theme-500 dark:text-theme-400",
+    pill: "border-theme-400/40 bg-theme-500/10 text-theme-600 dark:text-theme-300",
     dot: "bg-theme-400",
     color: "#64748B",
   },
@@ -121,6 +130,49 @@ function ShopLogo({ name, url, size = 16 }) {
       {String(name || "?")
         .trim()
         .charAt(0) || "?"}
+    </span>
+  );
+}
+
+// Per-shop deviation from the same-weekday median, drawn either side of a centre line so
+// a row's direction reads at a glance. Hidden below @2xl, where the row has no width to spare.
+function DeltaBar({ delta, color }) {
+  const { left, width } = deltaBar(delta);
+
+  return (
+    <span className="relative hidden h-2 min-w-0 flex-1 rounded-full bg-theme-300/40 @2xl:block dark:bg-white/10">
+      <span className="absolute inset-y-0 left-1/2 w-px bg-theme-500/40 dark:bg-white/25" />
+      {width > 0 ? (
+        <span
+          className="absolute inset-y-0 rounded-full opacity-90"
+          style={{ left: `${left}%`, width: `${width}%`, backgroundColor: color }}
+        />
+      ) : null}
+    </span>
+  );
+}
+
+// One half of the new/repeat composition bar. Its width is the share itself, so a small
+// share leaves no room for the copy — the label drops out first, then the percentage,
+// and the title keeps both readable at any ratio.
+const MIX_LABEL_MIN_SHARE = 18;
+const MIX_PERCENT_MIN_SHARE = 8;
+
+function MixSegment({ label, share, color, labelClassName }) {
+  const percent = `${share.toFixed(1)}%`;
+
+  return (
+    <span
+      title={`${label} ${percent}`}
+      className="flex min-w-0 flex-col justify-center overflow-hidden whitespace-nowrap rounded-lg px-2.5"
+      style={{ width: `${share}%`, backgroundColor: color }}
+    >
+      {share >= MIX_LABEL_MIN_SHARE ? (
+        <span className={`text-[9.5px] font-bold ${labelClassName}`}>{label}</span>
+      ) : null}
+      {share >= MIX_PERCENT_MIN_SHARE ? (
+        <span className="text-[12px] font-extrabold tabular-nums text-white">{percent}</span>
+      ) : null}
     </span>
   );
 }
@@ -207,11 +259,11 @@ function SourceChip({ name, source, t }) {
   return (
     <span className="inline-flex flex-wrap items-center gap-2 rounded-[9px] border border-theme-300/40 bg-theme-200/30 py-1 pl-2.5 pr-3 dark:border-theme-600/40 dark:bg-white/[0.06]">
       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${tone.dot}`} />
-      <span className="text-[11px] font-bold text-theme-700 dark:text-theme-200">{name}</span>
+      <span className="text-[11px] font-bold text-theme-800 dark:text-theme-100">{name}</span>
       <span className="text-[10.5px] font-semibold" style={{ color: tone.color }}>
         {state}
       </span>
-      <span className="text-[10.5px] font-medium tabular-nums text-theme-500 dark:text-theme-400">
+      <span className="text-[10.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
         {t(`${NS}.fetchedAt`)} {source?.updatedAtJST || DASH} · {t(`${NS}.businessDay`)} {source?.dataDateJST || DASH}
         {isNil(source?.coveredShopCount) ? "" : ` · ${source.coveredShopCount}`}
       </span>
@@ -320,7 +372,7 @@ function TrafficChart({ days, series, expected, t }) {
         {days.map((d) => (
           <span
             key={d.date}
-            className="flex-1 text-center text-[9px] font-medium tabular-nums text-theme-500 dark:text-theme-400"
+            className="flex-1 text-center text-[9px] font-medium tabular-nums text-theme-600 dark:text-theme-300"
           >
             {d.md}
           </span>
@@ -413,7 +465,7 @@ export default function Component({ service }) {
             <ChartIcon />
             <span className="flex min-w-0 flex-col">
               <span className="truncate text-sm font-bold text-theme-900 dark:text-theme-50">{t(`${NS}.title`)}</span>
-              <span className="text-[10px] font-semibold tracking-[0.06em] text-theme-500 dark:text-theme-400">
+              <span className="text-[10px] font-semibold tracking-[0.06em] text-theme-600 dark:text-theme-300">
                 {t(`${NS}.subtitle`, { count: model.shopCount })}
               </span>
             </span>
@@ -426,7 +478,7 @@ export default function Component({ service }) {
             ) : null}
             {/* business day ≠ fetch time — both are shown on purpose */}
             <span className="hidden items-center gap-1.5 rounded-[9px] border border-theme-300/50 bg-theme-200/30 px-2.5 py-1 @lg:inline-flex dark:border-theme-600/50 dark:bg-white/[0.06]">
-              <span className="text-[9px] font-bold tracking-[0.12em] text-theme-500 dark:text-theme-400">
+              <span className="text-[9px] font-bold tracking-[0.12em] text-theme-600 dark:text-theme-300">
                 {t(`${NS}.businessDay`)}
               </span>
               <span className="text-[12px] font-bold tabular-nums text-theme-900 dark:text-theme-50">
@@ -434,10 +486,10 @@ export default function Component({ service }) {
               </span>
             </span>
             <span className="flex flex-col items-end leading-tight">
-              <span className="text-[9px] font-bold tracking-[0.14em] text-theme-500 dark:text-theme-400">
+              <span className="text-[9px] font-bold tracking-[0.14em] text-theme-600 dark:text-theme-300">
                 {t(`${NS}.snapshot`)}
               </span>
-              <span className="text-[12px] font-semibold tabular-nums text-theme-700 dark:text-theme-200">
+              <span className="text-[12px] font-semibold tabular-nums text-theme-800 dark:text-theme-100">
                 {model.generatedAtJST || DASH}
               </span>
             </span>
@@ -459,7 +511,7 @@ export default function Component({ service }) {
         {/* traffic hero + 7-day chart */}
         <section className={`grid grid-cols-1 @2xl:grid-cols-[340px_1fr] ${cardCls}`}>
           <div className="flex min-w-0 flex-col justify-center gap-2.5 border-b border-theme-300/30 p-4 @2xl:border-b-0 @2xl:border-r dark:border-white/10">
-            <span className="text-[10.5px] font-bold tracking-wide text-theme-600 dark:text-theme-300">
+            <span className="text-[10.5px] font-bold tracking-wide text-theme-700 dark:text-theme-200">
               {t(`${NS}.visits`)} · {model.dataDateJST || DASH}
               {model.dataDateJST ? `（${weekdayJp(model.dataDateJST)}）` : ""}
             </span>
@@ -467,9 +519,9 @@ export default function Component({ service }) {
               <span className="text-[42px] font-extrabold leading-[0.9] tabular-nums text-theme-900 dark:text-theme-50">
                 {fmtNullable(t, model.visit)}
               </span>
-              <span className="text-[13px] font-bold text-theme-500 dark:text-theme-400">{t(`${NS}.visitsUnit`)}</span>
+              <span className="text-[13px] font-bold text-theme-600 dark:text-theme-300">{t(`${NS}.visitsUnit`)}</span>
             </span>
-            <span className="flex items-center gap-1 text-[11.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
+            <span className="flex items-center gap-1 text-[11.5px] font-medium tabular-nums text-theme-700 dark:text-theme-200">
               <span>
                 UU {fmtNullable(t, model.uu)} {t(`${NS}.peopleUnit`)}
                 {!isNil(model.visit) && model.uu > 0
@@ -482,7 +534,7 @@ export default function Component({ service }) {
             </span>
             <div className="mt-1 flex flex-col gap-1.5">
               <div className="flex items-baseline justify-between gap-2">
-                <span className="text-[10px] font-medium text-theme-500 dark:text-theme-400">
+                <span className="text-[10px] font-medium text-theme-600 dark:text-theme-300">
                   {t(`${NS}.vsMedian`, { value: fmtNullable(t, model.expected) })}
                 </span>
                 <span className="text-[12.5px] font-extrabold tabular-nums" style={{ color: tone.color }}>
@@ -499,7 +551,7 @@ export default function Component({ service }) {
                 />
               </span>
               <span className="text-[10px] font-semibold" style={{ color: sampleShort ? "#B45309" : undefined }}>
-                <span className={sampleShort ? "" : "text-theme-500 dark:text-theme-400"}>
+                <span className={sampleShort ? "" : "text-theme-600 dark:text-theme-300"}>
                   {sampleShort
                     ? t(`${NS}.sampleShort`, { n: model.sampleCount })
                     : t(`${NS}.sampleOk`, { n: model.sampleCount })}
@@ -510,15 +562,15 @@ export default function Component({ service }) {
 
           <div className="flex min-w-0 flex-col gap-2 p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-[10.5px] font-bold tracking-wide text-theme-600 dark:text-theme-300">
+              <span className="text-[10.5px] font-bold tracking-wide text-theme-700 dark:text-theme-200">
                 {t(`${NS}.sevenDay`)}{" "}
-                <span className="font-medium text-theme-500 dark:text-theme-400">
+                <span className="font-medium text-theme-600 dark:text-theme-300">
                   · {model.period?.startDateJST || DASH} 〜 {model.period?.endDateJST || DASH}
                 </span>
               </span>
               <span className="flex items-center gap-2.5">
                 {series === "visit" && !isNil(model.expected) ? (
-                  <span className="text-[9.5px] font-medium text-theme-500 dark:text-theme-400">
+                  <span className="text-[9.5px] font-medium text-theme-600 dark:text-theme-300">
                     <span
                       className="mr-1 inline-block w-3 border-t-[1.5px] border-dashed align-middle"
                       style={{ borderColor: ACCENT }}
@@ -544,9 +596,9 @@ export default function Component({ service }) {
 
         {/* customer mix */}
         <div className="flex flex-wrap items-center justify-between gap-2 px-0.5">
-          <span className="text-[12px] font-bold text-theme-700 dark:text-theme-200">
+          <span className="text-[12px] font-bold text-theme-800 dark:text-theme-100">
             {t(`${NS}.mixTitle`)}{" "}
-            <span className="text-[10px] font-medium text-theme-500 dark:text-theme-400">
+            <span className="text-[10px] font-medium text-theme-600 dark:text-theme-300">
               · {model.mix.period?.startDateJST || DASH} 〜 {model.mix.period?.endDateJST || DASH} ·{" "}
               {t(`${NS}.mixNote`)}
             </span>
@@ -562,7 +614,7 @@ export default function Component({ service }) {
         </div>
         <section className={`grid grid-cols-1 @2xl:grid-cols-[340px_1fr] ${cardCls}`}>
           <div className="flex min-w-0 flex-col gap-3 border-b border-theme-300/30 p-4 @2xl:border-b-0 @2xl:border-r dark:border-white/10">
-            <span className="text-[10.5px] font-bold tracking-wide text-theme-600 dark:text-theme-300">
+            <span className="text-[10.5px] font-bold tracking-wide text-theme-700 dark:text-theme-200">
               {t(`${NS}.mixComposition`)}
             </span>
             {isNil(newShare) || isNil(repShare) ? (
@@ -570,65 +622,63 @@ export default function Component({ service }) {
                 {t(`${NS}.mixUnavailable`)}
               </span>
             ) : (
-              <span className="flex h-[34px] gap-0.5">
-                <span
-                  className="flex flex-col justify-center rounded-lg px-2.5"
-                  style={{ width: `${newShare}%`, backgroundColor: BLUE }}
-                >
-                  <span className="text-[9.5px] font-bold text-white/80">{t(`${NS}.newCustomers`)}</span>
-                  <span className="text-[12px] font-extrabold tabular-nums text-white">{newShare.toFixed(1)}%</span>
-                </span>
-                <span
-                  className="flex flex-col justify-center rounded-lg px-2.5"
-                  style={{ width: `${repShare}%`, backgroundColor: BLUE_SOFT }}
-                >
-                  <span className="text-[9.5px] font-bold text-white/90">{t(`${NS}.repeatCustomers`)}</span>
-                  <span className="text-[12px] font-extrabold tabular-nums text-white">{repShare.toFixed(1)}%</span>
-                </span>
+              <span className="flex h-[34px] gap-0.5 overflow-hidden rounded-[10px]">
+                <MixSegment
+                  label={t(`${NS}.newCustomers`)}
+                  share={newShare}
+                  color={BLUE}
+                  labelClassName="text-white/80"
+                />
+                <MixSegment
+                  label={t(`${NS}.repeatCustomers`)}
+                  share={repShare}
+                  color={BLUE_SOFT}
+                  labelClassName="text-white/90"
+                />
               </span>
             )}
             <div className="grid grid-cols-2 gap-2.5">
               <div className="flex flex-col gap-0.5 rounded-xl border border-theme-300/30 bg-theme-100/60 p-2.5 dark:border-white/[0.06] dark:bg-white/[0.03]">
-                <span className="text-[9.5px] font-bold text-theme-600 dark:text-theme-300">
+                <span className="text-[9.5px] font-bold text-theme-700 dark:text-theme-200">
                   {t(`${NS}.newCustomers`)}
                 </span>
                 <span className="text-[17px] font-extrabold tabular-nums text-theme-900 dark:text-theme-50">
                   {mLabel(newV)}
                 </span>
-                <span className="text-[9.5px] font-medium tabular-nums text-theme-500 dark:text-theme-400">
+                <span className="text-[9.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
                   {isSales
                     ? `${fmtNullable(t, model.mix.newOrders)}${t(`${NS}.ordersUnit`)}`
                     : `¥${fmtNullable(t, model.mix.newYen)}`}
                 </span>
               </div>
               <div className="flex flex-col gap-0.5 rounded-xl border border-theme-300/30 bg-theme-100/60 p-2.5 dark:border-white/[0.06] dark:bg-white/[0.03]">
-                <span className="text-[9.5px] font-bold text-theme-600 dark:text-theme-300">
+                <span className="text-[9.5px] font-bold text-theme-700 dark:text-theme-200">
                   {t(`${NS}.repeatTotal`)}
                 </span>
                 <span className="text-[17px] font-extrabold tabular-nums text-theme-900 dark:text-theme-50">
                   {mLabel(repV)}
                 </span>
-                <span className="text-[9.5px] font-medium tabular-nums text-theme-500 dark:text-theme-400">
+                <span className="text-[9.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
                   {isSales
                     ? `${fmtNullable(t, model.mix.repOrders)}${t(`${NS}.ordersUnit`)}`
                     : `¥${fmtNullable(t, model.mix.repYen)}`}
                 </span>
               </div>
             </div>
-            <span className="text-[10px] font-medium leading-relaxed text-theme-500 dark:text-theme-400">
+            <span className="text-[10px] font-medium leading-relaxed text-theme-600 dark:text-theme-300">
               {t(`${NS}.mixCaveat`)}
             </span>
           </div>
 
           <div className="flex min-w-0 flex-col gap-2.5 p-4">
-            <span className="text-[10.5px] font-bold tracking-wide text-theme-600 dark:text-theme-300">
+            <span className="text-[10.5px] font-bold tracking-wide text-theme-700 dark:text-theme-200">
               {t(`${NS}.bucketTitle`)}
             </span>
             {rows.map((r) => (
               <div key={r.label} className="flex items-center gap-3">
                 <span className="flex w-[110px] shrink-0 items-center gap-2">
                   <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ backgroundColor: r.color }} />
-                  <span className="whitespace-nowrap text-[11.5px] font-bold text-theme-700 dark:text-theme-200">
+                  <span className="whitespace-nowrap text-[11.5px] font-bold text-theme-800 dark:text-theme-100">
                     {r.label}
                   </span>
                 </span>
@@ -641,7 +691,7 @@ export default function Component({ service }) {
                 <span className="w-[126px] shrink-0 text-right text-[13px] font-bold tabular-nums text-theme-900 dark:text-theme-50">
                   {mLabel(r.v)}
                 </span>
-                <span className="w-16 shrink-0 text-right text-[11.5px] font-bold tabular-nums text-theme-600 dark:text-theme-300">
+                <span className="w-16 shrink-0 text-right text-[11.5px] font-bold tabular-nums text-theme-700 dark:text-theme-200">
                   {isNil(r.v) || mixTotal <= 0 ? DASH : `${((r.v / mixTotal) * 100).toFixed(1)}%`}
                 </span>
                 <span className="hidden w-24 shrink-0 text-right text-[10.5px] font-medium tabular-nums text-theme-500 @2xl:inline dark:text-theme-400">
@@ -654,8 +704,8 @@ export default function Component({ service }) {
 
         {/* per-shop table */}
         <div className="flex items-baseline justify-between gap-2 px-0.5">
-          <span className="text-[12px] font-bold text-theme-700 dark:text-theme-200">{t(`${NS}.byShop`)}</span>
-          <span className="hidden text-[10px] font-medium text-theme-500 dark:text-theme-400 @lg:inline">
+          <span className="text-[12px] font-bold text-theme-800 dark:text-theme-100">{t(`${NS}.byShop`)}</span>
+          <span className="hidden text-[10px] font-medium text-theme-600 dark:text-theme-300 @lg:inline">
             {t(`${NS}.thresholds`)}
           </span>
         </div>
@@ -667,6 +717,7 @@ export default function Component({ service }) {
             <span className="min-w-0 flex-[0.9] text-right">UU</span>
             <span className="min-w-0 flex-[1.1] text-right">{t(`${NS}.median`)}</span>
             <span className="min-w-0 flex-[0.85] text-right">{t(`${NS}.vsMedianShort`)}</span>
+            <span className="hidden min-w-0 flex-1 @2xl:block" />
             <span className="min-w-0 flex-[1.1] text-right">{t(`${NS}.newShare`)}</span>
           </div>
           {model.shops.map((sh) => {
@@ -695,10 +746,10 @@ export default function Component({ service }) {
                 <span className="min-w-0 flex-[1] text-right text-[13px] font-bold tabular-nums text-theme-900 dark:text-theme-50">
                   {fmtNullable(t, sh.visit)}
                 </span>
-                <span className="min-w-0 flex-[0.9] text-right text-[12.5px] font-semibold tabular-nums text-theme-600 dark:text-theme-300">
+                <span className="min-w-0 flex-[0.9] text-right text-[12.5px] font-semibold tabular-nums text-theme-700 dark:text-theme-200">
                   {fmtNullable(t, sh.uu)}
                 </span>
-                <span className="min-w-0 flex-[1.1] text-right text-[12.5px] font-semibold tabular-nums text-theme-600 dark:text-theme-300">
+                <span className="min-w-0 flex-[1.1] text-right text-[12.5px] font-semibold tabular-nums text-theme-700 dark:text-theme-200">
                   {fmtNullable(t, sh.expected)}
                 </span>
                 <span
@@ -707,7 +758,8 @@ export default function Component({ service }) {
                 >
                   {pctLabel(sh.delta)}
                 </span>
-                <span className="min-w-0 flex-[1.1] text-right text-[12.5px] font-bold tabular-nums text-theme-700 dark:text-theme-200">
+                <DeltaBar delta={sh.delta} color={st.color} />
+                <span className="min-w-0 flex-[1.1] text-right text-[12.5px] font-bold tabular-nums text-theme-800 dark:text-theme-100">
                   {isNil(share) ? DASH : `${share.toFixed(1)}%`}
                 </span>
               </div>
@@ -716,7 +768,7 @@ export default function Component({ service }) {
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-theme-300/50 px-2 pt-2.5 dark:border-white/15">
             <span className="min-w-0 flex-[1.5] text-[11.5px] font-bold text-theme-900 dark:text-theme-50">
               {t(`${NS}.total`)}{" "}
-              <span className="font-medium text-theme-500 dark:text-theme-400">
+              <span className="font-medium text-theme-600 dark:text-theme-300">
                 {t(`${NS}.covered`, {
                   covered: model.sources?.traffic?.coveredShopCount ?? model.shops.length,
                   total: model.shopCount,
@@ -727,10 +779,10 @@ export default function Component({ service }) {
             <span className="min-w-0 flex-[1] text-right text-[13.5px] font-extrabold tabular-nums text-theme-900 dark:text-theme-50">
               {fmtNullable(t, model.visit)}
             </span>
-            <span className="min-w-0 flex-[0.9] text-right text-[13px] font-bold tabular-nums text-theme-600 dark:text-theme-300">
+            <span className="min-w-0 flex-[0.9] text-right text-[13px] font-bold tabular-nums text-theme-700 dark:text-theme-200">
               {fmtNullable(t, model.uu)}
             </span>
-            <span className="min-w-0 flex-[1.1] text-right text-[12.5px] font-semibold tabular-nums text-theme-500 dark:text-theme-400">
+            <span className="min-w-0 flex-[1.1] text-right text-[12.5px] font-semibold tabular-nums text-theme-600 dark:text-theme-300">
               {fmtNullable(t, model.expected)}
             </span>
             <span
@@ -739,7 +791,9 @@ export default function Component({ service }) {
             >
               {pctLabel(model.delta)}
             </span>
-            <span className="min-w-0 flex-[1.1] text-right text-[13px] font-bold tabular-nums text-theme-700 dark:text-theme-200">
+            {/* the totals row keeps the column's width but draws no bar, as in the design */}
+            <span className="hidden min-w-0 flex-1 @2xl:block" />
+            <span className="min-w-0 flex-[1.1] text-right text-[13px] font-bold tabular-nums text-theme-800 dark:text-theme-100">
               {isNil(newShare) ? DASH : `${newShare.toFixed(1)}%`}
             </span>
           </div>

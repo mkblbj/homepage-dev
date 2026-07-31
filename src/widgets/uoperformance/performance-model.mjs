@@ -25,6 +25,20 @@ export function pctLabel(value) {
   return isNil(value) ? DASH : `${value > 0 ? "+" : ""}${Number(value).toFixed(1)}%`;
 }
 
+// The per-shop delta bar diverges from a centre line: the track spans ±50%, so a delta
+// past that is clamped instead of running off the end. An unknown delta draws nothing.
+export const DELTA_BAR_RANGE = 50;
+
+export function deltaBar(delta) {
+  if (isNil(delta)) {
+    return { left: 50, width: 0 };
+  }
+
+  const clamped = Math.max(-DELTA_BAR_RANGE, Math.min(DELTA_BAR_RANGE, Number(delta)));
+
+  return { left: clamped < 0 ? 50 + clamped : 50, width: Math.abs(clamped) };
+}
+
 export function mdLabel(dateStr) {
   if (!dateStr) {
     return "";

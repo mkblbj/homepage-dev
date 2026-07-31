@@ -184,6 +184,39 @@ describe("widgets/uoperformance/component", () => {
     expect(screen.getByText("uoperformance.mixUnavailable")).toBeInTheDocument();
   });
 
+  it("keeps a small mix segment's copy inside its own width", () => {
+    mockData(
+      snapshot({
+        customerMix: {
+          ...snapshot().customerMix,
+          new: { salesYen: 9700, orderCount: 97, salesSharePercent: 97, orderSharePercent: 97 },
+          repeat: { salesYen: 300, orderCount: 3, salesSharePercent: 3, orderSharePercent: 3 },
+        },
+      }),
+    );
+    render();
+
+    // 3% has no room for either the word or the number — the title keeps both reachable.
+    const narrow = screen.getByTitle("uoperformance.repeatCustomers 3.0%");
+
+    expect(narrow.textContent).toBe("");
+    expect(narrow).toHaveClass("overflow-hidden");
+    // 97% still spells everything out
+    expect(screen.getByTitle("uoperformance.newCustomers 97.0%").textContent).toBe("uoperformance.newCustomers97.0%");
+  });
+
+  it("draws the per-shop delta bar left of centre for a shortfall", () => {
+    mockData(snapshot());
+    const { container } = render();
+
+    // shop 3911 sits at -24.5% → the bar starts at 25.5% and spans 24.5%
+    const bar = [...container.querySelectorAll("span")].find(
+      (el) => el.style.left === "25.5%" && el.style.width === "24.5%",
+    );
+
+    expect(bar).toBeTruthy();
+  });
+
   it("switches the customer mix between sales and orders", () => {
     mockData(snapshot());
     render();
