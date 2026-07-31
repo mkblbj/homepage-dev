@@ -1,0 +1,57 @@
+import fs from "node:fs";
+import path from "node:path";
+
+import { describe, expect, it } from "vitest";
+
+const LOCALES = ["en", "ja", "zh-Hans"];
+const NS = "uoattention";
+
+function loadNamespace(locale) {
+  const filePath = path.join(process.cwd(), "public", "locales", locale, "common.json");
+
+  return JSON.parse(fs.readFileSync(filePath, "utf8"))[NS];
+}
+
+function flatten(value, prefix = "") {
+  if (value === null || typeof value !== "object") {
+    return [prefix];
+  }
+
+  return Object.entries(value).flatMap(([key, child]) => flatten(child, prefix ? `${prefix}.${key}` : key));
+}
+
+describe("widgets/uoattention/locales", () => {
+  it("defines the namespace in every locale", () => {
+    for (const locale of LOCALES) {
+      expect(loadNamespace(locale), `${locale} is missing ${NS}`).toBeTruthy();
+    }
+  });
+
+  it("uses an identical key set across locales", () => {
+    const reference = flatten(loadNamespace("ja")).sort();
+
+    expect(reference.length).toBeGreaterThan(40);
+
+    for (const locale of LOCALES) {
+      expect(flatten(loadNamespace(locale)).sort(), `${locale} key set mismatch`).toEqual(reference);
+    }
+  });
+
+  it("has no empty strings", () => {
+    for (const locale of LOCALES) {
+      const namespace = loadNamespace(locale);
+
+      for (const key of flatten(namespace)) {
+        const value = key.split(".").reduce((node, part) => node[part], namespace);
+
+        expect(String(value).trim(), `${locale}.${key} is empty`).not.toBe("");
+      }
+    }
+  });
+
+  it("keeps the count interpolation in the subtitle of every locale", () => {
+    for (const locale of LOCALES) {
+      expect(loadNamespace(locale).subtitle, `${locale}.subtitle`).toContain("{{count}}");
+    }
+  });
+});
