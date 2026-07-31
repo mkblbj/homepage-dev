@@ -516,7 +516,8 @@ export default function Component({ service }) {
           </span>
           <span className="flex items-center gap-1.5">
             {[
-              { k: 0, label: `${t(`${NS}.all`)} ${model.recentReviews.length}` },
+              // the true count, matching the headline — the feed itself may hold fewer rows
+              { k: 0, label: `${t(`${NS}.all`)} ${fmtNullable(t, model.reviews)}` },
               ...model.ratings.map((r) => ({ k: r.star, label: `${r.star}★ ${fmtNullable(t, r.n)}` })),
             ].map((c) => (
               <button
@@ -585,15 +586,23 @@ export default function Component({ service }) {
             </div>
           ) : null}
         </section>
-        {hiddenCount > 0 || feedExpanded ? (
-          <button
-            type="button"
-            onClick={() => setFeedExpanded((prev) => !prev)}
-            className="mx-auto rounded-full border border-theme-300/50 px-3.5 py-1 text-[10.5px] font-bold text-theme-600 transition-colors hover:border-theme-400 hover:bg-theme-200/40 dark:border-theme-600/50 dark:text-theme-300 dark:hover:bg-white/10"
-          >
-            {feedExpanded ? t(`${NS}.showLess`) : t(`${NS}.showMore`, { count: hiddenCount })}
-          </button>
-        ) : null}
+        <div className="flex flex-col items-center gap-1.5">
+          {hiddenCount > 0 || feedExpanded ? (
+            <button
+              type="button"
+              onClick={() => setFeedExpanded((prev) => !prev)}
+              className="rounded-full border border-theme-300/50 px-3.5 py-1 text-[10.5px] font-bold text-theme-600 transition-colors hover:border-theme-400 hover:bg-theme-200/40 dark:border-theme-600/50 dark:text-theme-300 dark:hover:bg-white/10"
+            >
+              {feedExpanded ? t(`${NS}.showLess`) : t(`${NS}.showMore`, { count: hiddenCount })}
+            </button>
+          ) : null}
+          {/* without this the feed reads as the complete list once it is fully expanded */}
+          {model.reviewsTruncated ? (
+            <span className="text-[10px] font-medium text-theme-500 dark:text-theme-400">
+              {t(`${NS}.feedTruncated`, { shown: model.feedCount, total: fmtNullable(t, model.reviews) })}
+            </span>
+          ) : null}
+        </div>
       </div>
     </Container>
   );

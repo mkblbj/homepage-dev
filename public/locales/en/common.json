@@ -1258,6 +1258,7 @@
         "showMore": "Show more (+{{count}})",
         "showLess": "Show less",
         "expandReview": "Show the full text",
+        "feedTruncated": "Newest {{shown}} shown of {{total}} unreplied",
         "collapseReview": "Collapse",
         "reviewsNone": "No matching unreplied reviews",
         "reviewsNoneNote": "Try a different filter",

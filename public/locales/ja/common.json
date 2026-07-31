@@ -1258,6 +1258,7 @@
         "showMore": "もっと見る（+{{count}}）",
         "showLess": "折りたたむ",
         "expandReview": "全文を表示",
+        "feedTruncated": "明細は最新 {{shown}} 件のみ（未返信 全{{total}}件）",
         "collapseReview": "折りたたむ",
         "reviewsNone": "該当する未返信レビューはありません",
         "reviewsNoneNote": "フィルタを変更してください",

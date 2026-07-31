@@ -38,6 +38,8 @@ export function buildAttentionModel(data, logos) {
   const summary = data.summary || {};
   const byRating = summary.reviewCountByRating || {};
   const logoByName = toLogoMap(logos);
+  const reviewTotal = toNullableNumber(summary.unrepliedReviewCount);
+  const feedCount = (data.recentReviews || []).length;
   const shops = (data.shops || []).map((shop) => ({
     name: shop.shopName,
     logoUrl: logoByName.get(shop.shopName) || null,
@@ -59,7 +61,12 @@ export function buildAttentionModel(data, logos) {
     pending: toNullableNumber(summary.pendingOrderCount),
     inquiry: toNullableNumber(summary.unansweredInquiryCount),
     overdue: toNullableNumber(summary.overdueInquiryCount),
-    reviews: toNullableNumber(summary.unrepliedReviewCount),
+    reviews: reviewTotal,
+    // The Server counts every unreplied review from its full paginated fetch but only ships
+    // the newest 20 as detail rows, so the feed can hold fewer items than the headline says.
+    // Deriving it here beats trusting the array length as a total.
+    feedCount,
+    reviewsTruncated: !isNil(reviewTotal) && feedCount < reviewTotal,
     productReviews: toNullableNumber(summary.productReviewCount),
     shopReviews: toNullableNumber(summary.shopReviewCount),
     ratings: [1, 2, 3].map((star) => ({ star, n: toNullableNumber(byRating[star]) })),

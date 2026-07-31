@@ -245,6 +245,33 @@ describe("widgets/uoattention/component", () => {
     expect(screen.getAllByText(/^excerpt \d$/)).toHaveLength(6);
   });
 
+  it("labels the all-filter with the counted total, not the number of rows it received", () => {
+    // 20 detail rows but 27 counted unreplied reviews — the label must match the headline.
+    mockData(
+      snapshot({
+        summary: { ...snapshot().summary, unrepliedReviewCount: 27, reviewCountByRating: { 1: 9, 2: 9, 3: 9 } },
+        recentReviews: Array.from({ length: 20 }, (_, i) => review(i + 1, (i % 3) + 1)),
+      }),
+    );
+    render();
+
+    expect(screen.getByRole("button", { name: "uoattention.all 27" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "uoattention.all 20" })).not.toBeInTheDocument();
+    expect(screen.getByText("uoattention.feedTruncated")).toBeInTheDocument();
+  });
+
+  it("stays quiet about truncation when the feed is complete", () => {
+    mockData(
+      snapshot({
+        recentReviews: [review(1, 1), review(2, 2)],
+        summary: { ...snapshot().summary, unrepliedReviewCount: 2 },
+      }),
+    );
+    render();
+
+    expect(screen.queryByText("uoattention.feedTruncated")).not.toBeInTheDocument();
+  });
+
   it("hides the reveal button when everything already fits", () => {
     mockData(snapshot({ recentReviews: [review(1, 1), review(2, 2)] }));
     render();

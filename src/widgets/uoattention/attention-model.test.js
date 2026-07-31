@@ -203,6 +203,37 @@ describe("widgets/uoattention/attention-model", () => {
     expect(JSON.stringify(model)).not.toContain("review.rakuten.co.jp");
   });
 
+  it("flags the feed as truncated when it holds fewer rows than the counted total", () => {
+    // The Server counts every unreplied review but ships only the newest 20 as detail rows.
+    const truncated = buildAttentionModel({
+      ...snapshot,
+      summary: { ...snapshot.summary, unrepliedReviewCount: 27 },
+    });
+
+    expect(truncated.reviews).toBe(27);
+    expect(truncated.feedCount).toBe(2);
+    expect(truncated.reviewsTruncated).toBe(true);
+  });
+
+  it("does not flag truncation when the feed already holds everything", () => {
+    const model = buildAttentionModel({
+      ...snapshot,
+      summary: { ...snapshot.summary, unrepliedReviewCount: 2 },
+    });
+
+    expect(model.reviewsTruncated).toBe(false);
+  });
+
+  it("never claims truncation while the counted total is unknown", () => {
+    const model = buildAttentionModel({
+      ...snapshot,
+      summary: { ...snapshot.summary, unrepliedReviewCount: null },
+    });
+
+    expect(model.reviews).toBeNull();
+    expect(model.reviewsTruncated).toBe(false);
+  });
+
   it("merges shop logos by name and tolerates missing entries", () => {
     const logos = {
       shops: [
