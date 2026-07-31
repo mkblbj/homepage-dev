@@ -322,7 +322,7 @@ function ShopMiniChart({ points, mode, cvr = 0, t, height = 32 }) {
 }
 
 // ---- daily area chart with hover (aggregate across shops) ----
-function DailyChart({ model, t }) {
+function DailyChart({ model, mode, onModeChange, t }) {
   const [hover, setHover] = useState(null);
   const [avgHover, setAvgHover] = useState(false);
   // hover is an index into model.days; a background refresh can shrink model.days
@@ -335,13 +335,17 @@ function DailyChart({ model, t }) {
 
   return (
     <div className="flex min-w-0 flex-col gap-2">
-      <div className="flex items-baseline justify-between gap-2">
+      <div className="flex items-center justify-between gap-2">
         <span className="min-w-0 truncate text-[10.5px] font-bold tracking-wide text-theme-600 dark:text-theme-300">
           {t(`${NS}.dailyTrend`)} <span className="text-[9px] font-medium text-theme-500 dark:text-theme-400">· {t(`${NS}.excludesToday`)}</span>
         </span>
-        <span className="shrink-0 text-[9.5px] font-medium text-theme-600 dark:text-theme-300">
-          <span className="mr-1 inline-block w-3 border-t-[1.5px] border-dashed align-middle" style={{ borderColor: ACCENT }} />
-          {t(`${NS}.avgLabel`)}
+        <span className="flex shrink-0 items-center gap-2">
+          <span className="text-[9.5px] font-medium text-theme-600 dark:text-theme-300">
+            <span className="mr-1 inline-block w-3 border-t-[1.5px] border-dashed align-middle" style={{ borderColor: ACCENT }} />
+            {t(`${NS}.avgLabel`)}
+          </span>
+          {/* drives both this chart and the per-shop mini charts */}
+          <ChartModeToggle mode={mode} onChange={onModeChange} t={t} />
         </span>
       </div>
       <div className="relative h-[112px]">
@@ -370,19 +374,35 @@ function DailyChart({ model, t }) {
             </span>
           ) : null}
         </span>
-        <svg viewBox="0 0 100 40" preserveAspectRatio="none" width="100%" height="100%" className="absolute inset-0 block overflow-visible">
-          <path d={model.heroChart.area} fill="url(#uors-area)" />
-          <path
-            d={model.heroChart.line}
-            fill="none"
-            stroke="url(#uors-stroke)"
-            strokeWidth={3}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            vectorEffect="non-scaling-stroke"
-            style={{ filter: "drop-shadow(0 3px 6px rgba(59,130,246,.4))" }}
-          />
-        </svg>
+        {mode === "bar" ? (
+          <div className="absolute inset-0 flex items-end gap-[5px]">
+            {model.days.map((d, i) => (
+              <span
+                key={d.date}
+                className="block flex-1 rounded-[3px] transition-opacity"
+                style={{
+                  height: `${Math.max(2, (d.sales / model.maxDaily) * 100)}%`,
+                  backgroundColor: DOT,
+                  opacity: on ? (i === hover ? 1 : 0.32) : 0.72,
+                }}
+              />
+            ))}
+          </div>
+        ) : (
+          <svg viewBox="0 0 100 40" preserveAspectRatio="none" width="100%" height="100%" className="absolute inset-0 block overflow-visible">
+            <path d={model.heroChart.area} fill="url(#uors-area)" />
+            <path
+              d={model.heroChart.line}
+              fill="none"
+              stroke="url(#uors-stroke)"
+              strokeWidth={3}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+              style={{ filter: "drop-shadow(0 3px 6px rgba(59,130,246,.4))" }}
+            />
+          </svg>
+        )}
 
         {/* hover zones */}
         <div className="absolute inset-0 z-[5] flex" onMouseLeave={() => setHover(null)}>
@@ -395,7 +415,9 @@ function DailyChart({ model, t }) {
           <>
             <div className="pointer-events-none absolute inset-y-0 z-[6] w-px" style={{ left: `${hd.xPct}%`, backgroundColor: "rgba(198,54,43,.45)" }} />
             <div
-              className="pointer-events-none absolute z-[7] h-[9px] w-[9px] -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white"
+              className={`pointer-events-none absolute z-[7] h-[9px] w-[9px] -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white ${
+                mode === "bar" ? "hidden" : ""
+              }`}
               style={{ left: `${hd.xPct}%`, top: `${hd.yPct}%`, backgroundColor: ACCENT, boxShadow: "0 0 0 1px rgba(198,54,43,.4)" }}
             />
             <div
@@ -970,15 +992,12 @@ export default function Component({ service }) {
         {model.hasHistory ? (
           <section className={`grid grid-cols-1 gap-x-5 gap-y-4 p-4 @4xl:grid-cols-[300px_1fr] ${cardCls}`}>
             <div className="min-w-0 @4xl:border-r @4xl:border-theme-300/30 dark:@4xl:border-white/10 @4xl:pr-5">
-              <DailyChart model={model} t={t} />
+              <DailyChart model={model} mode={chartMode} onModeChange={setChartMode} t={t} />
             </div>
             <div className="flex min-w-0 flex-col gap-2.5">
-              <div className="flex items-center justify-between gap-2">
-                <span className="min-w-0 truncate text-[10.5px] font-bold tracking-wide text-theme-600 dark:text-theme-300">
-                  {t(`${NS}.shopTrend`)} <span className="text-[9px] font-medium text-theme-500 dark:text-theme-400">· {t(`${NS}.excludesToday`)}</span>
-                </span>
-                <ChartModeToggle mode={chartMode} onChange={setChartMode} t={t} />
-              </div>
+              <span className="min-w-0 truncate text-[10.5px] font-bold tracking-wide text-theme-600 dark:text-theme-300">
+                {t(`${NS}.shopTrend`)} <span className="text-[9px] font-medium text-theme-500 dark:text-theme-400">· {t(`${NS}.excludesToday`)}</span>
+              </span>
               <div className="grid grid-cols-[repeat(auto-fit,minmax(104px,1fr))] gap-2.5">
                 {model.rows.map((r) => (
                   <div key={r.name} className="relative flex min-w-0 flex-col rounded-xl border border-theme-300/30 bg-theme-100/60 p-2.5 dark:border-white/[0.06] dark:bg-white/[0.03]">
