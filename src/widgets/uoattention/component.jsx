@@ -388,7 +388,9 @@ export default function Component({ service }) {
                 <span className="min-w-0 flex-[1.1] text-right text-[13px] font-bold tabular-nums text-theme-900 dark:text-theme-50">
                   {fmtNullable(t, sh.reviews)}
                 </span>
-                <span className="flex min-w-0 flex-[1.7] gap-1.5 @2xl:pl-5">
+                {/* Follows its column header, which is @2xl-only: below that the row's
+                    zero-basis cells shrink far enough for the badges to overlap the total. */}
+                <span className="hidden min-w-0 flex-[1.7] gap-1.5 @2xl:flex @2xl:pl-5">
                   {sh.stars.map((x) => (
                     <span
                       key={x.star}
@@ -428,7 +430,7 @@ export default function Component({ service }) {
             <span className="min-w-0 flex-[1.1] text-right text-[13.5px] font-extrabold tabular-nums text-theme-900 dark:text-theme-50">
               {fmtNullable(t, model.reviews)}
             </span>
-            <span className="min-w-0 flex-[1.7] pl-5" />
+            <span className="hidden min-w-0 flex-[1.7] @2xl:block @2xl:pl-5" />
             <span
               className="min-w-0 flex-[0.75] text-right text-[14px] font-extrabold tabular-nums"
               style={{ color: ACCENT }}
