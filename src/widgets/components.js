@@ -153,6 +153,7 @@ const components = {
   truenas: dynamic(() => import("./truenas/component")),
   uoattendance: dynamic(() => import("./uoattendance/component")),
   uoattention: dynamic(() => import("./uoattention/component")),
+  uoperformance: dynamic(() => import("./uoperformance/component")),
   uoprinters: dynamic(() => import("./uoprinters/component")),
   uorakutensales: dynamic(() => import("./uorakutensales/component")),
   uoshippingdashboard: dynamic(() => import("./uoshippingdashboard/component")),

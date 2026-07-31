@@ -147,6 +147,7 @@ import unmanic from "./unmanic/widget";
 import unraid from "./unraid/widget";
 import uoattendance from "./uoattendance/widget";
 import uoattention from "./uoattention/widget";
+import uoperformance from "./uoperformance/widget";
 import uoprinters from "./uoprinters/widget";
 import uorakutensales from "./uorakutensales/widget";
 import uoshippingdashboard from "./uoshippingdashboard/widget";
@@ -314,6 +315,7 @@ const widgets = {
   truenas,
   uoattendance,
   uoattention,
+  uoperformance,
   uoprinters,
   uorakutensales,
   uoshippingdashboard,
