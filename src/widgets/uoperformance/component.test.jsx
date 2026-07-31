@@ -103,8 +103,12 @@ function snapshot(overrides = {}) {
   };
 }
 
-function mockData(data, mutate = vi.fn()) {
-  useWidgetAPI.mockReturnValue({ data, error: undefined, mutate });
+function mockData(data, mutate = vi.fn(), logos = undefined) {
+  useWidgetAPI.mockImplementation((_widget, endpoint) => {
+    if (endpoint === "logos") return { data: logos, error: undefined, mutate: vi.fn() };
+
+    return { data, error: undefined, mutate };
+  });
 
   return mutate;
 }
@@ -205,6 +209,31 @@ describe("widgets/uoperformance/component", () => {
 
     expect(screen.getByText("uoperformance.sourceTraffic")).toBeInTheDocument();
     expect(screen.getByText("uoperformance.sourceMix")).toBeInTheDocument();
+  });
+
+  it("shows a shop logo when one is available", () => {
+    mockData(snapshot(), vi.fn(), { shops: [{ shopName: "3911", logoUrl: "https://cabinet.example/3911.jpg" }] });
+    const { container } = render();
+
+    expect([...container.querySelectorAll("img")].map((img) => img.getAttribute("src"))).toContain(
+      "https://cabinet.example/3911.jpg",
+    );
+  });
+
+  it("falls back to an initial when the logo snapshot is unavailable", () => {
+    mockData(snapshot());
+    const { container } = render();
+
+    expect(container.querySelectorAll("img")).toHaveLength(0);
+    expect(screen.getAllByText("3").length).toBeGreaterThan(0);
+  });
+
+  it("drops the endpoint-naming footnote", () => {
+    mockData(snapshot());
+    const { container } = render();
+
+    expect(screen.queryByText("uoperformance.footnote")).not.toBeInTheDocument();
+    expect(container.textContent).not.toContain("/api/");
   });
 
   it("re-reads the snapshot when the refresh button is clicked", () => {

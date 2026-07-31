@@ -11,6 +11,9 @@ const widget = {
     attention: {
       endpoint: "api/attention",
     },
+    logos: {
+      endpoint: "api/shops/logos",
+    },
   },
 };
 

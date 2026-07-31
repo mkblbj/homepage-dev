@@ -25,15 +25,22 @@ function toStars(byRating) {
   return [1, 2, 3].map((star) => ({ star, n: toNullableNumber(rating[star]) })).filter((entry) => entry.n > 0);
 }
 
-export function buildAttentionModel(data) {
+// Logos are optional context merged by shopName; a missing entry just falls back to an initial.
+function toLogoMap(logos) {
+  return new Map((logos?.shops || []).map((shop) => [shop.shopName, shop.logoUrl || null]));
+}
+
+export function buildAttentionModel(data, logos) {
   if (!data) {
     return null;
   }
 
   const summary = data.summary || {};
   const byRating = summary.reviewCountByRating || {};
+  const logoByName = toLogoMap(logos);
   const shops = (data.shops || []).map((shop) => ({
     name: shop.shopName,
+    logoUrl: logoByName.get(shop.shopName) || null,
     status: shop.status || "unknown",
     pending: toNullableNumber(shop.pendingOrderCount),
     inquiry: toNullableNumber(shop.unansweredInquiryCount),
@@ -60,15 +67,17 @@ export function buildAttentionModel(data) {
     // An unknown review count must not be folded into the headline number.
     totalPartial: isNil(summary.unrepliedReviewCount),
     shops,
-    // reviewUrl is deliberately dropped: RMS requires a login and each shop replies there,
-    // so the feed stays read-only context with no outbound links.
+    // Capped at 20 by the Server, newest first. reviewUrl and itemName are deliberately
+    // dropped: RMS requires a login so the feed stays link-free, and the management number
+    // identifies the item far more compactly than its full title.
     recentReviews: (data.recentReviews || []).map((review) => ({
       id: review.reviewId,
       shop: review.shopName,
+      logoUrl: logoByName.get(review.shopName) || null,
       type: review.reviewType,
       rating: Number(review.rating),
       postedAtJST: review.postedAtJST,
-      itemName: review.itemName || null,
+      itemNo: review.itemManagementNumber || null,
       excerpt: review.excerpt || "",
     })),
     sources: data.sources || {},

@@ -1226,7 +1226,7 @@
             "normal": "正常",
             "unknown": "不明"
         },
-        "statusRule": "状態判定は Server 側（1〜2★ または 超期 = 緊急）",
+        "statusRule": "1〜2★ または 超期 = 緊急",
         "sourceMainMenu": "RMS トップ 未対応",
         "sourceReviews": "低評価レビュー",
         "sourceOk": "正常",
@@ -1248,13 +1248,17 @@
         "byShop": "店舗別 対応状況",
         "covered": "{{covered}}/{{total}} 店舗",
         "reviewFeed": "低評価 未返信レビュー",
-        "reviewFeedNote": "直近7 JST 日（今日と前6日）· recentReviews 最大20件 · RMS で各店が対応",
+        "reviewFeedNote": "直近7 JST 日（今日と前6日）· カードをクリックで全文",
         "reviewType": {
             "product": "商品レビュー",
             "shop": "店舗レビュー"
         },
         "noItem": "（店舗レビュー · 商品なし）",
         "all": "全件",
+        "showMore": "もっと見る（+{{count}}）",
+        "showLess": "折りたたむ",
+        "expandReview": "全文を表示",
+        "collapseReview": "折りたたむ",
         "reviewsNone": "該当する未返信レビューはありません",
         "reviewsNoneNote": "フィルタを変更してください",
         "reviewsUnavailable": "レビュー取得不可（件数は不明）",
@@ -1316,8 +1320,7 @@
         "ordersUnit": "件",
         "byShop": "店舗別 経営表現",
         "covered": "{{covered}}/{{total}} 店舗",
-        "thresholds": "閾値：注意 −20% / 重大 −35%（Server 管理）",
-        "footnote": "業務日は RMS の最新完全日で、スナップショット取得時刻とは別。全社の訪問/UU は店舗間で重複排除しない。同曜日サンプルが3件未満なら中位数比較は行わない。今日の売上は /api/sales、履歴売上・CVR は /api/history/sales。",
+        "thresholds": "閾値：注意 −20% / 重大 −35%",
         "noData": "データがありません"
     },
     "uoprinters": {

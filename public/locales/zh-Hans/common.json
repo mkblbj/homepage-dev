@@ -1239,7 +1239,7 @@
             "normal": "正常",
             "unknown": "未知"
         },
-        "statusRule": "状态由 Server 判定（1〜2★ 或超期 = 紧急）",
+        "statusRule": "1〜2★ 或超期 = 紧急",
         "sourceMainMenu": "RMS 首页待办",
         "sourceReviews": "低星评价",
         "sourceOk": "正常",
@@ -1261,13 +1261,17 @@
         "byShop": "各店铺处理状况",
         "covered": "{{covered}}/{{total}} 家店铺",
         "reviewFeed": "低星未回复评价",
-        "reviewFeedNote": "最近 7 个 JST 日（今天和前 6 天）· 最多 20 条 · 由各店在 RMS 内处理",
+        "reviewFeedNote": "最近 7 个 JST 日（今天和前 6 天）· 点击卡片看全文",
         "reviewType": {
             "product": "商品评价",
             "shop": "店铺评价"
         },
         "noItem": "（店铺评价 · 无商品）",
         "all": "全部",
+        "showMore": "展开更多（+{{count}}）",
+        "showLess": "收起",
+        "expandReview": "查看全文",
+        "collapseReview": "收起",
         "reviewsNone": "没有符合条件的未回复评价",
         "reviewsNoneNote": "请更换筛选条件",
         "reviewsUnavailable": "评价取得失败（件数未知）",
@@ -1329,8 +1333,7 @@
         "ordersUnit": " 件",
         "byShop": "各店铺经营表现",
         "covered": "{{covered}}/{{total}} 家店铺",
-        "thresholds": "阈值：注意 −20% / 严重 −35%（Server 管理）",
-        "footnote": "业务日是 RMS 的最新完整日，与快照取得时刻不同。全公司访问/UU 不跨店铺去重。同星期样本少于 3 个时不做中位数比较。今日销售来自 /api/sales，历史销售与 CVR 来自 /api/history/sales。",
+        "thresholds": "阈值：注意 −20% / 严重 −35%",
         "noData": "暂无数据"
     },
     "uoprinters": {

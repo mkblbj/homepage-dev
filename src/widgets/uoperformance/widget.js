@@ -11,6 +11,9 @@ const widget = {
     performance: {
       endpoint: "api/performance",
     },
+    logos: {
+      endpoint: "api/shops/logos",
+    },
   },
 };
 

@@ -179,6 +179,14 @@ describe("widgets/uoperformance/performance-model", () => {
     });
   });
 
+  it("merges shop logos by name and tolerates a missing snapshot", () => {
+    const logos = { shops: [{ shopName: "3911", logoUrl: "https://cabinet.example/3911.jpg" }] };
+
+    expect(buildPerformanceModel(snapshot, logos).shops[0].logoUrl).toBe("https://cabinet.example/3911.jpg");
+    expect(buildPerformanceModel(snapshot).shops[0].logoUrl).toBeNull();
+    expect(buildPerformanceModel(snapshot, { shops: [{ shopName: "other" }] }).shops[0].logoUrl).toBeNull();
+  });
+
   it("formats percentages with a sign and one decimal, and unknown as an em dash", () => {
     expect(pctLabel(-18.1)).toBe("-18.1%");
     expect(pctLabel(4)).toBe("+4.0%");

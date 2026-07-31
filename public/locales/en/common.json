@@ -1226,7 +1226,7 @@
             "normal": "Normal",
             "unknown": "Unknown"
         },
-        "statusRule": "Status is decided server-side (1–2★ or overdue = critical)",
+        "statusRule": "1–2★ or overdue = critical",
         "sourceMainMenu": "RMS top page",
         "sourceReviews": "Low-rating reviews",
         "sourceOk": "OK",
@@ -1248,13 +1248,17 @@
         "byShop": "By shop",
         "covered": "{{covered}}/{{total}} shops",
         "reviewFeed": "Low-rating unreplied reviews",
-        "reviewFeedNote": "Last 7 JST days (today + previous 6) · up to 20 items · each shop replies in RMS",
+        "reviewFeedNote": "Last 7 JST days (today + previous 6) · click a card for the full text",
         "reviewType": {
             "product": "Item review",
             "shop": "Shop review"
         },
         "noItem": "(shop review · no item)",
         "all": "All",
+        "showMore": "Show more (+{{count}})",
+        "showLess": "Show less",
+        "expandReview": "Show the full text",
+        "collapseReview": "Collapse",
         "reviewsNone": "No matching unreplied reviews",
         "reviewsNoneNote": "Try a different filter",
         "reviewsUnavailable": "Reviews unavailable (count unknown)",
@@ -1316,8 +1320,7 @@
         "ordersUnit": " orders",
         "byShop": "By shop",
         "covered": "{{covered}}/{{total}} shops",
-        "thresholds": "Thresholds: attention −20% / critical −35% (server-managed)",
-        "footnote": "The business day is the latest complete RMS day and differs from the snapshot fetch time. Company-wide visits and UU are not de-duplicated across shops. With fewer than 3 same-weekday samples no median comparison is made. Today's sales come from /api/sales; historical sales and CVR from /api/history/sales.",
+        "thresholds": "Thresholds: attention −20% / critical −35%",
         "noData": "No data"
     },
     "uoprinters": {

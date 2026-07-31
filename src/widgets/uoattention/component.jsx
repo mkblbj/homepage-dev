@@ -16,7 +16,7 @@
  */
 import Container from "components/services/widget/container";
 import { useTranslation } from "next-i18next/pages";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { DASH, buildAttentionModel, isNil, sumNullable } from "./attention-model.mjs";
 
@@ -26,6 +26,10 @@ const NS = "uoattention";
 // /api/attention refreshes server-side every 10 min (to-dos) / 30 min (reviews);
 // polling faster does not make the data fresher.
 const DEFAULT_REFRESH_INTERVAL = 60000;
+// Shop logos are URLs that essentially never change — no need to follow the snapshot cadence.
+const LOGO_REFRESH_INTERVAL = 1800000;
+// The feed can carry up to 20 items; showing them all makes the card dominate the board.
+const FEED_PREVIEW_COUNT = 6;
 
 const ACCENT = "#C6362B"; // 楽天アクセント / critical
 const WARN = "#D97706"; // attention
@@ -70,6 +74,44 @@ function fmt(t, value) {
 /** null/undefined → "—"; numbers → grouped digits. */
 function fmtNullable(t, value) {
   return isNil(value) ? DASH : fmt(t, value);
+}
+
+// Per-shop logo with a first-char fallback when the URL is empty or fails to load.
+// Rakuten logos vary (some white-bg) → bg-white + object-contain keeps them clean.
+function ShopLogo({ name, url, size = 16 }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [url]);
+
+  if (url && !failed) {
+    return (
+      <img
+        src={url}
+        alt=""
+        loading="lazy"
+        onError={() => setFailed(true)}
+        className="shrink-0 rounded-[5px] bg-white object-contain"
+        style={{ width: size, height: size }}
+      />
+    );
+  }
+
+  return (
+    <span
+      aria-hidden="true"
+      className="inline-flex shrink-0 items-center justify-center rounded-[5px] font-bold"
+      style={{
+        width: size,
+        height: size,
+        fontSize: size * 0.58,
+        color: ACCENT,
+        backgroundColor: "rgba(198,54,43,.14)",
+      }}
+    >
+      {String(name || "?")
+        .trim()
+        .charAt(0) || "?"}
+    </span>
+  );
 }
 
 function ClipboardIcon() {
@@ -190,9 +232,12 @@ export default function Component({ service }) {
   const { widget } = service;
   const refreshInterval = Math.max(1000, Number(widget.refreshInterval) || DEFAULT_REFRESH_INTERVAL);
   const [ratingFilter, setRatingFilter] = useState(0); // 0 = all
+  const [feedExpanded, setFeedExpanded] = useState(false);
+  const [openReviews, setOpenReviews] = useState(() => new Set());
 
   const { data, error, mutate } = useWidgetAPI(widget, "attention", { refreshInterval });
-  const model = useMemo(() => buildAttentionModel(data), [data]);
+  const { data: logos } = useWidgetAPI(widget, "logos", { refreshInterval: LOGO_REFRESH_INTERVAL });
+  const model = useMemo(() => buildAttentionModel(data, logos), [data, logos]);
 
   const handleRefresh = useCallback(
     (e) => {
@@ -202,6 +247,23 @@ export default function Component({ service }) {
     },
     [mutate],
   );
+
+  // A narrower filter shows fewer items, so a previous "show all" would silently swallow itself.
+  const handleFilter = useCallback((star) => {
+    setRatingFilter(star);
+    setFeedExpanded(false);
+  }, []);
+
+  const toggleReview = useCallback((id) => {
+    setOpenReviews((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(id)) {
+        next.add(id);
+      }
+
+      return next;
+    });
+  }, []);
 
   if (error) {
     return <Container service={service} error={error} />;
@@ -217,7 +279,10 @@ export default function Component({ service }) {
 
   const tone = toneOf(model.status);
   const cardCls = "rounded-2xl border border-theme-300/40 bg-theme-200/30 dark:border-theme-600/40 dark:bg-white/10";
-  const feed = ratingFilter === 0 ? model.recentReviews : model.recentReviews.filter((r) => r.rating === ratingFilter);
+  const matching =
+    ratingFilter === 0 ? model.recentReviews : model.recentReviews.filter((r) => r.rating === ratingFilter);
+  const feed = feedExpanded ? matching : matching.slice(0, FEED_PREVIEW_COUNT);
+  const hiddenCount = matching.length - feed.length;
   const totalForBar = Math.max(1, (model.pending || 0) + (model.inquiry || 0) + (model.reviews || 0));
   const pct = (v) => `${((v || 0) / totalForBar) * 100}%`;
 
@@ -362,6 +427,7 @@ export default function Component({ service }) {
               >
                 <span className="flex min-w-0 flex-[1.5] items-center gap-2">
                   <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${st.dot}`} />
+                  <ShopLogo name={sh.name} url={sh.logoUrl} size={16} />
                   <span className="truncate text-[12.5px] font-semibold text-theme-900 dark:text-theme-50">
                     {sh.name}
                   </span>
@@ -456,7 +522,7 @@ export default function Component({ service }) {
               <button
                 key={c.k}
                 type="button"
-                onClick={() => setRatingFilter(c.k)}
+                onClick={() => handleFilter(c.k)}
                 className={`rounded-full border px-2.5 py-1 text-[10.5px] font-bold tabular-nums transition-colors ${
                   ratingFilter === c.k
                     ? "border-theme-900 bg-theme-900 text-theme-50 dark:border-theme-50 dark:bg-theme-50 dark:text-theme-900"
@@ -469,33 +535,45 @@ export default function Component({ service }) {
           </span>
         </div>
         <section className="grid grid-cols-1 gap-3 @lg:grid-cols-2 @2xl:grid-cols-3">
-          {feed.map((rv) => (
-            <div
-              key={rv.id}
-              className="flex min-w-0 flex-col gap-1.5 rounded-xl border border-theme-300/40 bg-theme-200/30 p-3 dark:border-theme-600/40 dark:bg-white/10"
-            >
-              <span className="flex items-center gap-2">
+          {feed.map((rv) => {
+            const open = openReviews.has(rv.id);
+
+            return (
+              <button
+                key={rv.id}
+                type="button"
+                onClick={() => toggleReview(rv.id)}
+                aria-expanded={open}
+                title={open ? t(`${NS}.collapseReview`) : t(`${NS}.expandReview`)}
+                className="flex min-w-0 flex-col gap-1.5 rounded-xl border border-theme-300/40 bg-theme-200/30 p-3 text-left transition-colors hover:border-theme-400/60 dark:border-theme-600/40 dark:bg-white/10 dark:hover:border-theme-500/60"
+              >
+                <span className="flex w-full items-center gap-2">
+                  <span
+                    className={`inline-flex rounded-md border px-1.5 py-px text-[10.5px] font-extrabold tabular-nums ${RATING_TONE[rv.rating]}`}
+                  >
+                    {rv.rating}★
+                  </span>
+                  <span className="rounded bg-theme-300/40 px-1.5 py-px text-[9.5px] font-bold text-theme-600 dark:bg-white/10 dark:text-theme-300">
+                    {t(`${NS}.reviewType.${rv.type === "product" ? "product" : "shop"}`)}
+                  </span>
+                  <ShopLogo name={rv.shop} url={rv.logoUrl} size={13} />
+                  <span className="truncate text-[11px] font-bold text-theme-700 dark:text-theme-200">{rv.shop}</span>
+                  <span className="ml-auto shrink-0 text-[9.5px] font-medium tabular-nums text-theme-500 dark:text-theme-400">
+                    {rv.postedAtJST}
+                  </span>
+                </span>
+                {/* the management number identifies the item without eating the card */}
+                <span className="w-full truncate font-mono text-[11px] font-semibold text-theme-900 dark:text-theme-50">
+                  {rv.itemNo || t(`${NS}.noItem`)}
+                </span>
                 <span
-                  className={`inline-flex rounded-md border px-1.5 py-px text-[10.5px] font-extrabold tabular-nums ${RATING_TONE[rv.rating]}`}
+                  className={`text-[11px] leading-relaxed text-theme-600 dark:text-theme-300 ${open ? "" : "line-clamp-2"}`}
                 >
-                  {rv.rating}★
+                  {rv.excerpt}
                 </span>
-                <span className="rounded bg-theme-300/40 px-1.5 py-px text-[9.5px] font-bold text-theme-600 dark:bg-white/10 dark:text-theme-300">
-                  {t(`${NS}.reviewType.${rv.type === "product" ? "product" : "shop"}`)}
-                </span>
-                <span className="truncate text-[11px] font-bold text-theme-700 dark:text-theme-200">{rv.shop}</span>
-                <span className="ml-auto shrink-0 text-[9.5px] font-medium tabular-nums text-theme-500 dark:text-theme-400">
-                  {rv.postedAtJST}
-                </span>
-              </span>
-              <span className="truncate text-[12px] font-semibold text-theme-900 dark:text-theme-50">
-                {rv.itemName || t(`${NS}.noItem`)}
-              </span>
-              <span className="line-clamp-2 text-[11px] leading-relaxed text-theme-600 dark:text-theme-300">
-                {rv.excerpt}
-              </span>
-            </div>
-          ))}
+              </button>
+            );
+          })}
           {feed.length === 0 ? (
             <div className="col-span-full flex flex-col items-center gap-1.5 rounded-xl border border-dashed border-theme-300/60 bg-theme-200/20 p-6 dark:border-theme-600/60 dark:bg-white/[0.03]">
               <span className="text-[12.5px] font-bold text-theme-600 dark:text-theme-300">
@@ -507,6 +585,15 @@ export default function Component({ service }) {
             </div>
           ) : null}
         </section>
+        {hiddenCount > 0 || feedExpanded ? (
+          <button
+            type="button"
+            onClick={() => setFeedExpanded((prev) => !prev)}
+            className="mx-auto rounded-full border border-theme-300/50 px-3.5 py-1 text-[10.5px] font-bold text-theme-600 transition-colors hover:border-theme-400 hover:bg-theme-200/40 dark:border-theme-600/50 dark:text-theme-300 dark:hover:bg-white/10"
+          >
+            {feedExpanded ? t(`${NS}.showLess`) : t(`${NS}.showMore`, { count: hiddenCount })}
+          </button>
+        ) : null}
       </div>
     </Container>
   );

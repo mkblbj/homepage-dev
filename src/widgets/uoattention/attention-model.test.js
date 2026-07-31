@@ -177,27 +177,51 @@ describe("widgets/uoattention/attention-model", () => {
     expect(model.shops[0].status).toBe("unknown");
   });
 
-  it("normalizes recent reviews and defaults a missing excerpt to an empty string", () => {
+  it("identifies reviewed items by management number and drops the full title", () => {
     const model = buildAttentionModel(snapshot);
 
     expect(model.recentReviews).toHaveLength(2);
     expect(model.recentReviews[0]).toEqual({
       id: "rvw_0001",
       shop: "3911",
+      logoUrl: null,
       type: "product",
       rating: 1,
       postedAtJST: "2026-07-31 09:12 JST",
-      itemName: "サンプル商品",
+      itemNo: "sample-001",
       excerpt: "synthetic excerpt",
     });
-    expect(model.recentReviews[1].itemName).toBeNull();
+    // Shop reviews never carry a management number.
+    expect(model.recentReviews[1].itemNo).toBeNull();
     expect(model.recentReviews[1].excerpt).toBe("");
+    expect(JSON.stringify(model)).not.toContain("サンプル商品");
   });
 
   it("never leaks reviewUrl into the model", () => {
     const model = buildAttentionModel(snapshot);
 
     expect(JSON.stringify(model)).not.toContain("review.rakuten.co.jp");
+  });
+
+  it("merges shop logos by name and tolerates missing entries", () => {
+    const logos = {
+      shops: [
+        { shopName: "3911", logoUrl: "https://cabinet.example/3911.jpg" },
+        { shopName: "unknown-shop", logoUrl: "https://cabinet.example/other.jpg" },
+      ],
+    };
+    const model = buildAttentionModel(snapshot, logos);
+
+    expect(model.shops[0].logoUrl).toBe("https://cabinet.example/3911.jpg");
+    expect(model.shops[1].logoUrl).toBeNull();
+    expect(model.recentReviews[0].logoUrl).toBe("https://cabinet.example/3911.jpg");
+    expect(model.recentReviews[1].logoUrl).toBeNull();
+  });
+
+  it("leaves logos null when the snapshot is unavailable", () => {
+    const model = buildAttentionModel(snapshot, undefined);
+
+    expect(model.shops.every((shop) => shop.logoUrl === null)).toBe(true);
   });
 
   it("sums nullable lists, returning null only when every member is unknown", () => {

@@ -99,12 +99,18 @@ function buildMix(customerMix) {
   };
 }
 
-export function buildPerformanceModel(data) {
+// Logos are optional context merged by shopName; a missing entry just falls back to an initial.
+function toLogoMap(logos) {
+  return new Map((logos?.shops || []).map((shop) => [shop.shopName, shop.logoUrl || null]));
+}
+
+export function buildPerformanceModel(data, logos) {
   if (!data) {
     return null;
   }
 
   const traffic = data.traffic || {};
+  const logoByName = toLogoMap(logos);
 
   return {
     generatedAtJST: data.generatedAtJST || "",
@@ -134,6 +140,7 @@ export function buildPerformanceModel(data) {
 
       return {
         name: shop.shopName,
+        logoUrl: logoByName.get(shop.shopName) || null,
         status: shopTraffic.status || shop.status || "unknown",
         sampleCount: Number(shopTraffic.sampleCount || 0),
         visit: toNullableNumber(shopTraffic.visitCount),

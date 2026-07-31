@@ -96,8 +96,26 @@ function snapshot(overrides = {}) {
   };
 }
 
-function mockData(data, mutate = vi.fn()) {
-  useWidgetAPI.mockReturnValue({ data, error: undefined, mutate });
+function review(n, rating) {
+  return {
+    reviewId: `rvw_${String(n).padStart(4, "0")}`,
+    shopName: n % 2 ? "3911" : "0406",
+    reviewType: rating === 3 ? "shop" : "product",
+    rating,
+    postedAtJST: `2026-07-31 ${String(23 - n).padStart(2, "0")}:00 JST`,
+    itemManagementNumber: rating === 3 ? null : `item-no-${n}`,
+    itemName: `とても長い商品名がここに入ります その${n}`,
+    excerpt: `excerpt ${n}`,
+    reviewUrl: null,
+  };
+}
+
+function mockData(data, mutate = vi.fn(), logos = undefined) {
+  useWidgetAPI.mockImplementation((_widget, endpoint) => {
+    if (endpoint === "logos") return { data: logos, error: undefined, mutate: vi.fn() };
+
+    return { data, error: undefined, mutate };
+  });
 
   return mutate;
 }
@@ -200,6 +218,83 @@ describe("widgets/uoattention/component", () => {
     const { container } = render();
 
     expect(container.querySelectorAll("a")).toHaveLength(0);
+  });
+
+  it("identifies the reviewed item by management number, never by its full title", () => {
+    mockData(snapshot({ recentReviews: [review(1, 1), review(2, 3)] }));
+    render();
+
+    expect(screen.getByText("item-no-1")).toBeInTheDocument();
+    expect(screen.queryByText(/とても長い商品名/)).not.toBeInTheDocument();
+    // A shop review carries no management number.
+    expect(screen.getByText("uoattention.noItem")).toBeInTheDocument();
+  });
+
+  it("previews six reviews and reveals the rest on demand", () => {
+    mockData(snapshot({ recentReviews: Array.from({ length: 9 }, (_, i) => review(i + 1, 1)) }));
+    render();
+
+    expect(screen.getAllByText(/^excerpt \d$/)).toHaveLength(6);
+
+    fireEvent.click(screen.getByRole("button", { name: "uoattention.showMore" }));
+
+    expect(screen.getAllByText(/^excerpt \d$/)).toHaveLength(9);
+
+    fireEvent.click(screen.getByRole("button", { name: "uoattention.showLess" }));
+
+    expect(screen.getAllByText(/^excerpt \d$/)).toHaveLength(6);
+  });
+
+  it("hides the reveal button when everything already fits", () => {
+    mockData(snapshot({ recentReviews: [review(1, 1), review(2, 2)] }));
+    render();
+
+    expect(screen.queryByRole("button", { name: "uoattention.showMore" })).not.toBeInTheDocument();
+  });
+
+  it("collapses the feed again when the rating filter narrows", () => {
+    const reviews = [...Array.from({ length: 8 }, (_, i) => review(i + 1, 1)), review(9, 2)];
+    mockData(snapshot({ recentReviews: reviews }));
+    render();
+
+    fireEvent.click(screen.getByRole("button", { name: "uoattention.showMore" }));
+    expect(screen.getAllByText(/^excerpt \d$/)).toHaveLength(9);
+
+    fireEvent.click(screen.getByRole("button", { name: "1★ 4" }));
+
+    expect(screen.getAllByText(/^excerpt \d$/)).toHaveLength(6);
+    expect(screen.getByRole("button", { name: "uoattention.showMore" })).toBeInTheDocument();
+  });
+
+  it("expands a single review in place when its card is clicked", () => {
+    mockData(snapshot({ recentReviews: [review(1, 1)] }));
+    render();
+
+    const card = screen.getByText("excerpt 1").closest("button");
+
+    expect(card).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByText("excerpt 1")).toHaveClass("line-clamp-2");
+
+    fireEvent.click(card);
+
+    expect(card).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("excerpt 1")).not.toHaveClass("line-clamp-2");
+
+    fireEvent.click(card);
+
+    expect(screen.getByText("excerpt 1")).toHaveClass("line-clamp-2");
+  });
+
+  it("shows a shop logo when one is available and falls back to an initial otherwise", () => {
+    mockData(snapshot(), vi.fn(), { shops: [{ shopName: "3911", logoUrl: "https://cabinet.example/3911.jpg" }] });
+    const { container } = render();
+
+    const logos = [...container.querySelectorAll("img")].map((img) => img.getAttribute("src"));
+
+    expect(logos).toContain("https://cabinet.example/3911.jpg");
+    // 0406 has no logo → initial-letter fallback instead of a broken image.
+    expect(logos).not.toContain(null);
+    expect(screen.getAllByText("0").length).toBeGreaterThan(0);
   });
 
   it("re-reads the snapshot when the refresh button is clicked", () => {

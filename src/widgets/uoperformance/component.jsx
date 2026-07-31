@@ -15,7 +15,7 @@
  */
 import Container from "components/services/widget/container";
 import { useTranslation } from "next-i18next/pages";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { DASH, SPARK_PADDING, buildPerformanceModel, isNil, pctLabel, spark, weekdayJp } from "./performance-model.mjs";
 
@@ -24,6 +24,8 @@ import useWidgetAPI from "utils/proxy/use-widget-api";
 const NS = "uoperformance";
 // /api/performance refreshes once a day at 07:00 JST → 5–15 min polling is plenty.
 const DEFAULT_REFRESH_INTERVAL = 600000;
+// Shop logos are URLs that essentially never change — no need to follow the snapshot cadence.
+const LOGO_REFRESH_INTERVAL = 1800000;
 
 const ACCENT = "#C6362B";
 const BLUE = "#2E7DF6";
@@ -82,6 +84,44 @@ function SparkDefs() {
         </linearGradient>
       </defs>
     </svg>
+  );
+}
+
+// Per-shop logo with a first-char fallback when the URL is empty or fails to load.
+// Rakuten logos vary (some white-bg) → bg-white + object-contain keeps them clean.
+function ShopLogo({ name, url, size = 16 }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [url]);
+
+  if (url && !failed) {
+    return (
+      <img
+        src={url}
+        alt=""
+        loading="lazy"
+        onError={() => setFailed(true)}
+        className="shrink-0 rounded-[5px] bg-white object-contain"
+        style={{ width: size, height: size }}
+      />
+    );
+  }
+
+  return (
+    <span
+      aria-hidden="true"
+      className="inline-flex shrink-0 items-center justify-center rounded-[5px] font-bold"
+      style={{
+        width: size,
+        height: size,
+        fontSize: size * 0.58,
+        color: BLUE,
+        backgroundColor: "rgba(46,125,246,.14)",
+      }}
+    >
+      {String(name || "?")
+        .trim()
+        .charAt(0) || "?"}
+    </span>
   );
 }
 
@@ -296,7 +336,8 @@ export default function Component({ service }) {
   const [metric, setMetric] = useState("sales"); // sales | orders
 
   const { data, error, mutate } = useWidgetAPI(widget, "performance", { refreshInterval });
-  const model = useMemo(() => buildPerformanceModel(data), [data]);
+  const { data: logos } = useWidgetAPI(widget, "logos", { refreshInterval: LOGO_REFRESH_INTERVAL });
+  const model = useMemo(() => buildPerformanceModel(data, logos), [data, logos]);
 
   const handleRefresh = useCallback(
     (e) => {
@@ -621,6 +662,7 @@ export default function Component({ service }) {
               >
                 <span className="flex min-w-0 flex-[1.5] items-center gap-2">
                   <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${st.dot}`} />
+                  <ShopLogo name={sh.name} url={sh.logoUrl} size={16} />
                   <span className="truncate text-[12.5px] font-semibold text-theme-900 dark:text-theme-50">
                     {sh.name}
                   </span>
@@ -682,10 +724,6 @@ export default function Component({ service }) {
             </span>
           </div>
         </section>
-
-        <span className="px-0.5 text-[10.5px] font-medium leading-relaxed text-theme-500 dark:text-theme-400">
-          {t(`${NS}.footnote`)}
-        </span>
       </div>
     </Container>
   );
