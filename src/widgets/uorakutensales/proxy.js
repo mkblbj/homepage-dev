@@ -31,17 +31,6 @@ function parseResponseData(data) {
   return data;
 }
 
-function resolveToken(widget) {
-  const configuredKey = String(widget?.key || "").trim();
-  const envKey = process.env.HOMEPAGE_VAR_UO_EC_TOKEN || process.env.UO_EC_TOKEN || "";
-
-  if (configuredKey && !configuredKey.startsWith("{{")) {
-    return configuredKey;
-  }
-
-  return envKey;
-}
-
 export default async function uoRakutenSalesProxyHandler(req, res) {
   const { group, service, index, endpoint } = req.query;
 
@@ -69,7 +58,6 @@ export default async function uoRakutenSalesProxyHandler(req, res) {
     const { url, params } = buildSalesProxyRequest({
       endpoint,
       baseUrl: widget.url,
-      token: resolveToken(widget),
     });
     const [status, contentType, data] = await httpProxy(url, params);
     const resultData = parseResponseData(data);

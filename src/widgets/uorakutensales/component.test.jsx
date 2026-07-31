@@ -37,16 +37,27 @@ function rankedItem(mno, shopName) {
   };
 }
 
-function ranking(overallMno, shops) {
+// One ranked board. GET /api/item-rankings nests three of these under `rankings`.
+function rankingBoard(overallMno, shops) {
   return {
-    sourceDateJST: "2026-07-28",
     shopCount: shops.length,
-    overall: { items: [rankedItem(overallMno, shops[0].shopName)] },
+    overall: { itemCount: 1, items: [rankedItem(overallMno, shops[0].shopName)] },
     shops: shops.map(({ shopName, mno }) => ({
       shopName,
       itemCount: 1,
       items: [rankedItem(mno, shopName)],
     })),
+  };
+}
+
+function ranking(overallMno, shops) {
+  return {
+    sourceDateJST: "2026-07-28",
+    rankings: {
+      sales: rankingBoard(overallMno, shops),
+      units: rankingBoard(overallMno, shops),
+      orderCount: rankingBoard(overallMno, shops),
+    },
   };
 }
 
