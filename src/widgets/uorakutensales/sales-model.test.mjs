@@ -140,6 +140,39 @@ test("buildModel aggregates daily totals across shops for the trend chart", () =
   assert.equal(Number(model.days[2].xPct.toFixed(2)), 83.33);
 });
 
+test("buildModel keeps per-shop daily CVR and derives the all-shop one", () => {
+  const withCvr = {
+    range: { dates: ["2026-07-26"] },
+    totals: { salesYen: 0, orderCount: 0, conversionRate: 0 },
+    shops: [
+      // 100 orders at 5% → 2000 visits
+      { shopName: "3911", totals: {}, daily: [{ date: "2026-07-26", salesYen: 1000, orderCount: 100, conversionRate: 5 }] },
+      // 20 orders at 2% → 1000 visits
+      { shopName: "0406", totals: {}, daily: [{ date: "2026-07-26", salesYen: 500, orderCount: 20, conversionRate: 2 }] },
+    ],
+  };
+  const model = buildModel({ totals: {}, shops: [{ shopName: "3911" }, { shopName: "0406" }] }, withCvr);
+
+  // per-shop rows carry the API's own rate verbatim
+  assert.equal(model.rows.find((r) => r.name === "3911").daily[0].cvr, 5);
+  assert.equal(model.rows.find((r) => r.name === "0406").daily[0].cvr, 2);
+
+  // all-shop day: 120 orders over 3000 derived visits = 4.00%, not (5+2)/2
+  assert.equal(model.days[0].orders, 120);
+  assert.equal(Number(model.days[0].cvr.toFixed(2)), 4);
+});
+
+test("buildModel reports a zero all-shop CVR when no day has one", () => {
+  const noCvr = {
+    range: { dates: ["2026-07-26"] },
+    totals: {},
+    shops: [{ shopName: "3911", totals: {}, daily: [{ date: "2026-07-26", salesYen: 100, orderCount: 5 }] }],
+  };
+  const model = buildModel({ totals: {}, shops: [{ shopName: "3911" }] }, noCvr);
+  assert.equal(model.days[0].cvr, 0); // component hides the CVR segment
+  assert.equal(model.rows[0].daily[0].cvr, 0);
+});
+
 test("buildModel tolerates a missing history snapshot", () => {
   const model = buildModel(sales, null);
   assert.equal(model.hasHistory, false);

@@ -232,6 +232,8 @@ export function buildModel(sales, history, logos) {
         wd: weekdayJp(d.date),
         sales: toNumber(d.salesYen),
         orders: toNumber(d.orderCount),
+        // per-shop daily CVR is authoritative — it comes straight from the API
+        cvr: toNumber(d.conversionRate),
       })),
     });
   });
@@ -241,18 +243,33 @@ export function buildModel(sales, history, logos) {
   const nDays = dates.length || 7;
   const avg = grandTotal / nDays;
 
-  // daily totals across shops (for the area chart + hover crosshair)
+  // daily totals across shops (for the area chart + hover crosshair).
+  // A conversion rate cannot be summed, so the all-shop figure is derived: each
+  // shop-day's visits are recovered as orders / (cvr/100), summed, then divided
+  // back. Exact within a day; it can drift slightly from the API's own range
+  // total, which additionally de-duplicates visitors across days.
   const dailyTotals = dates.map((date, i) => {
     let s = 0;
     let o = 0;
+    let visits = 0;
     (history?.shops || []).forEach((sh) => {
       const d = (sh.daily || [])[i];
       if (d) {
+        const orders = toNumber(d.orderCount);
+        const cvr = toNumber(d.conversionRate);
         s += toNumber(d.salesYen);
-        o += toNumber(d.orderCount);
+        o += orders;
+        if (cvr > 0) visits += (orders * 100) / cvr;
       }
     });
-    return { date, wd: weekdayJp(date), md: mdLabel(date), sales: s, orders: o };
+    return {
+      date,
+      wd: weekdayJp(date),
+      md: mdLabel(date),
+      sales: s,
+      orders: o,
+      cvr: visits > 0 ? (o / visits) * 100 : 0,
+    };
   });
   const maxDaily = Math.max(1, ...dailyTotals.map((d) => d.sales));
   const heroChart = spark(dailyTotals.map((d) => d.sales), 100, 40, true, true);

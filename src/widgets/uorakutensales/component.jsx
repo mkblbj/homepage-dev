@@ -312,6 +312,7 @@ function ShopMiniChart({ points, mode, cvr = 0, t, height = 32 }) {
             <span className="block text-[8.5px] font-medium tabular-nums text-slate-400">
               {fmt(t, hp.orders)}
               {t(`${NS}.ordersUnit`)}
+              {hp.cvr > 0 ? ` · CVR ${hp.cvr.toFixed(2)}%` : ""}
             </span>
           </div>
         </>
@@ -408,6 +409,7 @@ function DailyChart({ model, t }) {
               <span className="block text-[9px] font-medium tabular-nums text-slate-400">
                 {fmt(t, hd.orders)}
                 {t(`${NS}.ordersUnit`)}
+                {hd.cvr > 0 ? ` · CVR ${hd.cvr.toFixed(2)}%` : ""}
               </span>
             </div>
           </>
