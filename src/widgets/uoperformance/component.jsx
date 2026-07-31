@@ -152,27 +152,29 @@ function DeltaBar({ delta, color }) {
   );
 }
 
-// One half of the new/repeat composition bar. Its width is the share itself, so a small
-// share leaves no room for the copy — the label drops out first, then the percentage,
-// and the title keeps both readable at any ratio.
-const MIX_LABEL_MIN_SHARE = 18;
-const MIX_PERCENT_MIN_SHARE = 8;
-
+// One half of the new/repeat composition bar. Narrow shares keep their full copy in the DOM
+// but use tighter inset and type so common ratios such as 14.6% and 13.1% remain visible.
+// Ellipsis is the last resort at extreme ratios; the title always carries the full value.
 function MixSegment({ label, share, color, labelClassName }) {
   const percent = `${share.toFixed(1)}%`;
+  const isCompact = share < 18;
 
   return (
     <span
       title={`${label} ${percent}`}
-      className="flex min-w-0 flex-col justify-center overflow-hidden whitespace-nowrap rounded-lg px-2.5"
+      className={`flex min-w-0 flex-col justify-center overflow-hidden rounded-lg text-center ${
+        isCompact ? "px-0.5" : "px-1.5"
+      }`}
       style={{ width: `${share}%`, backgroundColor: color }}
     >
-      {share >= MIX_LABEL_MIN_SHARE ? (
-        <span className={`text-[9.5px] font-bold ${labelClassName}`}>{label}</span>
-      ) : null}
-      {share >= MIX_PERCENT_MIN_SHARE ? (
-        <span className="text-[12px] font-extrabold tabular-nums text-white">{percent}</span>
-      ) : null}
+      <span className={`truncate ${isCompact ? "text-[8.5px]" : "text-[9.5px]"} font-bold ${labelClassName}`}>
+        {label}
+      </span>
+      <span
+        className={`truncate ${isCompact ? "text-[10.5px]" : "text-[12px]"} font-extrabold tabular-nums text-white`}
+      >
+        {percent}
+      </span>
     </span>
   );
 }
@@ -612,7 +614,7 @@ export default function Component({ service }) {
             ]}
           />
         </div>
-        <section className={`grid grid-cols-1 @2xl:grid-cols-[340px_1fr] ${cardCls}`}>
+        <section className={`grid grid-cols-1 @2xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] ${cardCls}`}>
           <div className="flex min-w-0 flex-col gap-3 border-b border-theme-300/30 p-4 @2xl:border-b-0 @2xl:border-r dark:border-white/10">
             <span className="text-[10.5px] font-bold tracking-wide text-theme-700 dark:text-theme-200">
               {t(`${NS}.mixComposition`)}

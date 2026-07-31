@@ -184,7 +184,7 @@ describe("widgets/uoperformance/component", () => {
     expect(screen.getByText("uoperformance.mixUnavailable")).toBeInTheDocument();
   });
 
-  it("keeps a small mix segment's copy inside its own width", () => {
+  it("names both mix shares inside the bar whatever the ratio", () => {
     mockData(
       snapshot({
         customerMix: {
@@ -196,13 +196,40 @@ describe("widgets/uoperformance/component", () => {
     );
     render();
 
-    // 3% has no room for either the word or the number — the title keeps both reachable.
+    // how much of the label survives is up to the bar's width, so the copy is always
+    // rendered and left to ellipsize rather than dropped on a share threshold
     const narrow = screen.getByTitle("uoperformance.repeatCustomers 3.0%");
-
-    expect(narrow.textContent).toBe("");
+    expect(narrow.textContent).toBe("uoperformance.repeatCustomers3.0%");
     expect(narrow).toHaveClass("overflow-hidden");
-    // 97% still spells everything out
+    expect(narrow.firstChild).toHaveClass("truncate");
+
     expect(screen.getByTitle("uoperformance.newCustomers 97.0%").textContent).toBe("uoperformance.newCustomers97.0%");
+  });
+
+  it("compacts the narrow repeat segment without changing the wide segment", () => {
+    mockData(snapshot());
+    render();
+
+    const wide = screen.getByTitle("uoperformance.newCustomers 85.4%");
+    const narrow = screen.getByTitle("uoperformance.repeatCustomers 14.6%");
+
+    expect(wide).toHaveClass("px-1.5");
+    expect(wide).toHaveClass("text-center");
+    expect(wide.firstChild).toHaveClass("text-[9.5px]");
+    expect(wide.lastChild).toHaveClass("text-[12px]");
+    expect(narrow).toHaveClass("px-0.5");
+    expect(narrow).toHaveClass("text-center");
+    expect(narrow.firstChild).toHaveClass("text-[8.5px]");
+    expect(narrow.lastChild).toHaveClass("text-[10.5px]");
+  });
+
+  it("gives the composition one third of the wide customer-mix card", () => {
+    mockData(snapshot());
+    render();
+
+    expect(screen.getByText("uoperformance.mixComposition").closest("section")).toHaveClass(
+      "@2xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]",
+    );
   });
 
   it("draws the per-shop delta bar left of centre for a shortfall", () => {
