@@ -18,6 +18,7 @@ const allowedDevOrigins = [
 const nextConfig = {
   reactStrictMode: true,
   output: "standalone",
+  serverExternalPackages: ["dockerode"],
   allowedDevOrigins,
   images: {
     remotePatterns: [
