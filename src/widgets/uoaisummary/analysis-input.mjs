@@ -13,13 +13,18 @@ function truncateChars(value, max) {
 
 export function sanitizeReview(review) {
   let excerpt = String(review?.excerpt ?? "")
-    .replace(/https?:\/\/\S+/gi, "[redacted url]")
+    .normalize("NFKC")
+    .replace(/\p{Cf}/gu, "")
     .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, "[redacted email]")
-    .replace(/(?:\+?\d[\d()\-\s]{7,}\d)/g, "[redacted phone]")
+    .replace(/\b(?:https?:\/\/|www\.)\S+|\b(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/\S*)?/gi, "[redacted url]")
+    .replace(/(?:\+?\d[\d()\-\sー－−‐‑‒–—―・]{7,}\d)/g, "[redacted phone]")
     .replace(/(?:注文番号|受注番号|order(?:\s+id)?)[\s:#-]*[A-Z0-9-]{5,}/gi, "[redacted order]")
-    .replace(/(?:review|レビュー|評価)(?:\s+id|番号)?[\s:#-]*[A-Z0-9-]{5,}/gi, "[redacted review]")
-    .replace(/(?:buyer|購入者|顧客)(?:\s+id|番号)?[\s:#-]*[A-Z0-9-]{5,}/gi, "[redacted buyer]")
-    .replace(/(?:system|assistant|developer|user)\s*:/gi, "[redacted instruction]")
+    .replace(/(?:review|レビュー|評価)(?:\s+id|番号)?[\s:#-]*[A-Z0-9_-]{5,}/gi, "[redacted review]")
+    .replace(/(?:buyer|購入者|顧客)(?:\s+id|番号)?[\s:#-]*[A-Z0-9_-]{5,}/gi, "[redacted buyer]")
+    .replace(
+      /(?:(?:system|assistant|developer|user)\s*:|[\[【<]\s*(?:system|assistant|developer|user)\s*[\]】>](?:\s*:)?|#{1,6}\s*(?:system|assistant|developer|user)(?:\s*:)?)/gi,
+      "[redacted instruction]",
+    )
     .replace(/<\|[^|]{1,80}\|>|\[\/?INST\]/gi, "[redacted instruction]")
     .replace(/ignore\s+(?:all\s+)?previous\s+instructions/gi, "[redacted instruction]")
     .replace(/(?:disregard|override)\s+(?:all\s+)?(?:prior|previous)\s+instructions/gi, "[redacted instruction]")
@@ -59,8 +64,10 @@ function dataQuality(collected, validCount) {
 
 function severity(collected, validCount) {
   if (validCount < 2) return "unknown";
-  const attention = collected.attention?.data?.status;
-  const performance = collected.performance?.data?.traffic?.status;
+  const attention = VALID_STATES.has(collected.attention?.state) ? collected.attention?.data?.status : null;
+  const performance = VALID_STATES.has(collected.performance?.state)
+    ? collected.performance?.data?.traffic?.status
+    : null;
   if (attention === "critical" || performance === "critical") return "critical";
   if (
     attention === "attention" ||
@@ -341,6 +348,7 @@ function collectShops(collected) {
 }
 
 function collectProducts(collected) {
+  if (!VALID_STATES.has(collected.sales?.state)) return [];
   const ranking = collected.sales?.data?.ranking?.rankings || collected.sales?.data?.ranking || {};
   const merged = new Map();
   for (const dimension of ["sales", "orderCount", "units"]) {
@@ -545,7 +553,9 @@ export function buildAnalysisInput(collected, { previousSnapshot, nowTs }) {
     Object.entries(metrics).map(([key, entry]) => [key, displayMetric(entry, comparisonWindow)]),
   );
   const shopData = collectShops(collected);
-  const reviewSamples = (collected.attention?.data?.recentReviews || [])
+  const reviewSamples = (
+    VALID_STATES.has(collected.attention?.state) ? collected.attention?.data?.recentReviews || [] : []
+  )
     .filter((review) => Number(review.rating) <= 3)
     .sort(
       (left, right) =>
