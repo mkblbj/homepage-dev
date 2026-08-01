@@ -69,9 +69,30 @@ describe("discoverSummaryConfiguration", () => {
     expect(result.sources.shipping.error).toBeNull();
   });
 
-  it("rejects missing secrets, unresolved placeholders and non-xhigh effort", () => {
+  it("rejects missing API keys", () => {
+    const invalid = structuredClone(groups);
+    delete invalid[0].groups[0].services[0].widget.apiKey;
+
+    expect(() => discoverSummaryConfiguration(invalid)).toThrow(AISummaryError);
+  });
+
+  it("rejects unresolved API key placeholders", () => {
     const invalid = structuredClone(groups);
     invalid[0].groups[0].services[0].widget.apiKey = "{{HOMEPAGE_FILE_UO_AI_API_KEY}}";
+
+    expect(() => discoverSummaryConfiguration(invalid)).toThrow(AISummaryError);
+  });
+
+  it("rejects reasoning efforts other than xhigh", () => {
+    const invalid = structuredClone(groups);
+    invalid[0].groups[0].services[0].widget.reasoningEffort = "high";
+
+    expect(() => discoverSummaryConfiguration(invalid)).toThrow(AISummaryError);
+  });
+
+  it("rejects models other than gpt-5.6-luna", () => {
+    const invalid = structuredClone(groups);
+    invalid[0].groups[0].services[0].widget.model = "gpt-5.6-mini";
 
     expect(() => discoverSummaryConfiguration(invalid)).toThrow(AISummaryError);
   });

@@ -85,7 +85,7 @@ export function discoverSummaryConfiguration(groups) {
   const apiUrl = responsesUrl(raw.apiUrl);
   const apiKey = configured(raw.apiKey);
   const model = configured(raw.model);
-  if (!apiUrl || !apiKey || !model || raw.reasoningEffort !== "xhigh") {
+  if (!apiUrl || !apiKey || model !== "gpt-5.6-luna" || raw.reasoningEffort !== "xhigh") {
     throw new AISummaryError("configuration", "Invalid AI Responses configuration");
   }
 
