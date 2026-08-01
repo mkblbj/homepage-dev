@@ -3,6 +3,56 @@ import { computeFreshness } from "../uorakutensales/sales-model.mjs";
 
 import { AISummaryError, publicErrorCode } from "./errors.mjs";
 
+function isRecord(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function invalidPayload() {
+  throw new AISummaryError("source_unavailable", "Source response is invalid");
+}
+
+function requireString(value) {
+  if (typeof value !== "string" || !value.trim()) invalidPayload();
+}
+
+function requireRecord(value) {
+  if (!isRecord(value)) invalidPayload();
+}
+
+function requireArray(value) {
+  if (!Array.isArray(value)) invalidPayload();
+}
+
+function validatePayload(endpointName, data) {
+  requireRecord(data);
+  if (endpointName === "shipping") {
+    requireString(data.updated_at);
+    requireRecord(data.today_output);
+    requireRecord(data.today_shipping);
+  } else if (endpointName === "attention") {
+    requireString(data.generatedAtJST);
+    if (!["normal", "attention", "critical"].includes(data.status)) invalidPayload();
+    requireRecord(data.summary);
+  } else if (endpointName === "sales") {
+    requireString(data.generatedAtJST);
+    requireRecord(data.totals);
+    requireArray(data.shops);
+  } else if (endpointName === "history") {
+    requireRecord(data.totals);
+    requireArray(data.shops);
+    requireRecord(data.range);
+    requireArray(data.range.dates);
+  } else if (endpointName === "ranking") {
+    requireString(data.generatedAtJST);
+    requireRecord(data.rankings);
+  } else if (endpointName === "performance") {
+    requireString(data.generatedAtJST);
+    requireRecord(data.traffic);
+    if (!["normal", "attention", "critical"].includes(data.traffic.status)) invalidPayload();
+  }
+  return data;
+}
+
 export async function fetchJson(url, { fetcher = globalThis.fetch, timeoutMs = 15000 } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -67,10 +117,7 @@ function timestampFreshness(timestamp, nowTs, refreshInterval) {
 
 function worstState(...states) {
   const weight = { fresh: 0, delayed: 1, stale: 2, unavailable: 3 };
-  return states.reduce(
-    (worst, state) => (weight[state] > weight[worst] ? state : worst),
-    "fresh",
-  );
+  return states.reduce((worst, state) => (weight[state] > weight[worst] ? state : worst), "fresh");
 }
 
 function endpoint(baseUrl, path) {
@@ -79,10 +126,7 @@ function endpoint(baseUrl, path) {
 
 async function isolated(key, source, work) {
   if (!source?.widget || source.error) {
-    return unavailable(
-      key,
-      new AISummaryError("configuration", "Source configuration invalid"),
-    );
+    return unavailable(key, new AISummaryError("configuration", "Source configuration invalid"));
   }
   try {
     return await work(source.widget);
@@ -98,7 +142,7 @@ export async function collectBusinessSources(
   const read = (url) => fetchJson(url, { fetcher, timeoutMs });
   const [shipping, attention, sales, performance] = await Promise.all([
     isolated("shipping", sources.shipping, async (widget) => {
-      const data = await read(widget.url);
+      const data = validatePayload("shipping", await read(widget.url));
       return {
         key: "shipping",
         state: shippingFreshness(data.updated_at, nowTs, widget.refreshInterval),
@@ -109,7 +153,7 @@ export async function collectBusinessSources(
       };
     }),
     isolated("attention", sources.attention, async (widget) => {
-      const data = await read(endpoint(widget.url, "/api/attention"));
+      const data = validatePayload("attention", await read(endpoint(widget.url, "/api/attention")));
       const state = worstState(
         timestampFreshness(data.generatedAtJST, nowTs, widget.refreshInterval || 60000),
         compositeFreshness(data.sources),
@@ -127,20 +171,13 @@ export async function collectBusinessSources(
       const requests = ["sales", "history", "ranking"].map((name) =>
         buildSalesProxyRequest({ endpoint: name, baseUrl: widget.url }),
       );
-      const [salesData, history, ranking] = await Promise.all(
-        requests.map(({ url }) => read(url)),
-      );
+      const [salesData, history, ranking] = await Promise.all(requests.map(({ url }) => read(url)));
+      validatePayload("sales", salesData);
+      validatePayload("history", history);
+      validatePayload("ranking", ranking);
       const state = worstState(
-        timestampFreshness(
-          salesData.generatedAtJST,
-          nowTs,
-          widget.refreshInterval || 900000,
-        ),
-        timestampFreshness(
-          ranking.generatedAtJST,
-          nowTs,
-          widget.refreshInterval || 900000,
-        ),
+        timestampFreshness(salesData.generatedAtJST, nowTs, widget.refreshInterval || 900000),
+        timestampFreshness(ranking.generatedAtJST, nowTs, widget.refreshInterval || 900000),
       );
       return {
         key: "sales",
@@ -157,13 +194,9 @@ export async function collectBusinessSources(
       };
     }),
     isolated("performance", sources.performance, async (widget) => {
-      const data = await read(endpoint(widget.url, "/api/performance"));
+      const data = validatePayload("performance", await read(endpoint(widget.url, "/api/performance")));
       const state = worstState(
-        timestampFreshness(
-          data.generatedAtJST,
-          nowTs,
-          widget.refreshInterval || 600000,
-        ),
+        timestampFreshness(data.generatedAtJST, nowTs, widget.refreshInterval || 600000),
         compositeFreshness(data.sources),
       );
       return {

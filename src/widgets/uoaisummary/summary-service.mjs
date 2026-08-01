@@ -21,6 +21,7 @@ export function createSummaryService(dependencies) {
     dependencies;
 
   let persisted = store.read();
+  if (!persisted.latest?.summary) persisted = { ...persisted, latest: null };
   let activePromise = null;
   let timer = null;
   let stopped = false;
@@ -42,6 +43,27 @@ export function createSummaryService(dependencies) {
     if (timer) timers.clearTimeout(timer);
     timer = timers.setTimeout(() => requestRefresh({ manual: false }), Math.max(0, delayMs));
     if (typeof timer?.unref === "function") timer.unref();
+  }
+
+  function cacheFailure(fallback) {
+    persisted = structuredClone(fallback);
+    persisted.lastError = "cache";
+    const interval = currentConfiguration?.ai?.generationInterval || 3600000;
+    persisted.nextScheduledAtJST = clock.toJST(clock.now() + interval);
+    runtimeState = persisted.latest ? "stale" : "error";
+    runtimeAnalysis = null;
+    schedule(interval);
+    logger.error("AI summary persistence failed: cache");
+  }
+
+  function persistOrCacheFailure(fallback) {
+    try {
+      persisted = store.write(persisted) || persisted;
+      return true;
+    } catch {
+      cacheFailure(fallback);
+      return false;
+    }
   }
 
   function initialize() {
@@ -81,7 +103,12 @@ export function createSummaryService(dependencies) {
     });
     runtimeAnalysis = analysis;
 
-    if (analysis.sourceCoverage.valid < 2) {
+    const metricKeys = new Set(
+      Object.entries(analysis.metrics)
+        .filter(([, metric]) => metric?.value !== null && Number.isFinite(metric?.value))
+        .map(([key]) => key),
+    );
+    if (analysis.sourceCoverage.valid < 2 || metricKeys.size < 2) {
       const error = new Error("Insufficient business sources");
       error.code = "source_unavailable";
       error.retryable = false;
@@ -89,14 +116,21 @@ export function createSummaryService(dependencies) {
     }
 
     persisted = appendSnapshot(persisted, analysis.snapshot);
-    const metricKeys = new Set(Object.keys(analysis.metrics));
     const shopNames = new Set(analysis.modelInput.shops?.map((shop) => shop.name) || []);
+    const availableModules = new Set(
+      Object.entries(analysis.modelInput.modules || {})
+        .filter(([, module]) => module !== null)
+        .map(([key]) => key),
+    );
+    const hasReviewSamples = (analysis.modelInput.reviewSamples?.length || 0) > 0;
     const generated = await onceWithRetry(() =>
       requestSummaryOnce({
         config: ai,
         modelInput: analysis.modelInput,
         metricKeys,
         shopNames,
+        availableModules,
+        hasReviewSamples,
       }),
     );
     const generatedAtJST = clock.toJST(clock.now());
@@ -114,8 +148,6 @@ export function createSummaryService(dependencies) {
     persisted.usage = generated.usage || null;
     persisted.lastError = null;
     persisted.nextScheduledAtJST = clock.toJST(clock.now() + ai.generationInterval);
-    runtimeState = analysis.dataQuality === "partial" ? "partial" : "ready";
-    schedule(ai.generationInterval);
   }
 
   function requestRefresh({ manual }) {
@@ -136,23 +168,38 @@ export function createSummaryService(dependencies) {
     }
 
     if (manual) {
+      const beforeCooldown = structuredClone(persisted);
       persisted.manualCooldownUntilJST = clock.toJST(clock.now() + currentConfiguration.ai.manualCooldown);
-      store.write(persisted);
+      if (!persistOrCacheFailure(beforeCooldown)) {
+        return {
+          accepted: false,
+          state: "error",
+          cooldownUntilJST: beforeCooldown.manualCooldownUntilJST,
+        };
+      }
     }
 
+    const durableBeforeRun = structuredClone(persisted);
     runtimeState = "running";
     activePromise = runGeneration()
+      .then(() => {
+        const interval = currentConfiguration.ai.generationInterval;
+        if (persistOrCacheFailure(durableBeforeRun)) {
+          runtimeState = persisted.latest.dataQuality === "partial" ? "partial" : "ready";
+          runtimeAnalysis = null;
+          schedule(interval);
+        }
+      })
       .catch((error) => {
         persisted.lastError = publicErrorCode(error);
         runtimeState = persisted.latest ? "stale" : "error";
         const interval = currentConfiguration?.ai?.generationInterval || 3600000;
         persisted.nextScheduledAtJST = clock.toJST(clock.now() + interval);
-        schedule(interval);
         logger.error("AI summary generation failed: %s", persisted.lastError);
+        if (persistOrCacheFailure(durableBeforeRun)) schedule(interval);
       })
       .finally(() => {
         activePromise = null;
-        store.write(persisted);
       });
 
     return {
@@ -163,8 +210,8 @@ export function createSummaryService(dependencies) {
   }
 
   function getPublicState() {
-    const publicRecord =
-      runtimeState === "stale" && persisted.latest ? persisted.latest : runtimeAnalysis || persisted.latest;
+    const shouldDisplayPersistedSummary = persisted.latest && (runtimeState === "stale" || runtimeState === "running");
+    const publicRecord = shouldDisplayPersistedSummary ? persisted.latest : runtimeAnalysis || persisted.latest;
     return structuredClone({
       state: runtimeState,
       severity: publicRecord?.severity || "unknown",

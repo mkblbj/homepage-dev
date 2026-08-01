@@ -1,10 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  buildResponsesBody,
-  deriveOpenAIEndpoint,
-  requestSummaryOnce,
-} from "./responses-client.mjs";
+import { buildResponsesBody, deriveOpenAIEndpoint, requestSummaryOnce } from "./responses-client.mjs";
 
 function validSummary() {
   return {
@@ -50,6 +46,8 @@ function configuredRequest(fetcher) {
     modelInput: {},
     metricKeys: new Set(["performance.traffic.delta_percent", "attention.open_total"]),
     shopNames: new Set(),
+    availableModules: new Set(["attention", "performance"]),
+    hasReviewSamples: false,
     fetcher,
   });
 }
@@ -81,9 +79,7 @@ describe("Responses client", () => {
   });
 
   it("derives an SDK baseURL without losing a custom path prefix", () => {
-    expect(
-      deriveOpenAIEndpoint("https://ai.example.test/custom/openai/v1/responses"),
-    ).toEqual({
+    expect(deriveOpenAIEndpoint("https://ai.example.test/custom/openai/v1/responses")).toEqual({
       baseURL: "https://ai.example.test/custom/openai/v1",
       endpoint: "https://ai.example.test/custom/openai/v1/responses",
     });
@@ -115,11 +111,10 @@ describe("Responses client", () => {
         requestTimeout: 1000,
       },
       modelInput: {},
-      metricKeys: new Set([
-        "performance.traffic.delta_percent",
-        "attention.open_total",
-      ]),
+      metricKeys: new Set(["performance.traffic.delta_percent", "attention.open_total"]),
       shopNames: new Set(),
+      availableModules: new Set(["attention", "performance"]),
+      hasReviewSamples: false,
       fetcher,
     });
 
@@ -141,11 +136,12 @@ describe("Responses client", () => {
     [429, "model_http", true],
     [500, "model_http", true],
   ])("maps HTTP %i to %s retryable=%s", async (status, code, retryable) => {
-    const fetcher = vi.fn(async () =>
-      new Response("private-response-text", {
-        status,
-        headers: { location: "https://redirect.example.test" },
-      }),
+    const fetcher = vi.fn(
+      async () =>
+        new Response("private-response-text", {
+          status,
+          headers: { location: "https://redirect.example.test" },
+        }),
     );
 
     await expect(configuredRequest(fetcher)).rejects.toMatchObject({ code, retryable });
@@ -154,21 +150,18 @@ describe("Responses client", () => {
     try {
       await configuredRequest(fetcher);
     } catch (error) {
-      expect(String(error.message)).not.toMatch(
-        /private-ai|private-secret|private-response-text|redirect/,
-      );
+      expect(String(error.message)).not.toMatch(/private-ai|private-secret|private-response-text|redirect/);
     }
   });
 
   it("maps an abort to a retryable model timeout", async () => {
-    const fetcher = vi.fn((_url, { signal }) =>
-      new Promise((_resolve, reject) => {
-        signal.addEventListener(
-          "abort",
-          () => reject(new DOMException("private request details", "AbortError")),
-          { once: true },
-        );
-      }),
+    const fetcher = vi.fn(
+      (_url, { signal }) =>
+        new Promise((_resolve, reject) => {
+          signal.addEventListener("abort", () => reject(new DOMException("private request details", "AbortError")), {
+            once: true,
+          });
+        }),
     );
     await expect(configuredRequest(fetcher)).rejects.toMatchObject({
       code: "model_timeout",

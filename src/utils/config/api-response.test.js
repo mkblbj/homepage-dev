@@ -1,3 +1,7 @@
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { fs, yaml, config, widgetHelpers, serviceHelpers } = vi.hoisted(() => ({
@@ -26,7 +30,8 @@ const { fs, yaml, config, widgetHelpers, serviceHelpers } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("fs", () => ({
+vi.mock("fs", async (importOriginal) => ({
+  ...(await importOriginal()),
   promises: fs,
 }));
 
@@ -161,6 +166,43 @@ describe("utils/config/api-response", () => {
     expect(errSpy).toHaveBeenCalled();
 
     errSpy.mockRestore();
+  });
+
+  it("servicesResponse never logs YAML snippets from a synthetic configuration error", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "homepage-synthetic-yaml-"));
+    const configPath = join(directory, "services.yaml");
+    const syntheticSecret = "synthetic-local-key-never-log";
+    writeFileSync(
+      configPath,
+      `- Group:\n    - AI:\n        widget:\n          apiKey: ${syntheticSecret}\n         broken: true\n`,
+      "utf8",
+    );
+    const actualYaml = await vi.importActual("js-yaml");
+    let parseError;
+    try {
+      actualYaml.load(readFileSync(configPath, "utf8"));
+    } catch (error) {
+      parseError = error;
+    }
+    expect(parseError).toBeTruthy();
+
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    serviceHelpers.servicesFromDocker.mockResolvedValueOnce([]);
+    serviceHelpers.servicesFromKubernetes.mockResolvedValueOnce([]);
+    serviceHelpers.servicesFromConfig.mockRejectedValueOnce(parseError);
+    config.getSettings.mockResolvedValueOnce({});
+
+    try {
+      expect(await servicesResponse()).toEqual([]);
+      const logged = JSON.stringify(errSpy.mock.calls);
+      expect(logged).toContain("Failed to load services.yaml, please check for errors");
+      expect(logged).not.toContain(syntheticSecret);
+      expect(logged).not.toContain("broken: true");
+      expect(logged).not.toContain("YAMLException");
+    } finally {
+      errSpy.mockRestore();
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 
   it("servicesResponse supports multi-level nested layout groups and ensures the top-level parent exists", async () => {

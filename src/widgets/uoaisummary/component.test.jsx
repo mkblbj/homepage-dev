@@ -128,12 +128,18 @@ describe("widgets/uoaisummary/component", () => {
 
     expect(screen.getByText("対応待ち案件を優先してください。")).toBeInTheDocument();
     expect(screen.getByText("未対応合計 64件 (+4件)")).toBeInTheDocument();
+    expect(screen.getByText("未対応案件を整理")).toBeInTheDocument();
+    expect(screen.getByText("最優先")).toBeInTheDocument();
+    expect(screen.queryByText("優先順を確認してください。")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "中文" }));
 
     expect(screen.getByText("请优先处理待办事项。")).toBeInTheDocument();
     expect(screen.getByText("未处理合计 64件 (+4件)")).toBeInTheDocument();
+    expect(screen.getByText("梳理待办事项")).toBeInTheDocument();
+    expect(screen.getByText("最高优先")).toBeInTheDocument();
     expect(screen.queryByText("未対応合計 64件 (+4件)")).not.toBeInTheDocument();
+    expect(screen.queryByText("未対応案件を整理")).not.toBeInTheDocument();
     expect(screen.getByText("AI 经营总结")).toBeInTheDocument();
     expect(screen.getByText("关注")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "AI重新分析" })).toBeInTheDocument();
@@ -156,16 +162,19 @@ describe("widgets/uoaisummary/component", () => {
     expect(disclosure).toHaveAttribute("type", "button");
     expect(disclosure).toHaveAttribute("aria-expanded", "false");
     expect(disclosure).toHaveAttribute("aria-controls", "uoaisummary-details");
-    expect(screen.queryByText("未対応案件を整理")).not.toBeInTheDocument();
+    expect(screen.getByText("未対応案件を整理")).toBeInTheDocument();
+    expect(screen.queryByText("優先順を確認してください。")).not.toBeInTheDocument();
 
     fireEvent.click(disclosure);
 
     expect(screen.getByRole("button", { name: "詳細を閉じる" })).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText("未対応案件を整理")).toBeInTheDocument();
+    expect(screen.getByText("優先順を確認してください。")).toBeInTheDocument();
     expect(screen.getByText("データカバレッジ · 4/4")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "詳細を閉じる" }));
-    expect(screen.queryByText("未対応案件を整理")).not.toBeInTheDocument();
+    expect(screen.getByText("未対応案件を整理")).toBeInTheDocument();
+    expect(screen.queryByText("優先順を確認してください。")).not.toBeInTheDocument();
   });
 
   it("posts a manual refresh once and revalidates after a 202 response", async () => {
@@ -190,13 +199,18 @@ describe("widgets/uoaisummary/component", () => {
     global.fetch.mockResolvedValue({
       ok: false,
       status: 429,
-      json: async () => ({ accepted: false, state: "cooldown" }),
+      json: async () => ({
+        accepted: false,
+        state: "cooldown",
+        cooldownUntilJST: "2026-08-01 23:59:00 JST",
+      }),
     });
     renderSummary();
 
     fireEvent.click(screen.getByRole("button", { name: "AI再分析" }));
 
-    expect(await screen.findByRole("status")).toHaveTextContent("再分析はしばらくお待ちください");
+    expect(await screen.findByRole("status")).toHaveTextContent("再分析は 2026-08-01 23:59:00 JST までお待ちください");
+    expect(screen.getByRole("button", { name: "AI再分析" })).toBeDisabled();
     expect(mutate).toHaveBeenCalledTimes(1);
   });
 
@@ -259,6 +273,7 @@ describe("widgets/uoaisummary/component", () => {
     expect(screen.getByText("初回分析を開始してください")).toBeInTheDocument();
     expect(screen.queryByText("AIサマリーを生成できません")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "AI再分析" })).toBeEnabled();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("shows an actionable error panel when no cached summary exists", async () => {
@@ -266,6 +281,7 @@ describe("widgets/uoaisummary/component", () => {
     renderSummary();
 
     expect(screen.getByRole("alert")).toHaveTextContent("AIサマリーを生成できません");
+    expect(screen.getByRole("alert")).toHaveTextContent("AIの設定を確認してください");
     const retry = screen.getByRole("button", { name: "AI再分析" });
     expect(retry).toHaveAttribute("type", "button");
 
@@ -280,15 +296,55 @@ describe("widgets/uoaisummary/component", () => {
     global.fetch.mockResolvedValue({
       ok: false,
       status: 429,
-      json: async () => ({ accepted: false, state: "cooldown" }),
+      json: async () => ({
+        accepted: false,
+        state: "cooldown",
+        cooldownUntilJST: "2026-08-01 23:59:00 JST",
+      }),
     });
     renderSummary();
 
     fireEvent.click(screen.getByRole("button", { name: "AI再分析" }));
 
-    const feedback = await screen.findByText("再分析はしばらくお待ちください");
+    const feedback = await screen.findByText("再分析は 2026-08-01 23:59:00 JST までお待ちください");
     expect(feedback).toHaveAttribute("role", "status");
+    expect(screen.getByRole("button", { name: "AI再分析" })).toBeDisabled();
     expect(mutate).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows a localized safe error category while retaining a cached summary", () => {
+    mockSummary({ ...ready, state: "error", lastError: "model_http" });
+    renderSummary();
+
+    expect(screen.getByRole("alert")).toHaveTextContent("AI分析サービスでエラーが発生しました");
+    expect(screen.getByText("対応待ち案件を優先してください。")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "中文" }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent("AI分析服务发生错误");
+    expect(screen.queryByText("model_http")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["source_timeout", "元データを取得できませんでした"],
+    ["source_unavailable", "元データを取得できませんでした"],
+    ["model_schema", "AI分析サービスでエラーが発生しました"],
+    ["cache", "サマリーの保存に失敗しました"],
+    ["unexpected", "予期しないエラーが発生しました"],
+  ])("maps the safe %s category without exposing its internal code", (lastError, message) => {
+    mockSummary({ ...ready, state: "error", lastError });
+    renderSummary();
+
+    expect(screen.getByRole("alert")).toHaveTextContent(message);
+    expect(screen.queryByText(lastError)).not.toBeInTheDocument();
+  });
+
+  it("honors a persisted cooldown while displaying a cached summary", () => {
+    mockSummary({ ...ready, cooldownUntilJST: "2026-08-01 23:59:00 JST" });
+    renderSummary();
+
+    expect(screen.getByRole("status")).toHaveTextContent("再分析は 2026-08-01 23:59:00 JST までお待ちください");
+    expect(screen.getByRole("button", { name: "AI再分析" })).toBeDisabled();
   });
 
   it("announces unexpected refresh feedback from the no-summary error state", async () => {

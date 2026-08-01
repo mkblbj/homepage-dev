@@ -129,7 +129,17 @@ function normalizeSourceCoverage(value) {
 }
 
 function normalizeSourceFreshness(value) {
-  if (!isRecord(value)) return null;
+  if (
+    !isRecord(value) ||
+    SOURCE_KEYS.some(
+      (key) =>
+        !Object.prototype.hasOwnProperty.call(value, key) ||
+        !isRecord(value[key]) ||
+        !["fresh", "delayed", "stale", "unavailable"].includes(value[key].state),
+    )
+  ) {
+    return null;
+  }
 
   return Object.fromEntries(
     SOURCE_KEYS.map((key) => {
@@ -162,18 +172,34 @@ function normalizeMetricDisplay(value) {
 
 function normalizeLatest(value) {
   if (!isRecord(value)) return null;
-  const severity = ["normal", "attention", "critical", "unknown"].includes(value.severity) ? value.severity : "unknown";
+  const severity = ["normal", "attention", "critical", "unknown"].includes(value.severity) ? value.severity : null;
   const dataQuality = ["complete", "partial", "insufficient", "stale"].includes(value.dataQuality)
     ? value.dataQuality
-    : "insufficient";
+    : null;
+  const generatedAtJST = timestampOrNull(value.generatedAtJST);
+  const sourceCoverage = normalizeSourceCoverage(value.sourceCoverage);
+  const sourceFreshness = normalizeSourceFreshness(value.sourceFreshness);
+  const summary = normalizeSummary(value.summary);
+  if (
+    severity === null ||
+    dataQuality === null ||
+    generatedAtJST === null ||
+    sourceCoverage === null ||
+    sourceCoverage.total !== 4 ||
+    sourceCoverage.valid > sourceCoverage.total ||
+    sourceFreshness === null ||
+    summary === null
+  ) {
+    return null;
+  }
 
   return {
     severity,
     dataQuality,
-    generatedAtJST: timestampOrNull(value.generatedAtJST),
-    sourceCoverage: normalizeSourceCoverage(value.sourceCoverage),
-    sourceFreshness: normalizeSourceFreshness(value.sourceFreshness),
-    summary: normalizeSummary(value.summary),
+    generatedAtJST,
+    sourceCoverage,
+    sourceFreshness,
+    summary,
     metricDisplay: normalizeMetricDisplay(value.metricDisplay),
   };
 }
@@ -261,7 +287,12 @@ export function createSummaryStore({ configDir, now = Date.now }) {
       if (!existsSync(filePath)) return emptySummaryState();
 
       try {
-        return normalizeState(JSON.parse(readFileSync(filePath, "utf8")));
+        const parsed = JSON.parse(readFileSync(filePath, "utf8"));
+        const state = normalizeState(parsed);
+        if (parsed?.latest !== null && parsed?.latest !== undefined && state.latest === null) {
+          throw new Error("Invalid cached summary");
+        }
+        return state;
       } catch {
         renameSync(filePath, `${filePath}.corrupt-${now()}`);
         return emptySummaryState();

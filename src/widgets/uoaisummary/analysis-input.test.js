@@ -158,6 +158,41 @@ describe("analysis input", () => {
     expect(JSON.stringify(safe)).not.toContain("rvw-secret");
   });
 
+  it("normalizes and sanitizes every review leaf admitted to model input", () => {
+    const safe = sanitizeReview({
+      shopName: "shop@example.test",
+      rating: 9,
+      postedAtJST: "not-a-timestamp",
+      itemManagementNumber: "https://private.example.test/item",
+      excerpt: "ordinary review",
+    });
+
+    expect(safe).toEqual({
+      shopName: "[redacted email]",
+      rating: null,
+      postedAtJST: null,
+      itemManagementNumber: "[redacted url]",
+      excerpt: "ordinary review",
+    });
+  });
+
+  it("excludes null and empty ratings instead of letting them consume low-rating sample capacity", () => {
+    const collected = fourSourceFixture();
+    collected.attention.data.recentReviews = [
+      { shopName: "3911", rating: null, postedAtJST: "2026-08-01 09:03 JST", excerpt: "null-rating" },
+      { shopName: "3911", rating: "", postedAtJST: "2026-08-01 09:02 JST", excerpt: "empty-rating" },
+      { shopName: "3911", rating: 1, postedAtJST: "2026-08-01 09:01 JST", excerpt: "valid-rating" },
+    ];
+
+    const bundle = buildAnalysisInput(collected, {
+      previousSnapshot: null,
+      nowTs: Date.parse("2026-08-01T10:00:00+09:00"),
+    });
+
+    expect(bundle.modelInput.reviewSamples).toHaveLength(1);
+    expect(bundle.modelInput.reviewSamples[0].excerpt).toBe("valid-rating");
+  });
+
   it("removes review and buyer identifiers containing underscores", () => {
     const safe = sanitizeReview({
       excerpt: "review id rvw_0001 buyer id BUY_778899",
@@ -329,12 +364,121 @@ describe("analysis input", () => {
       note: "x".repeat(12000),
     }));
 
-    expect(() =>
-      buildAnalysisInput(collected, {
-        previousSnapshot: null,
-        nowTs: Date.parse("2026-08-01T10:00:00+09:00"),
-      }),
-    ).toThrow("Normalized AI input exceeds safe size");
+    const bundle = buildAnalysisInput(collected, {
+      previousSnapshot: null,
+      nowTs: Date.parse("2026-08-01T10:00:00+09:00"),
+    });
+
+    expect(Buffer.byteLength(JSON.stringify(bundle.modelInput), "utf8")).toBeLessThanOrEqual(50000);
+    expect(JSON.stringify(bundle.modelInput)).not.toContain("x".repeat(12000));
+  });
+
+  it("copies upstream aggregates into the model input only through leaf allowlists", () => {
+    const collected = fourSourceFixture();
+    collected.attention.data.summary.unknownAttentionField = "attention-sentinel";
+    collected.sales.data.sales.totals.unknownSalesField = "sales-sentinel";
+    collected.sales.data.history.totals.unknownHistoryField = "history-sentinel";
+    collected.performance.data.traffic.unknownTrafficField = "traffic-sentinel";
+    collected.performance.data.customerMix.new.unknownMixField = "mix-sentinel";
+
+    const bundle = buildAnalysisInput(collected, {
+      previousSnapshot: null,
+      nowTs: Date.parse("2026-08-01T10:00:00+09:00"),
+    });
+
+    expect(JSON.stringify(bundle.modelInput)).not.toMatch(
+      /attention-sentinel|sales-sentinel|history-sentinel|traffic-sentinel|mix-sentinel/,
+    );
+  });
+
+  it("aggregates the real per-shop sales history and exposes realtime and seven-day shares", () => {
+    const collected = fourSourceFixture();
+    collected.sales.data.sales.totals.salesYen = 100000;
+    collected.sales.data.sales.shops = [
+      { shopName: "3911", salesYen: 70000, orderCount: 14 },
+      { shopName: "0406", salesYen: 30000, orderCount: 6 },
+    ];
+    collected.sales.data.history = {
+      totals: { salesYen: 300000, orderCount: 60, conversionRate: 3.2 },
+      range: { dates: ["2026-07-30", "2026-07-31"] },
+      shops: [
+        {
+          shopName: "3911",
+          totals: { salesYen: 180000, orderCount: 36 },
+          daily: [
+            { date: "2026-07-30", salesYen: 80000, orderCount: 16 },
+            { date: "2026-07-31", salesYen: 100000, orderCount: 20 },
+          ],
+        },
+        {
+          shopName: "0406",
+          totals: { salesYen: 120000, orderCount: 24 },
+          daily: [
+            { date: "2026-07-30", salesYen: 50000, orderCount: 10 },
+            { date: "2026-07-31", salesYen: 70000, orderCount: 14 },
+          ],
+        },
+      ],
+    };
+
+    const bundle = buildAnalysisInput(collected, {
+      previousSnapshot: null,
+      nowTs: Date.parse("2026-08-01T10:00:00+09:00"),
+    });
+
+    expect(bundle.modelInput.modules.sales.sevenDay.dailyTrend).toEqual([
+      { date: "2026-07-30", salesYen: 130000, orderCount: 26 },
+      { date: "2026-07-31", salesYen: 170000, orderCount: 34 },
+    ]);
+    expect(bundle.modelInput.modules.sales.shops).toEqual([
+      {
+        shopName: "3911",
+        salesYen: 70000,
+        orderCount: 14,
+        realtimeSharePercent: 70,
+        sevenDaySalesYen: 180000,
+        sevenDayOrderCount: 36,
+        sevenDaySharePercent: 60,
+      },
+      {
+        shopName: "0406",
+        salesYen: 30000,
+        orderCount: 6,
+        realtimeSharePercent: 30,
+        sevenDaySalesYen: 120000,
+        sevenDayOrderCount: 24,
+        sevenDaySharePercent: 40,
+      },
+    ]);
+  });
+
+  it("takes top ten from each ranking and interleaves unique products before the cap", () => {
+    const collected = fourSourceFixture();
+    const ranked = (prefix) =>
+      Array.from({ length: 10 }, (_, index) => ({
+        itemManagementNumber: `${prefix}-${index + 1}`,
+        title: `${prefix} item ${index + 1}`,
+        rank: index + 1,
+      }));
+    collected.sales.data.ranking = {
+      rankings: {
+        sales: ranked("sales"),
+        orderCount: ranked("orders"),
+        units: ranked("units"),
+      },
+    };
+
+    const bundle = buildAnalysisInput(collected, {
+      previousSnapshot: null,
+      nowTs: Date.parse("2026-08-01T10:00:00+09:00"),
+    });
+    const keys = bundle.modelInput.rankedProducts.map((product) => product.itemManagementNumber);
+
+    expect(keys).toHaveLength(20);
+    expect(keys.slice(0, 6)).toEqual(["sales-1", "orders-1", "units-1", "sales-2", "orders-2", "units-2"]);
+    expect(keys.some((key) => key.startsWith("sales-"))).toBe(true);
+    expect(keys.some((key) => key.startsWith("orders-"))).toBe(true);
+    expect(keys.some((key) => key.startsWith("units-"))).toBe(true);
   });
 
   it("limits sanitized review excerpts to 300 Unicode characters", () => {

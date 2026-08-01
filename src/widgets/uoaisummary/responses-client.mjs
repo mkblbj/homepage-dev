@@ -90,6 +90,8 @@ export async function requestSummaryOnce({
   modelInput,
   metricKeys,
   shopNames,
+  availableModules,
+  hasReviewSamples,
   fetcher = globalThis.fetch,
 }) {
   try {
@@ -100,9 +102,7 @@ export async function requestSummaryOnce({
     });
     if (
       response?.status !== "completed" ||
-      (response.output || []).some((item) =>
-        (item.content || []).some((part) => part?.type === "refusal"),
-      )
+      (response.output || []).some((item) => (item.content || []).some((part) => part?.type === "refusal"))
     ) {
       throw new AISummaryError("model_schema", "Model response is incomplete", {
         retryable: true,
@@ -123,7 +123,12 @@ export async function requestSummaryOnce({
       });
     }
     return {
-      summary: validateModelSummary(parsed, { metricKeys, shopNames }),
+      summary: validateModelSummary(parsed, {
+        metricKeys,
+        shopNames,
+        availableModules,
+        hasReviewSamples,
+      }),
       usage: response.usage
         ? {
             input_tokens: Number(response.usage.input_tokens) || 0,

@@ -80,7 +80,10 @@ function analysisBundle({ valid = 4, dataQuality = "complete" } = {}) {
       sales: { state: "fresh", updatedAtJST: "2026-08-01 09:45:00 JST" },
       performance: { state: "fresh", updatedAtJST: "2026-08-01 07:00:00 JST" },
     },
-    metrics: {},
+    metrics: {
+      "attention.open_total": { value: 1 },
+      "performance.traffic.delta_percent": { value: -10 },
+    },
     metricDisplay: {
       "attention.open_total": { rawValue: 1, ja: "未対応 1件", zh: "待办 1件" },
       "performance.traffic.delta_percent": {
@@ -195,6 +198,23 @@ describe("summary generation service", () => {
     await deps.flush();
   });
 
+  it("regenerates immediately when a future-dated latest record has no usable summary", async () => {
+    const deps = serviceDependencies({
+      persisted: persistedState({
+        latest: { ...persistedState().latest, summary: null },
+        nextScheduledAtJST: "2026-08-01 11:00:00 JST",
+      }),
+    });
+    const service = createSummaryService(deps);
+
+    await service.initialize();
+    await deps.flush();
+
+    expect(deps.collectSources).toHaveBeenCalledTimes(1);
+    expect(deps.requestSummaryOnce).toHaveBeenCalledTimes(1);
+    expect(service.getPublicState().state).toBe("ready");
+  });
+
   it("initializes idempotently and schedules a future automatic refresh", async () => {
     const deps = serviceDependencies();
     const service = createSummaryService(deps);
@@ -276,6 +296,32 @@ describe("summary generation service", () => {
     await deps.flush();
   });
 
+  it("turns a manual cooldown persistence failure into a safe cache error", async () => {
+    const deps = serviceDependencies();
+    deps.store.write.mockImplementationOnce(() => {
+      throw new Error("synthetic cache write failure");
+    });
+    const service = createSummaryService(deps);
+    await service.initialize();
+
+    let result;
+    expect(() => {
+      result = service.requestRefresh({ manual: true });
+    }).not.toThrow();
+
+    expect(result).toEqual({
+      accepted: false,
+      state: "error",
+      cooldownUntilJST: null,
+    });
+    expect(deps.requestSummaryOnce).not.toHaveBeenCalled();
+    expect(service.getPublicState()).toMatchObject({
+      state: "stale",
+      cooldownUntilJST: null,
+      lastError: "cache",
+    });
+  });
+
   it("merges automatic and manual requests into one active promise", async () => {
     const run = deferred();
     const deps = serviceDependencies({ requestSummaryOnce: vi.fn(() => run.promise) });
@@ -289,6 +335,50 @@ describe("summary generation service", () => {
     expect(first.accepted).toBe(true);
     expect(second.accepted).toBe(false);
     expect(deps.requestSummaryOnce).toHaveBeenCalledTimes(1);
+
+    run.resolve({ summary: validSummary(), usage: null });
+    await deps.flush();
+  });
+
+  it("keeps the displayed cached summary metadata coherent while a new analysis is running", async () => {
+    const run = deferred();
+    const oldLatest = {
+      ...persistedState().latest,
+      severity: "normal",
+      dataQuality: "complete",
+      sourceCoverage: { valid: 4, total: 4 },
+      metricDisplay: {
+        "attention.open_total": { rawValue: 7, ja: "未対応 7件", zh: "待办 7件" },
+      },
+    };
+    const pendingAnalysis = analysisBundle({ valid: 2, dataQuality: "partial" });
+    pendingAnalysis.severity = "critical";
+    pendingAnalysis.sourceFreshness = {
+      shipping: { state: "unavailable", updatedAtJST: null },
+      attention: { state: "unavailable", updatedAtJST: null },
+      sales: { state: "fresh", updatedAtJST: "2026-08-01 10:00:00 JST" },
+      performance: { state: "fresh", updatedAtJST: "2026-08-01 10:00:00 JST" },
+    };
+    const deps = serviceDependencies({
+      persisted: persistedState({ latest: oldLatest }),
+      analysis: pendingAnalysis,
+      requestSummaryOnce: vi.fn(() => run.promise),
+    });
+    const service = createSummaryService(deps);
+    await service.initialize();
+
+    service.requestRefresh({ manual: false });
+    await deps.flush();
+
+    expect(service.getPublicState()).toMatchObject({
+      state: "running",
+      severity: "normal",
+      dataQuality: "complete",
+      sourceCoverage: { valid: 4, total: 4 },
+      sourceFreshness: oldLatest.sourceFreshness,
+      summary: oldLatest.summary,
+      metricDisplay: oldLatest.metricDisplay,
+    });
 
     run.resolve({ summary: validSummary(), usage: null });
     await deps.flush();
@@ -329,6 +419,28 @@ describe("summary generation service", () => {
     });
   });
 
+  it("does not call the model with fewer than two non-null evidence metrics", async () => {
+    const analysis = analysisBundle();
+    analysis.metrics = {
+      "attention.open_total": { value: 3 },
+      "performance.traffic.delta_percent": { value: null },
+    };
+    const deps = serviceDependencies({
+      persisted: persistedState({ latest: null }),
+      analysis,
+    });
+    const service = createSummaryService(deps);
+
+    await service.initialize();
+    await deps.flush();
+
+    expect(deps.requestSummaryOnce).not.toHaveBeenCalled();
+    expect(service.getPublicState()).toMatchObject({
+      state: "error",
+      lastError: "source_unavailable",
+    });
+  });
+
   it("publishes partial state when only three sources are usable", async () => {
     const deps = serviceDependencies({
       analysis: analysisBundle({ valid: 3, dataQuality: "partial" }),
@@ -345,6 +457,33 @@ describe("summary generation service", () => {
       dataQuality: "partial",
       sourceCoverage: { valid: 3, total: 4 },
     });
+  });
+
+  it("passes the available modules and review-sample presence to model validation", async () => {
+    const analysis = analysisBundle({ valid: 2, dataQuality: "partial" });
+    analysis.modelInput = {
+      modules: {
+        shipping: null,
+        attention: {},
+        sales: null,
+        performance: {},
+      },
+      shops: [],
+      reviewSamples: [{ excerpt: "synthetic review" }],
+    };
+    const deps = serviceDependencies({ analysis });
+    const service = createSummaryService(deps);
+
+    await service.initialize();
+    service.requestRefresh({ manual: false });
+    await deps.flush();
+
+    expect(deps.requestSummaryOnce).toHaveBeenCalledWith(
+      expect.objectContaining({
+        availableModules: new Set(["attention", "performance"]),
+        hasReviewSamples: true,
+      }),
+    );
   });
 
   it("retries one retryable model failure and never retries configuration failures", async () => {
@@ -396,6 +535,37 @@ describe("summary generation service", () => {
       state: "stale",
       lastError: "model_http",
     });
+  });
+
+  it("consumes a final cache write failure, keeps the durable summary stale, and clears single-flight", async () => {
+    const deps = serviceDependencies();
+    deps.store.write.mockImplementationOnce(() => {
+      throw new Error("synthetic cache write failure");
+    });
+    const service = createSummaryService(deps);
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+
+    try {
+      await service.initialize();
+      service.requestRefresh({ manual: false });
+      await deps.flush();
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(unhandled).not.toHaveBeenCalled();
+      expect(service.getPublicState()).toMatchObject({
+        state: "stale",
+        summary: persistedState().latest.summary,
+        lastError: "cache",
+      });
+      expect(service.requestRefresh({ manual: false })).toMatchObject({
+        accepted: true,
+        state: "running",
+      });
+      await deps.flush();
+    } finally {
+      process.off("unhandledRejection", unhandled);
+    }
   });
 
   it("keeps every stale field from the last good summary after a failed generation", async () => {

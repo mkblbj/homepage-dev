@@ -73,6 +73,31 @@ describe("summary store", () => {
     expect(readdirSync(dir)).toContain("uo-ai-summary.json.corrupt-123");
   });
 
+  it("isolates structurally invalid latest data and resets its future deadline", () => {
+    writeFileSync(
+      getSummaryStorePath(dir),
+      JSON.stringify({
+        ...emptySummaryState(),
+        latest: {
+          severity: "normal",
+          dataQuality: "complete",
+          generatedAtJST: "2026-08-01 10:00:00 JST",
+          sourceCoverage: { valid: 4, total: 4 },
+          sourceFreshness: {},
+          summary: { headline: null },
+          metricDisplay: {},
+        },
+        nextScheduledAtJST: "2026-08-01 11:00:00 JST",
+      }),
+      "utf8",
+    );
+
+    const state = createSummaryStore({ configDir: dir, now: () => 456 }).read();
+
+    expect(state).toEqual(emptySummaryState());
+    expect(readdirSync(dir)).toContain("uo-ai-summary.json.corrupt-456");
+  });
+
   it("atomically writes readable state without persisting running", () => {
     const store = createSummaryStore({ configDir: dir, now: () => 123 });
     store.write({ ...emptySummaryState(), running: true, lastAttemptAtJST: "2026-08-01 10:00:00 JST" });

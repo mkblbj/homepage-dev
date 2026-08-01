@@ -28,9 +28,15 @@ vi.mock("next-i18next/pages", () => {
       stale: "前回の結果を表示中",
       partial: "一部データで分析",
       cooldown: "再分析はしばらくお待ちください",
+      cooldownUntil: "再分析は {{deadline}} までお待ちください",
       refreshFailed: "再分析を開始できませんでした",
       cannotGenerate: "AIサマリーを生成できません",
       insufficient: "分析に必要なデータが不足しています",
+      errorConfiguration: "AIの設定を確認してください",
+      errorSources: "元データを取得できませんでした",
+      errorModel: "AI分析サービスでエラーが発生しました",
+      errorCache: "サマリーの保存に失敗しました",
+      errorUnexpected: "予期しないエラーが発生しました",
       reviewThemes: "低評価レビューの傾向",
       coverage: "データカバレッジ",
       "source.shipping": "出荷",
@@ -66,9 +72,15 @@ vi.mock("next-i18next/pages", () => {
       stale: "正在显示上次结果",
       partial: "基于部分数据分析",
       cooldown: "请稍后再重新分析",
+      cooldownUntil: "请等待至 {{deadline}} 后再重新分析",
       refreshFailed: "无法开始重新分析",
       cannotGenerate: "无法生成AI总结",
       insufficient: "缺少分析所需的数据",
+      errorConfiguration: "请检查AI设置",
+      errorSources: "无法获取源数据",
+      errorModel: "AI分析服务发生错误",
+      errorCache: "保存总结失败",
+      errorUnexpected: "发生了意外错误",
       reviewThemes: "低评分评价趋势",
       coverage: "数据覆盖",
       "source.shipping": "发货",
@@ -104,9 +116,15 @@ vi.mock("next-i18next/pages", () => {
       stale: "Showing the previous result",
       partial: "Analysis uses partial data",
       cooldown: "Please wait before reanalyzing",
+      cooldownUntil: "Please wait until {{deadline}} before reanalyzing",
       refreshFailed: "Could not start reanalysis",
       cannotGenerate: "Could not generate an AI summary",
       insufficient: "Not enough data to analyze",
+      errorConfiguration: "Check the AI settings",
+      errorSources: "Could not retrieve source data",
+      errorModel: "The AI analysis service encountered an error",
+      errorCache: "Could not save the summary",
+      errorUnexpected: "An unexpected error occurred",
       reviewThemes: "Low-rating review themes",
       coverage: "Data coverage",
       "source.shipping": "Shipping",
@@ -146,7 +164,11 @@ vi.mock("next-i18next/pages", () => {
     }
     const cockpitKey =
       typeof key === "string" && key.startsWith("uoaisummary.") ? key.slice("uoaisummary.".length) : null;
-    return (cockpitKey && cockpitByLocale[locale]?.[cockpitKey]) || key;
+    const translated = (cockpitKey && cockpitByLocale[locale]?.[cockpitKey]) || key;
+    return Object.entries(opts || {}).reduce(
+      (result, [name, value]) => result.replaceAll(`{{${name}}}`, String(value)),
+      translated,
+    );
   };
 
   return {

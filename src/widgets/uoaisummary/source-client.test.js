@@ -27,7 +27,12 @@ describe("source-client", () => {
         return reply({ generatedAtJST: "2026-08-01 09:45 JST", totals: { salesYen: 100, orderCount: 2 }, shops: [] });
       }
       if (value.endsWith("/api/history/sales")) return reply({ totals: {}, shops: [], range: { dates: [] } });
-      if (value.endsWith("/api/item-rankings")) return reply({ rankings: {} });
+      if (value.endsWith("/api/item-rankings")) {
+        return reply({
+          generatedAtJST: "2026-08-01 09:45 JST",
+          rankings: {},
+        });
+      }
       if (value.endsWith("/api/attention")) {
         return reply({ generatedAtJST: "2026-08-01 09:50 JST", status: "attention", sources: {}, summary: {} });
       }
@@ -65,5 +70,87 @@ describe("source-client", () => {
 
     expect(compositeFreshness(allStale)).toBe("stale");
     expect(compositeFreshness(oneStale)).toBe("delayed");
+  });
+
+  it.each([
+    ["shipping", "shipping"],
+    ["attention", "attention"],
+    ["sales", "sales"],
+    ["history", "sales"],
+    ["ranking", "sales"],
+    ["performance", "performance"],
+  ])("marks %s unavailable when its HTTP 200 payload misses the endpoint contract", async (broken, sourceKey) => {
+    const fetcher = vi.fn(async (url) => {
+      const value = String(url);
+      const endpoint = value.includes("shipping.test")
+        ? "shipping"
+        : value.endsWith("/api/attention")
+          ? "attention"
+          : value.endsWith("/api/sales")
+            ? "sales"
+            : value.endsWith("/api/history/sales")
+              ? "history"
+              : value.endsWith("/api/item-rankings")
+                ? "ranking"
+                : "performance";
+      if (endpoint === broken) return reply({});
+      if (endpoint === "shipping") {
+        return reply({
+          updated_at: "2026-08-01T09:59:00+09:00",
+          today_output: {},
+          today_shipping: {},
+        });
+      }
+      if (endpoint === "attention") {
+        return reply({
+          generatedAtJST: "2026-08-01 09:50:00 JST",
+          status: "attention",
+          summary: {},
+        });
+      }
+      if (endpoint === "sales") {
+        return reply({
+          generatedAtJST: "2026-08-01 09:45:00 JST",
+          totals: {},
+          shops: [],
+        });
+      }
+      if (endpoint === "history") {
+        return reply({ totals: {}, shops: [], range: { dates: [] } });
+      }
+      if (endpoint === "ranking") {
+        return reply({
+          generatedAtJST: "2026-08-01 09:45:00 JST",
+          rankings: {},
+        });
+      }
+      return reply({
+        generatedAtJST: "2026-08-01 09:40:00 JST",
+        traffic: { status: "normal" },
+      });
+    });
+    const sources = {
+      shipping: {
+        widget: {
+          type: "uoshippingdashboard",
+          url: "http://shipping.test/api/dashboard/homepage",
+        },
+      },
+      attention: { widget: { type: "uoattention", url: "http://commerce.test" } },
+      sales: { widget: { type: "uorakutensales", url: "http://commerce.test" } },
+      performance: { widget: { type: "uoperformance", url: "http://commerce.test" } },
+    };
+
+    const result = await collectBusinessSources(sources, {
+      fetcher,
+      nowTs: Date.parse("2026-08-01T10:00:00+09:00"),
+      timeoutMs: 100,
+    });
+
+    expect(result[sourceKey]).toMatchObject({
+      state: "unavailable",
+      data: null,
+      error: "source_unavailable",
+    });
   });
 });

@@ -27,23 +27,26 @@ const valid = {
   reviewThemes: [],
 };
 
+function validationContext(overrides = {}) {
+  return {
+    metricKeys: new Set(["performance.traffic.delta_percent", "attention.open_total"]),
+    shopNames: new Set(["3911"]),
+    availableModules: new Set(["shipping", "attention", "sales", "performance"]),
+    hasReviewSamples: false,
+    ...overrides,
+  };
+}
+
 describe("executive summary schema", () => {
   it("uses a strict closed JSON schema", () => {
     expect(SUMMARY_JSON_SCHEMA.additionalProperties).toBe(false);
-    expect(SUMMARY_JSON_SCHEMA.required).toEqual([
-      "headline",
-      "assessment",
-      "evidence",
-      "actions",
-      "reviewThemes",
-    ]);
+    expect(SUMMARY_JSON_SCHEMA.required).toEqual(["headline", "assessment", "evidence", "actions", "reviewThemes"]);
   });
 
   it("accepts aligned bilingual output with known evidence", () => {
     expect(
       validateModelSummary(valid, {
-        metricKeys: new Set(["performance.traffic.delta_percent", "attention.open_total"]),
-        shopNames: new Set(["3911"]),
+        ...validationContext(),
       }),
     ).toEqual(valid);
   });
@@ -51,9 +54,7 @@ describe("executive summary schema", () => {
   it("rejects unknown metric keys, unknown shops and business numbers in free text", () => {
     const unknownMetric = structuredClone(valid);
     unknownMetric.evidence[0].metricKey = "invented.value";
-    expect(() =>
-      validateModelSummary(unknownMetric, { metricKeys: new Set(), shopNames: new Set() }),
-    ).toThrow();
+    expect(() => validateModelSummary(unknownMetric, { metricKeys: new Set(), shopNames: new Set() })).toThrow();
 
     const numericClaim = structuredClone(valid);
     numericClaim.headline.ja = "売上は123件です。";
@@ -68,10 +69,7 @@ describe("executive summary schema", () => {
     unknownShop.actions[0].shopName = "unknown-shop";
     expect(() =>
       validateModelSummary(unknownShop, {
-        metricKeys: new Set([
-          "performance.traffic.delta_percent",
-          "attention.open_total",
-        ]),
+        metricKeys: new Set(["performance.traffic.delta_percent", "attention.open_total"]),
         shopNames: new Set(["3911"]),
       }),
     ).toThrow();
@@ -82,10 +80,7 @@ describe("executive summary schema", () => {
     delete missingLanguage.headline.zh;
     expect(() =>
       validateModelSummary(missingLanguage, {
-        metricKeys: new Set([
-          "performance.traffic.delta_percent",
-          "attention.open_total",
-        ]),
+        metricKeys: new Set(["performance.traffic.delta_percent", "attention.open_total"]),
         shopNames: new Set(),
       }),
     ).toThrow();
@@ -103,12 +98,60 @@ describe("executive summary schema", () => {
     excess.actions = Array.from({ length: 4 }, () => valid.actions[0]);
     expect(() =>
       validateModelSummary(excess, {
-        metricKeys: new Set([
-          "performance.traffic.delta_percent",
-          "attention.open_total",
-        ]),
+        metricKeys: new Set(["performance.traffic.delta_percent", "attention.open_total"]),
         shopNames: new Set(),
       }),
     ).toThrow();
+  });
+
+  it("rejects actions for unavailable modules and themes without review samples", () => {
+    const missingModule = structuredClone(valid);
+    expect(() =>
+      validateModelSummary(missingModule, validationContext({ availableModules: new Set(["performance"]) })),
+    ).toThrow("action module is unavailable");
+
+    const unsupportedTheme = structuredClone(valid);
+    unsupportedTheme.reviewThemes = [
+      {
+        theme: { ja: "配送品質", zh: "配送质量" },
+        impact: { ja: "信頼に影響します。", zh: "会影响信任。" },
+        suggestion: { ja: "原因を確認してください。", zh: "请检查原因。" },
+      },
+    ];
+    expect(() => validateModelSummary(unsupportedTheme, validationContext({ hasReviewSamples: false }))).toThrow(
+      "review themes require review samples",
+    );
+  });
+
+  it.each([
+    ["email", "buyer@synthetic.invalid"],
+    ["URL", "https://synthetic.invalid/private"],
+    ["order identifier", "注文番号 ABCDE-SECRET"],
+    ["review identifier", "review id PRIVATE_TOKEN"],
+  ])("rejects %s-shaped text in model prose", (_label, unsafeText) => {
+    const output = structuredClone(valid);
+    output.assessment.zh = `请联系 ${unsafeText}`;
+
+    expect(() => validateModelSummary(output, validationContext())).toThrow("Sensitive data found in model prose");
+  });
+
+  it.each([
+    ["Japanese", "未対応は三件あります。"],
+    ["Chinese", "待办共有十件。"],
+  ])("rejects %s business number words", (_label, numericText) => {
+    const output = structuredClone(valid);
+    output.headline.zh = numericText;
+
+    expect(() => validateModelSummary(output, validationContext())).toThrow("Business number found in model prose");
+  });
+
+  it("allows ordinary Japanese and Chinese prose without a quantity claim", () => {
+    const output = structuredClone(valid);
+    output.headline = {
+      ja: "一方で、物流は安定しています。",
+      zh: "另一方面，物流保持稳定。",
+    };
+
+    expect(validateModelSummary(output, validationContext())).toEqual(output);
   });
 });
