@@ -31,9 +31,12 @@ const LOGO_REFRESH_INTERVAL = 1800000;
 // The feed can carry up to 20 items; showing them all makes the card dominate the board.
 const FEED_PREVIEW_COUNT = 6;
 
-const ACCENT = "#C6362B"; // 楽天アクセント / critical
+const ACCENT = "#C6362B"; // 楽天アクセント / critical — for fills, which sit on their own tint
 const WARN = "#D97706"; // attention
 const INFO = "#2E7DF6"; // reviews / data-viz blue
+// Text needs a theme-aware pair instead: the flat accent is too dark to read against a
+// bright background image showing through the translucent card. Matches uoperformance.
+const ACCENT_TEXT = "text-rose-700 dark:text-rose-400";
 
 const TONE = {
   critical: {
@@ -197,7 +200,7 @@ function SourceChip({ name, source, t }) {
   );
 }
 
-function KpiCard({ label, hint, value, sub, subTone }) {
+function KpiCard({ label, hint, value, sub, subAlert }) {
   return (
     <div className="flex min-w-0 flex-col gap-2 rounded-xl border border-theme-300/30 bg-theme-100/60 p-3.5 dark:border-white/[0.06] dark:bg-white/[0.03]">
       <span className="flex items-center gap-1.5 text-[11px] font-bold text-theme-800 dark:text-theme-100">
@@ -207,8 +210,10 @@ function KpiCard({ label, hint, value, sub, subTone }) {
       <span className="text-[30px] font-extrabold leading-[0.9] tabular-nums text-theme-900 dark:text-theme-50">
         {value}
       </span>
-      <span className="text-[10.5px] font-medium tabular-nums" style={subTone ? { color: subTone } : undefined}>
-        <span className={subTone ? "" : "text-theme-600 dark:text-theme-300"}>{sub}</span>
+      <span
+        className={`text-[10.5px] font-medium tabular-nums ${subAlert ? ACCENT_TEXT : "text-theme-600 dark:text-theme-300"}`}
+      >
+        {sub}
       </span>
     </div>
   );
@@ -383,7 +388,7 @@ export default function Component({ service }) {
               label={t(`${NS}.inquiries`)}
               value={fmtNullable(t, model.inquiry)}
               sub={`${t(`${NS}.overdue`)} ${fmtNullable(t, model.overdue)} ${t(`${NS}.unit`)}`}
-              subTone={model.overdue > 0 ? ACCENT : undefined}
+              subAlert={model.overdue > 0}
             />
             <KpiCard
               label={t(`${NS}.reviews`)}
@@ -444,12 +449,11 @@ export default function Component({ service }) {
                   {fmtNullable(t, sh.inquiry)}
                 </span>
                 <span
-                  className="min-w-0 flex-[0.75] text-right text-[13px] font-bold tabular-nums"
-                  style={sh.overdue > 0 ? { color: ACCENT } : undefined}
+                  className={`min-w-0 flex-[0.75] text-right text-[13px] font-bold tabular-nums ${
+                    sh.overdue > 0 ? ACCENT_TEXT : "text-theme-400 dark:text-theme-500"
+                  }`}
                 >
-                  <span className={sh.overdue > 0 ? "" : "text-theme-400 dark:text-theme-500"}>
-                    {fmtNullable(t, sh.overdue)}
-                  </span>
+                  {fmtNullable(t, sh.overdue)}
                 </span>
                 <span className="min-w-0 flex-[1.1] text-right text-[13px] font-bold tabular-nums text-theme-900 dark:text-theme-50">
                   {fmtNullable(t, sh.reviews)}
@@ -487,20 +491,14 @@ export default function Component({ service }) {
             <span className="min-w-0 flex-[0.85] text-right text-[13.5px] font-extrabold tabular-nums text-theme-900 dark:text-theme-50">
               {fmtNullable(t, model.inquiry)}
             </span>
-            <span
-              className="min-w-0 flex-[0.75] text-right text-[13.5px] font-extrabold tabular-nums"
-              style={{ color: ACCENT }}
-            >
+            <span className={`min-w-0 flex-[0.75] text-right text-[13.5px] font-extrabold tabular-nums ${ACCENT_TEXT}`}>
               {fmtNullable(t, model.overdue)}
             </span>
             <span className="min-w-0 flex-[1.1] text-right text-[13.5px] font-extrabold tabular-nums text-theme-900 dark:text-theme-50">
               {fmtNullable(t, model.reviews)}
             </span>
             <span className="hidden min-w-0 flex-[1.7] @2xl:block @2xl:pl-5" />
-            <span
-              className="min-w-0 flex-[0.75] text-right text-[14px] font-extrabold tabular-nums"
-              style={{ color: ACCENT }}
-            >
+            <span className={`min-w-0 flex-[0.75] text-right text-[14px] font-extrabold tabular-nums ${ACCENT_TEXT}`}>
               {fmtNullable(t, model.total)}
             </span>
           </div>
