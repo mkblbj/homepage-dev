@@ -145,6 +145,7 @@ import unifi from "./unifi/widget";
 import unifi_drive from "./unifi_drive/widget";
 import unmanic from "./unmanic/widget";
 import unraid from "./unraid/widget";
+import uoaisummary from "./uoaisummary/widget";
 import uoattendance from "./uoattendance/widget";
 import uoattention from "./uoattention/widget";
 import uoperformance from "./uoperformance/widget";
@@ -314,6 +315,7 @@ const widgets = {
   tubearchivist,
   truenas,
   uoattendance,
+  uoaisummary,
   uoattention,
   uoperformance,
   uoprinters,
