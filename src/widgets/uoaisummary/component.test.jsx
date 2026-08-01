@@ -134,9 +134,18 @@ describe("widgets/uoaisummary/component", () => {
     expect(screen.getByText("请优先处理待办事项。")).toBeInTheDocument();
     expect(screen.getByText("未处理合计 64件 (+4件)")).toBeInTheDocument();
     expect(screen.queryByText("未対応合計 64件 (+4件)")).not.toBeInTheDocument();
+    expect(screen.getByText("AI 经营总结")).toBeInTheDocument();
+    expect(screen.getByText("关注")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "AI重新分析" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "查看详情" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "日本語" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "日本語" }));
+
+    expect(screen.getByText("対応待ち案件を優先してください。")).toBeInTheDocument();
+    expect(screen.getByText("未対応合計 64件 (+4件)")).toBeInTheDocument();
+    expect(screen.getByText("AI 経営サマリー")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "AI再分析" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "詳細を見る" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "中文" })).toBeInTheDocument();
     expect(global.fetch).not.toHaveBeenCalled();
   });
 

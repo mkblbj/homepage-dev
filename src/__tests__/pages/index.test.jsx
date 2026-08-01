@@ -17,7 +17,7 @@ const {
   servicesResponse,
   bookmarksResponse,
   widgetsResponse,
-  serverSideTranslations,
+  loadHomeTranslations,
   logger,
   useSWR,
   useWindowFocus,
@@ -58,16 +58,7 @@ const {
     return [{ type: "search" }];
   });
 
-  const serverSideTranslations = vi.fn(async (language, namespaces = ["common"], _config = null, extraLocales = []) => {
-    const locales = [...new Set([language, ...extraLocales])];
-    return {
-      _nextI18Next: {
-        initialLocale: language,
-        ns: namespaces,
-        initialI18nStore: Object.fromEntries(locales.map((locale) => [locale, { common: { loadedForTest: locale } }])),
-      },
-    };
-  });
+  const loadHomeTranslations = vi.fn(async (language) => ({ _translations: language }));
   const logger = { error: vi.fn() };
 
   const useSWR = vi.fn((key) => {
@@ -90,7 +81,7 @@ const {
     servicesResponse,
     bookmarksResponse,
     widgetsResponse,
-    serverSideTranslations,
+    loadHomeTranslations,
     logger,
     useSWR,
     useWindowFocus,
@@ -111,8 +102,8 @@ vi.mock("next-i18next/pages", () => ({
   }),
 }));
 
-vi.mock("next-i18next/pages/serverSideTranslations", () => ({
-  serverSideTranslations,
+vi.mock("utils/home-translations", () => ({
+  loadHomeTranslations,
 }));
 
 vi.mock("swr", () => ({
@@ -207,19 +198,7 @@ describe("pages/index getStaticProps", () => {
     expect(result.props.fallback["/api/widgets"]).toEqual([{ type: "search" }]);
     expect(result.props.fallback["/api/announcements"]).toEqual({ enabled: false, items: [] });
     expect(result.props.fallback["/api/hash"]).toBe(false);
-    expect(serverSideTranslations).toHaveBeenCalledWith("en", ["common"], null, ["ja", "zh-Hans", "en"]);
-  });
-
-  it.each(["ja", "en"])("preloads every fixed cockpit locale for a %s homepage", async (language) => {
-    getSettings.mockReturnValueOnce({ providers: {}, language });
-
-    const { getStaticProps } = await import("pages/index.jsx");
-    const result = await getStaticProps();
-
-    expect(Object.keys(result.props._nextI18Next.initialI18nStore).sort()).toEqual(["en", "ja", "zh-Hans"]);
-    expect(result.props._nextI18Next.initialI18nStore.ja.common.loadedForTest).toBe("ja");
-    expect(result.props._nextI18Next.initialI18nStore["zh-Hans"].common.loadedForTest).toBe("zh-Hans");
-    expect(result.props._nextI18Next.initialI18nStore.en.common.loadedForTest).toBe("en");
+    expect(loadHomeTranslations).toHaveBeenCalledWith("en");
   });
 
   it("normalizes legacy language codes before requesting translations", async () => {
@@ -228,7 +207,7 @@ describe("pages/index getStaticProps", () => {
     const { getStaticProps } = await import("pages/index.jsx");
     await getStaticProps();
 
-    expect(serverSideTranslations).toHaveBeenCalledWith("zh-Hans", ["common"], null, ["ja", "zh-Hans", "en"]);
+    expect(loadHomeTranslations).toHaveBeenCalledWith("zh-Hans");
   });
 
   it("falls back to empty settings and en translations on errors", async () => {
@@ -242,7 +221,7 @@ describe("pages/index getStaticProps", () => {
     expect(result.props.fallback["/api/services"]).toEqual([]);
     expect(result.props.fallback["/api/bookmarks"]).toEqual([]);
     expect(result.props.fallback["/api/widgets"]).toEqual([]);
-    expect(serverSideTranslations).toHaveBeenCalledWith("en", ["common"], null, ["ja", "zh-Hans", "en"]);
+    expect(loadHomeTranslations).toHaveBeenCalledWith("en");
     expect(logger.error).toHaveBeenCalled();
   });
 });
