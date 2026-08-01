@@ -43,6 +43,7 @@ const ERROR_CODES = new Set([
   "unexpected",
 ]);
 const JST_TIMESTAMP = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(?::\d{2})? JST$/;
+const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/;
 
 function isRecord(value) {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -53,7 +54,7 @@ function stringOrNull(value) {
 }
 
 function timestampOrNull(value) {
-  return typeof value === "string" && JST_TIMESTAMP.test(value) ? value : null;
+  return typeof value === "string" && (JST_TIMESTAMP.test(value) || ISO_TIMESTAMP.test(value)) ? value : null;
 }
 
 function numberOrNull(value) {
@@ -134,7 +135,7 @@ function normalizeSourceFreshness(value) {
     SOURCE_KEYS.map((key) => {
       const source = value[key];
       const state =
-        typeof source?.state === "string" && ["fresh", "stale", "unavailable"].includes(source.state)
+        typeof source?.state === "string" && ["fresh", "delayed", "stale", "unavailable"].includes(source.state)
           ? source.state
           : "unavailable";
       return [key, { state, updatedAtJST: timestampOrNull(source?.updatedAtJST) }];
