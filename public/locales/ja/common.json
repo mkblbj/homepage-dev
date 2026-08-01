@@ -1210,6 +1210,49 @@
         "max": "最高",
         "now": "現在"
     },
+    "uoaisummary": {
+        "title": "AI 経営サマリー",
+        "subtitle": "全社データをもとに1時間ごとに更新",
+        "updatedAt": "生成時刻",
+        "nextUpdate": "次回",
+        "reanalyze": "AI再分析",
+        "switchToChinese": "中文",
+        "switchToJapanese": "日本語",
+        "showDetails": "詳細を見る",
+        "hideDetails": "詳細を閉じる",
+        "analyzing": "AI分析中",
+        "stale": "前回の結果を表示中",
+        "partial": "一部データで分析",
+        "cooldown": "再分析はしばらくお待ちください",
+        "refreshFailed": "再分析を開始できませんでした",
+        "cannotGenerate": "AIサマリーを生成できません",
+        "insufficient": "分析に必要なデータが不足しています",
+        "reviewThemes": "低評価レビューの傾向",
+        "coverage": "データカバレッジ",
+        "source": {
+            "shipping": "出荷",
+            "attention": "運営対応",
+            "sales": "楽天売上",
+            "performance": "経営表現"
+        },
+        "sourceState": {
+            "fresh": "最新",
+            "delayed": "遅延",
+            "stale": "期限切れ",
+            "unavailable": "取得不可"
+        },
+        "severity": {
+            "normal": "正常",
+            "attention": "注意",
+            "critical": "重要",
+            "unknown": "判定不可"
+        },
+        "priority": {
+            "high": "最優先",
+            "medium": "優先",
+            "low": "確認"
+        }
+    },
     "uoattention": {
         "title": "運営対応",
         "subtitle": "RMS トップ ＋ 低評価レビュー · 全{{count}}店舗",

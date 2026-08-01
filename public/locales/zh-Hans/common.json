@@ -1223,6 +1223,49 @@
         "markRead": "标记已读",
         "markUnread": "标记未读"
     },
+    "uoaisummary": {
+        "title": "AI 经营总结",
+        "subtitle": "基于全公司数据，每小时更新",
+        "updatedAt": "生成时间",
+        "nextUpdate": "下次更新",
+        "reanalyze": "AI重新分析",
+        "switchToChinese": "中文",
+        "switchToJapanese": "日本語",
+        "showDetails": "查看详情",
+        "hideDetails": "收起详情",
+        "analyzing": "AI分析中",
+        "stale": "正在显示上次结果",
+        "partial": "基于部分数据分析",
+        "cooldown": "请稍后再重新分析",
+        "refreshFailed": "无法开始重新分析",
+        "cannotGenerate": "无法生成AI总结",
+        "insufficient": "缺少分析所需的数据",
+        "reviewThemes": "低评分评价趋势",
+        "coverage": "数据覆盖",
+        "source": {
+            "shipping": "发货",
+            "attention": "运营待办",
+            "sales": "乐天销售",
+            "performance": "经营表现"
+        },
+        "sourceState": {
+            "fresh": "最新",
+            "delayed": "延迟",
+            "stale": "已过期",
+            "unavailable": "不可用"
+        },
+        "severity": {
+            "normal": "正常",
+            "attention": "关注",
+            "critical": "重要",
+            "unknown": "无法判断"
+        },
+        "priority": {
+            "high": "最高优先",
+            "medium": "优先",
+            "low": "确认"
+        }
+    },
     "uoattention": {
         "title": "运营待办",
         "subtitle": "RMS 首页 + 低星评价 · 共 {{count}} 家店铺",

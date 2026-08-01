@@ -1210,6 +1210,49 @@
         "max": "Max",
         "now": "Now"
     },
+    "uoaisummary": {
+        "title": "AI Executive Summary",
+        "subtitle": "Updated hourly from company-wide data",
+        "updatedAt": "Generated",
+        "nextUpdate": "Next update",
+        "reanalyze": "Reanalyze",
+        "switchToChinese": "Chinese",
+        "switchToJapanese": "Japanese",
+        "showDetails": "View details",
+        "hideDetails": "Hide details",
+        "analyzing": "AI analysis in progress",
+        "stale": "Showing the previous result",
+        "partial": "Analysis uses partial data",
+        "cooldown": "Please wait before reanalyzing",
+        "refreshFailed": "Could not start reanalysis",
+        "cannotGenerate": "Could not generate an AI summary",
+        "insufficient": "Not enough data to analyze",
+        "reviewThemes": "Low-rating review themes",
+        "coverage": "Data coverage",
+        "source": {
+            "shipping": "Shipping",
+            "attention": "Operations",
+            "sales": "Rakuten sales",
+            "performance": "Performance"
+        },
+        "sourceState": {
+            "fresh": "Fresh",
+            "delayed": "Delayed",
+            "stale": "Stale",
+            "unavailable": "Unavailable"
+        },
+        "severity": {
+            "normal": "Normal",
+            "attention": "Attention",
+            "critical": "Critical",
+            "unknown": "Unknown"
+        },
+        "priority": {
+            "high": "Highest",
+            "medium": "Priority",
+            "low": "Review"
+        }
+    },
     "uoattention": {
         "title": "Operations To-Do",
         "subtitle": "RMS top page + low-rating reviews · {{count}} shops",
