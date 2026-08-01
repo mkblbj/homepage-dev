@@ -10,7 +10,14 @@ const logger = createLogger("servicesProxy");
 export default async function handler(req, res) {
   try {
     const { service, group, index } = req.query;
-    const serviceWidget = await getServiceWidget(group, service, index);
+    let serviceWidget;
+    try {
+      serviceWidget = await getServiceWidget(group, service, index);
+    } catch {
+      logger.error("Service proxy configuration load failed");
+      return res.status(503).json({ error: "configuration" });
+    }
+
     let type = serviceWidget?.type;
 
     // exceptions
