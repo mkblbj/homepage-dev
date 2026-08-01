@@ -23,7 +23,7 @@ function persistedLatest() {
     generatedAtJST: "2026-08-01 10:00:00 JST",
     sourceCoverage: { valid: 3, total: 4 },
     sourceFreshness: {
-      shipping: { state: "fresh", updatedAtJST: "2026-08-01T09:59:00+09:00" },
+      shipping: { state: "fresh", updatedAtJST: "2026-08-01 09:59:00+09:00" },
       attention: { state: "delayed", updatedAtJST: "2026-08-01 09:50:00 JST" },
       sales: { state: "stale", updatedAtJST: "2026-08-01 09:45:00 JST" },
       performance: { state: "unavailable", updatedAtJST: null },
