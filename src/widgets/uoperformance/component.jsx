@@ -48,19 +48,19 @@ const CHART_HEIGHT = 124;
 const TONE = {
   critical: {
     pill: "border-rose-400/40 bg-rose-500/10 text-rose-600 dark:text-rose-300",
-    text: "text-rose-700 dark:text-rose-200",
+    text: "text-rose-700 dark:text-rose-400",
     dot: "bg-rose-500",
     color: ACCENT,
   },
   attention: {
     pill: "border-amber-400/40 bg-amber-500/10 text-amber-600 dark:text-amber-300",
-    text: "text-amber-700 dark:text-amber-200",
+    text: "text-amber-700 dark:text-amber-400",
     dot: "bg-amber-500",
     color: "#B45309",
   },
   normal: {
     pill: "border-emerald-400/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300",
-    text: "text-emerald-700 dark:text-emerald-200",
+    text: "text-emerald-700 dark:text-emerald-400",
     dot: "bg-emerald-500",
     color: "#0E9F6E",
   },

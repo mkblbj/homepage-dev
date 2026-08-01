@@ -265,10 +265,12 @@ describe("widgets/uoperformance/component", () => {
     );
     render();
 
+    // dark mode uses the -400 step: the -200 tints washed out to near-white against a
+    // bright background image, losing the hue that carries the status
     const cases = [
-      ["-41.9%", "text-rose-700", "dark:text-rose-200"],
-      ["-24.5%", "text-amber-700", "dark:text-amber-200"],
-      ["-18.4%", "text-emerald-700", "dark:text-emerald-200"],
+      ["-41.9%", "text-rose-700", "dark:text-rose-400"],
+      ["-24.5%", "text-amber-700", "dark:text-amber-400"],
+      ["-18.4%", "text-emerald-700", "dark:text-emerald-400"],
     ];
 
     cases.forEach(([value, lightClass, darkClass]) => {
@@ -278,7 +280,7 @@ describe("widgets/uoperformance/component", () => {
     });
 
     screen.getAllByText("-18.1%").forEach((label) => {
-      expect(label).toHaveClass("text-emerald-700", "dark:text-emerald-200");
+      expect(label).toHaveClass("text-emerald-700", "dark:text-emerald-400");
       expect(label).not.toHaveAttribute("style");
     });
   });
