@@ -30,10 +30,12 @@ export function createSummaryService(dependencies) {
       : persisted.latest.dataQuality === "partial"
         ? "partial"
         : "ready"
-    : "empty";
+    : persisted.lastError
+      ? "error"
+      : "empty";
   let runtimeAnalysis = null;
   let currentConfiguration = null;
-  let initialized = false;
+  let initializationPromise = null;
 
   function schedule(delayMs) {
     if (stopped) return;
@@ -42,17 +44,26 @@ export function createSummaryService(dependencies) {
     if (typeof timer?.unref === "function") timer.unref();
   }
 
-  async function initialize() {
-    if (initialized) return;
-    initialized = true;
-    currentConfiguration = await loadConfiguration();
-    const dueTs = parseTimestamp(persisted.nextScheduledAtJST);
-    if (!persisted.latest || !Number.isFinite(dueTs) || dueTs <= clock.now()) {
-      requestRefresh({ manual: false });
-    } else {
-      schedule(dueTs - clock.now());
-    }
-    return currentConfiguration;
+  function initialize() {
+    if (initializationPromise) return initializationPromise;
+
+    initializationPromise = (async () => {
+      currentConfiguration = await loadConfiguration();
+      if (stopped) return currentConfiguration;
+
+      const dueTs = parseTimestamp(persisted.nextScheduledAtJST);
+      if (!Number.isFinite(dueTs) || dueTs <= clock.now()) {
+        requestRefresh({ manual: false });
+      } else {
+        schedule(dueTs - clock.now());
+      }
+      return currentConfiguration;
+    })().catch((error) => {
+      initializationPromise = null;
+      throw error;
+    });
+
+    return initializationPromise;
   }
 
   async function runGeneration() {
@@ -152,17 +163,16 @@ export function createSummaryService(dependencies) {
   }
 
   function getPublicState() {
+    const publicRecord =
+      runtimeState === "stale" && persisted.latest ? persisted.latest : runtimeAnalysis || persisted.latest;
     return structuredClone({
       state: runtimeState,
-      severity: runtimeAnalysis?.severity || persisted.latest?.severity || "unknown",
-      dataQuality:
-        runtimeAnalysis?.dataQuality ||
-        (runtimeState === "stale" ? "stale" : persisted.latest?.dataQuality) ||
-        "insufficient",
+      severity: publicRecord?.severity || "unknown",
+      dataQuality: runtimeState === "stale" ? "stale" : publicRecord?.dataQuality || "insufficient",
       generatedAtJST: persisted.latest?.generatedAtJST || null,
       nextScheduledAtJST: persisted.nextScheduledAtJST,
-      sourceCoverage: runtimeAnalysis?.sourceCoverage || persisted.latest?.sourceCoverage || { valid: 0, total: 4 },
-      sourceFreshness: runtimeAnalysis?.sourceFreshness || persisted.latest?.sourceFreshness || {},
+      sourceCoverage: publicRecord?.sourceCoverage || { valid: 0, total: 4 },
+      sourceFreshness: publicRecord?.sourceFreshness || {},
       summary: persisted.latest?.summary || null,
       metricDisplay: persisted.latest?.metricDisplay || {},
       cooldownUntilJST: persisted.manualCooldownUntilJST,

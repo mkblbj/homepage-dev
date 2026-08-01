@@ -139,6 +139,7 @@ function serviceDependencies(options = {}) {
     },
     logger: { error: vi.fn(), info: vi.fn() },
   };
+  deps.configuration = configuration;
   deps.flush = async () => {
     for (let turn = 0; turn < 12; turn += 1) await Promise.resolve();
   };
@@ -182,6 +183,50 @@ describe("summary generation service", () => {
     deps.timers.setTimeout.mock.calls[0][0]();
     await deps.flush();
     expect(deps.requestSummaryOnce).toHaveBeenCalledTimes(1);
+  });
+
+  it("shares one pending initialization promise before allowing refresh", async () => {
+    const configurationRun = deferred();
+    const deps = serviceDependencies();
+    deps.loadConfiguration = vi.fn(() => configurationRun.promise);
+    const service = createSummaryService(deps);
+
+    const first = service.initialize();
+    const second = service.initialize();
+    let secondSettled = false;
+    second.then(() => {
+      secondSettled = true;
+    });
+
+    expect(second).toBe(first);
+    await deps.flush();
+    expect(secondSettled).toBe(false);
+
+    configurationRun.resolve(deps.configuration);
+    await Promise.all([first, second]);
+    expect(deps.loadConfiguration).toHaveBeenCalledTimes(1);
+    expect(service.requestRefresh({ manual: true }).accepted).toBe(true);
+    await deps.flush();
+  });
+
+  it("allows initialization to retry after configuration loading fails", async () => {
+    const failure = Object.assign(new Error("bad configuration"), {
+      code: "configuration",
+      retryable: false,
+    });
+    const deps = serviceDependencies();
+    deps.loadConfiguration = vi.fn().mockRejectedValueOnce(failure).mockResolvedValue(deps.configuration);
+    const service = createSummaryService(deps);
+
+    const first = service.initialize();
+    await expect(first).rejects.toBe(failure);
+
+    const second = service.initialize();
+    expect(second).not.toBe(first);
+    await expect(second).resolves.toBe(deps.configuration);
+    expect(deps.loadConfiguration).toHaveBeenCalledTimes(2);
+    expect(service.requestRefresh({ manual: true }).accepted).toBe(true);
+    await deps.flush();
   });
 
   it("returns synchronously without waiting for the model", async () => {
@@ -326,24 +371,48 @@ describe("summary generation service", () => {
     });
   });
 
-  it("keeps the last good summary stale after a failed generation", async () => {
+  it("keeps every stale field from the last good summary after a failed generation", async () => {
     const failure = Object.assign(new Error("bad output"), {
       code: "model_schema",
       retryable: false,
     });
+    const oldMetricDisplay = {
+      "attention.open_total": { rawValue: 7, ja: "未対応 7件", zh: "待办 7件" },
+    };
+    const oldLatest = {
+      ...persistedState().latest,
+      severity: "normal",
+      sourceCoverage: { valid: 4, total: 4 },
+      metricDisplay: oldMetricDisplay,
+    };
+    const newAnalysis = analysisBundle({ valid: 2, dataQuality: "partial" });
+    newAnalysis.severity = "critical";
+    newAnalysis.sourceFreshness = {
+      shipping: { state: "unavailable", updatedAtJST: null },
+      attention: { state: "unavailable", updatedAtJST: null },
+      sales: { state: "fresh", updatedAtJST: "2026-08-01 10:00:00 JST" },
+      performance: { state: "fresh", updatedAtJST: "2026-08-01 10:00:00 JST" },
+    };
     const deps = serviceDependencies({
+      persisted: persistedState({ latest: oldLatest }),
+      analysis: newAnalysis,
       requestSummaryOnce: vi.fn().mockRejectedValue(failure),
     });
     const service = createSummaryService(deps);
     await service.initialize();
-    const cachedSummary = service.getPublicState().summary;
 
     service.requestRefresh({ manual: false });
     await deps.flush();
 
     expect(service.getPublicState()).toMatchObject({
       state: "stale",
-      summary: cachedSummary,
+      severity: "normal",
+      dataQuality: "stale",
+      generatedAtJST: "2026-08-01 09:00:00 JST",
+      sourceCoverage: { valid: 4, total: 4 },
+      sourceFreshness: oldLatest.sourceFreshness,
+      summary: oldLatest.summary,
+      metricDisplay: oldMetricDisplay,
       lastError: "model_schema",
       nextScheduledAtJST: "2026-08-01 11:00:00 JST",
     });
@@ -363,6 +432,32 @@ describe("summary generation service", () => {
       summary: validSummary(),
       lastError: "model_http",
     });
+  });
+
+  it("restores an error without a summary and respects its future retry deadline", async () => {
+    const deps = serviceDependencies({
+      persisted: persistedState({
+        latest: null,
+        lastError: "model_http",
+        nextScheduledAtJST: "2026-08-01 11:00:00 JST",
+      }),
+    });
+    const service = createSummaryService(deps);
+
+    await service.initialize();
+    await deps.flush();
+
+    expect(service.getPublicState()).toMatchObject({
+      state: "error",
+      summary: null,
+      generatedAtJST: null,
+      lastError: "model_http",
+      nextScheduledAtJST: "2026-08-01 11:00:00 JST",
+    });
+    expect(deps.collectSources).not.toHaveBeenCalled();
+    expect(deps.requestSummaryOnce).not.toHaveBeenCalled();
+    expect(deps.timers.setTimeout).toHaveBeenCalledTimes(1);
+    expect(deps.timers.setTimeout.mock.calls[0][1]).toBe(3600000);
   });
 
   it("resets the hourly schedule after a successful manual refresh", async () => {
@@ -443,6 +538,27 @@ describe("summary generation service", () => {
     await deps.flush();
     expect(service.getPublicState().state).toBe("ready");
     expect(deps.timers.setTimeout).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not continue an overdue initialization stopped during configuration loading", async () => {
+    const configurationRun = deferred();
+    const deps = serviceDependencies({
+      persisted: persistedState({ nextScheduledAtJST: "2026-08-01 09:00:00 JST" }),
+    });
+    deps.loadConfiguration = vi.fn(() => configurationRun.promise);
+    const service = createSummaryService(deps);
+
+    const initializing = service.initialize();
+    service.stop();
+    configurationRun.resolve(deps.configuration);
+    await initializing;
+    await deps.flush();
+
+    expect(deps.loadConfiguration).toHaveBeenCalledTimes(1);
+    expect(deps.collectSources).not.toHaveBeenCalled();
+    expect(deps.requestSummaryOnce).not.toHaveBeenCalled();
+    expect(deps.timers.setTimeout).not.toHaveBeenCalled();
+    expect(service.getPublicState().state).toBe("ready");
   });
 
   it("does not reschedule after a stopped active request fails", async () => {
