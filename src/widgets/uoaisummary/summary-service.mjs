@@ -52,7 +52,7 @@ export function createSummaryService(dependencies) {
       if (stopped) return currentConfiguration;
 
       const dueTs = parseTimestamp(persisted.nextScheduledAtJST);
-      if (!Number.isFinite(dueTs) || dueTs <= clock.now()) {
+      if ((!persisted.latest && !persisted.lastError) || !Number.isFinite(dueTs) || dueTs <= clock.now()) {
         requestRefresh({ manual: false });
       } else {
         schedule(dueTs - clock.now());

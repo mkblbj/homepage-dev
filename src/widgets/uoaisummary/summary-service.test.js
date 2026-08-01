@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createSummaryService } from "./summary-service.mjs";
+import { emptySummaryState } from "./summary-store.mjs";
 
 const FIXED_NOW = Date.parse("2026-08-01T10:00:00+09:00");
 
@@ -166,6 +167,32 @@ describe("summary generation service", () => {
     run.resolve({ summary: validSummary(), usage: { total_tokens: 100 } });
     await deps.flush();
     expect(service.getPublicState().state).toBe("ready");
+  });
+
+  it("generates immediately for a new empty cache despite a future deadline", async () => {
+    const run = deferred();
+    const deps = serviceDependencies({
+      persisted: {
+        ...emptySummaryState(),
+        nextScheduledAtJST: "2026-08-01 11:00:00 JST",
+      },
+      requestSummaryOnce: vi.fn(() => run.promise),
+    });
+    const service = createSummaryService(deps);
+
+    await service.initialize();
+    await deps.flush();
+
+    expect(service.getPublicState()).toMatchObject({
+      state: "running",
+      summary: null,
+      lastError: null,
+    });
+    expect(deps.requestSummaryOnce).toHaveBeenCalledTimes(1);
+    expect(deps.timers.setTimeout).not.toHaveBeenCalled();
+
+    run.resolve({ summary: validSummary(), usage: null });
+    await deps.flush();
   });
 
   it("initializes idempotently and schedules a future automatic refresh", async () => {
