@@ -549,6 +549,9 @@ export function cleanServiceGroups(groups) {
           if (allowScrolling) widget.allowScrolling = allowScrolling;
           if (refreshInterval) widget.refreshInterval = refreshInterval;
         }
+        if (type === "uoaisummary") {
+          if (refreshInterval) widget.refreshInterval = refreshInterval;
+        }
         if (["deluge", "qbittorrent"].includes(type)) {
           if (enableLeechProgress !== undefined) widget.enableLeechProgress = JSON.parse(enableLeechProgress);
           if (enableLeechSize !== undefined) widget.enableLeechSize = JSON.parse(enableLeechSize);

@@ -642,4 +642,40 @@ describe("utils/config/service-helpers", () => {
     await expect(mod.servicesFromKubernetes()).rejects.toThrow("boom");
     expect(state.logger.error).toHaveBeenCalled();
   });
+
+  it("exposes only the safe uoaisummary polling interval", async () => {
+    const mod = await import("./service-helpers");
+    const { cleanServiceGroups } = mod;
+    const [group] = cleanServiceGroups([
+      {
+        name: "g",
+        services: [
+          {
+            name: "AI",
+            widget: {
+              type: "uoaisummary",
+              apiUrl: "https://ai.example.test/v1/responses",
+              apiKey: "secret",
+              model: "gpt-5.6-luna",
+              reasoningEffort: "xhigh",
+              generationInterval: 3600000,
+              manualCooldown: 600000,
+              requestTimeout: 180000,
+              refreshInterval: 60000,
+            },
+          },
+        ],
+        groups: [],
+      },
+    ]);
+
+    expect(group.services[0].widgets[0]).toMatchObject({
+      type: "uoaisummary",
+      refreshInterval: 60000,
+    });
+    expect(group.services[0].widgets[0]).not.toHaveProperty("apiUrl");
+    expect(group.services[0].widgets[0]).not.toHaveProperty("apiKey");
+    expect(group.services[0].widgets[0]).not.toHaveProperty("model");
+    expect(group.services[0].widgets[0]).not.toHaveProperty("reasoningEffort");
+  });
 });
