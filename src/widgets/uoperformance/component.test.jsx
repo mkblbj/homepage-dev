@@ -244,6 +244,45 @@ describe("widgets/uoperformance/component", () => {
     expect(bar).toBeTruthy();
   });
 
+  it("uses theme-aware high-contrast colors for delta labels", () => {
+    const base = snapshot();
+    const shop = base.shops[0];
+    const withStatus = (shopName, status, visitDeltaPercent) => ({
+      ...shop,
+      shopName,
+      status,
+      traffic: { ...shop.traffic, status, visitDeltaPercent },
+    });
+
+    mockData(
+      snapshot({
+        shops: [
+          withStatus("critical-shop", "critical", -41.9),
+          withStatus("attention-shop", "attention", -24.5),
+          withStatus("normal-shop", "normal", -18.4),
+        ],
+      }),
+    );
+    render();
+
+    const cases = [
+      ["-41.9%", "text-rose-700", "dark:text-rose-200"],
+      ["-24.5%", "text-amber-700", "dark:text-amber-200"],
+      ["-18.4%", "text-emerald-700", "dark:text-emerald-200"],
+    ];
+
+    cases.forEach(([value, lightClass, darkClass]) => {
+      const label = screen.getByText(value);
+      expect(label).toHaveClass(lightClass, darkClass);
+      expect(label).not.toHaveAttribute("style");
+    });
+
+    screen.getAllByText("-18.1%").forEach((label) => {
+      expect(label).toHaveClass("text-emerald-700", "dark:text-emerald-200");
+      expect(label).not.toHaveAttribute("style");
+    });
+  });
+
   it("switches the customer mix between sales and orders", () => {
     mockData(snapshot());
     render();

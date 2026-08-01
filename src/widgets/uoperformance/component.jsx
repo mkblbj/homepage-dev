@@ -48,21 +48,25 @@ const CHART_HEIGHT = 124;
 const TONE = {
   critical: {
     pill: "border-rose-400/40 bg-rose-500/10 text-rose-600 dark:text-rose-300",
+    text: "text-rose-700 dark:text-rose-200",
     dot: "bg-rose-500",
     color: ACCENT,
   },
   attention: {
     pill: "border-amber-400/40 bg-amber-500/10 text-amber-600 dark:text-amber-300",
+    text: "text-amber-700 dark:text-amber-200",
     dot: "bg-amber-500",
     color: "#B45309",
   },
   normal: {
     pill: "border-emerald-400/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300",
+    text: "text-emerald-700 dark:text-emerald-200",
     dot: "bg-emerald-500",
     color: "#0E9F6E",
   },
   unknown: {
     pill: "border-theme-400/40 bg-theme-500/10 text-theme-600 dark:text-theme-300",
+    text: "text-theme-700 dark:text-theme-200",
     dot: "bg-theme-400",
     color: "#64748B",
   },
@@ -539,7 +543,7 @@ export default function Component({ service }) {
                 <span className="text-[10px] font-medium text-theme-600 dark:text-theme-300">
                   {t(`${NS}.vsMedian`, { value: fmtNullable(t, model.expected) })}
                 </span>
-                <span className="text-[12.5px] font-extrabold tabular-nums" style={{ color: tone.color }}>
+                <span className={`text-[12.5px] font-extrabold tabular-nums ${tone.text}`}>
                   {pctLabel(model.delta)}
                 </span>
               </div>
@@ -754,10 +758,7 @@ export default function Component({ service }) {
                 <span className="min-w-0 flex-[1.1] text-right text-[12.5px] font-semibold tabular-nums text-theme-700 dark:text-theme-200">
                   {fmtNullable(t, sh.expected)}
                 </span>
-                <span
-                  className="min-w-0 flex-[0.85] text-right text-[13px] font-extrabold tabular-nums"
-                  style={{ color: st.color }}
-                >
+                <span className={`min-w-0 flex-[0.85] text-right text-[13px] font-extrabold tabular-nums ${st.text}`}>
                   {pctLabel(sh.delta)}
                 </span>
                 <DeltaBar delta={sh.delta} color={st.color} />
@@ -787,10 +788,7 @@ export default function Component({ service }) {
             <span className="min-w-0 flex-[1.1] text-right text-[12.5px] font-semibold tabular-nums text-theme-600 dark:text-theme-300">
               {fmtNullable(t, model.expected)}
             </span>
-            <span
-              className="min-w-0 flex-[0.85] text-right text-[13.5px] font-extrabold tabular-nums"
-              style={{ color: tone.color }}
-            >
+            <span className={`min-w-0 flex-[0.85] text-right text-[13.5px] font-extrabold tabular-nums ${tone.text}`}>
               {pctLabel(model.delta)}
             </span>
             {/* the totals row keeps the column's width but draws no bar, as in the design */}
