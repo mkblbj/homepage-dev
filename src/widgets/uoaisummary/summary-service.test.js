@@ -1,0 +1,467 @@
+import { describe, expect, it, vi } from "vitest";
+
+import { createSummaryService } from "./summary-service.mjs";
+
+const FIXED_NOW = Date.parse("2026-08-01T10:00:00+09:00");
+
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((done, fail) => {
+    resolve = done;
+    reject = fail;
+  });
+  return { promise, resolve, reject };
+}
+
+function validSummary() {
+  return {
+    headline: { ja: "対応を確認してください。", zh: "请确认待办。" },
+    assessment: { ja: "運営対応を優先してください。", zh: "请优先处理运营事项。" },
+    evidence: [
+      {
+        metricKey: "attention.open_total",
+        interpretation: { ja: "滞留があります。", zh: "存在积压。" },
+      },
+      {
+        metricKey: "performance.traffic.delta_percent",
+        interpretation: { ja: "基準を下回ります。", zh: "低于基准。" },
+      },
+    ],
+    actions: [
+      {
+        priority: "high",
+        module: "attention",
+        shopName: null,
+        title: { ja: "未対応を整理", zh: "梳理待办" },
+        reason: { ja: "優先順を確認してください。", zh: "请确认优先级。" },
+      },
+    ],
+    reviewThemes: [],
+  };
+}
+
+function persistedState(overrides = {}) {
+  return {
+    version: 1,
+    latest: {
+      severity: "attention",
+      dataQuality: "complete",
+      generatedAtJST: "2026-08-01 09:00:00 JST",
+      sourceCoverage: { valid: 4, total: 4 },
+      sourceFreshness: {
+        shipping: { state: "fresh", updatedAtJST: "2026-08-01 09:59:00 JST" },
+        attention: { state: "fresh", updatedAtJST: "2026-08-01 09:50:00 JST" },
+        sales: { state: "fresh", updatedAtJST: "2026-08-01 09:45:00 JST" },
+        performance: { state: "fresh", updatedAtJST: "2026-08-01 07:00:00 JST" },
+      },
+      summary: validSummary(),
+      metricDisplay: {},
+    },
+    snapshots: [],
+    lastAttemptAtJST: null,
+    manualCooldownUntilJST: null,
+    nextScheduledAtJST: "2026-08-01 11:00:00 JST",
+    lastError: null,
+    usage: null,
+    ...overrides,
+  };
+}
+
+function analysisBundle({ valid = 4, dataQuality = "complete" } = {}) {
+  return {
+    severity: valid < 2 ? "unknown" : "attention",
+    dataQuality,
+    sourceCoverage: { valid, total: 4 },
+    sourceFreshness: {
+      shipping: { state: "fresh", updatedAtJST: "2026-08-01 09:59:00 JST" },
+      attention: { state: "fresh", updatedAtJST: "2026-08-01 09:50:00 JST" },
+      sales: { state: "fresh", updatedAtJST: "2026-08-01 09:45:00 JST" },
+      performance: { state: "fresh", updatedAtJST: "2026-08-01 07:00:00 JST" },
+    },
+    metrics: {},
+    metricDisplay: {
+      "attention.open_total": { rawValue: 1, ja: "未対応 1件", zh: "待办 1件" },
+      "performance.traffic.delta_percent": {
+        rawValue: null,
+        ja: "訪問差 —",
+        zh: "访问差 —",
+      },
+    },
+    modelInput: { severity: "attention" },
+    snapshot: { capturedAtJST: "2026-08-01 10:00:00 JST", metrics: {} },
+  };
+}
+
+function serviceDependencies(options = {}) {
+  let state = structuredClone(options.persisted || persistedState());
+  const scheduled = new Set();
+  const configuration = {
+    ai: {
+      apiUrl: "https://ai.example.test/v1/responses",
+      apiKey: "secret",
+      model: "gpt-5.6-luna",
+      reasoningEffort: "xhigh",
+      generationInterval: 3600000,
+      manualCooldown: 600000,
+      requestTimeout: 180000,
+    },
+    sources: {},
+  };
+  const deps = {
+    loadConfiguration: options.loadConfiguration || vi.fn(async () => configuration),
+    collectSources: vi.fn(async () => ({})),
+    buildAnalysisInput: vi.fn(() => options.analysis || analysisBundle()),
+    requestSummaryOnce: options.requestSummaryOnce || vi.fn(async () => ({ summary: validSummary(), usage: null })),
+    store: {
+      read: vi.fn(() => structuredClone(state)),
+      write: vi.fn((next) => {
+        state = structuredClone(next);
+        return structuredClone(state);
+      }),
+    },
+    clock: {
+      now: () => options.now ?? FIXED_NOW,
+      toJST: (timestamp) =>
+        timestamp === FIXED_NOW + 600000
+          ? "2026-08-01 10:10:00 JST"
+          : timestamp === FIXED_NOW + 3600000
+            ? "2026-08-01 11:00:00 JST"
+            : "2026-08-01 10:00:00 JST",
+    },
+    timers: {
+      setTimeout: vi.fn((callback) => {
+        const handle = { callback, unref: vi.fn() };
+        scheduled.add(handle);
+        return handle;
+      }),
+      clearTimeout: vi.fn((handle) => scheduled.delete(handle)),
+    },
+    logger: { error: vi.fn(), info: vi.fn() },
+  };
+  deps.flush = async () => {
+    for (let turn = 0; turn < 12; turn += 1) await Promise.resolve();
+  };
+  return deps;
+}
+
+describe("summary generation service", () => {
+  it("restores cached summary and submits one overdue background generation", async () => {
+    const run = deferred();
+    const deps = serviceDependencies({
+      persisted: persistedState({ nextScheduledAtJST: "2026-08-01 09:00:00 JST" }),
+      requestSummaryOnce: vi.fn(() => run.promise),
+    });
+    const service = createSummaryService(deps);
+
+    await service.initialize();
+    await deps.flush();
+    expect(service.getPublicState()).toMatchObject({
+      state: "running",
+      summary: expect.any(Object),
+    });
+    expect(deps.requestSummaryOnce).toHaveBeenCalledTimes(1);
+
+    run.resolve({ summary: validSummary(), usage: { total_tokens: 100 } });
+    await deps.flush();
+    expect(service.getPublicState().state).toBe("ready");
+  });
+
+  it("initializes idempotently and schedules a future automatic refresh", async () => {
+    const deps = serviceDependencies();
+    const service = createSummaryService(deps);
+
+    await service.initialize();
+    await service.initialize();
+
+    expect(deps.loadConfiguration).toHaveBeenCalledTimes(1);
+    expect(deps.requestSummaryOnce).not.toHaveBeenCalled();
+    expect(deps.timers.setTimeout).toHaveBeenCalledTimes(1);
+    expect(deps.timers.setTimeout.mock.calls[0][1]).toBe(3600000);
+
+    deps.timers.setTimeout.mock.calls[0][0]();
+    await deps.flush();
+    expect(deps.requestSummaryOnce).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns synchronously without waiting for the model", async () => {
+    const run = deferred();
+    const deps = serviceDependencies({ requestSummaryOnce: vi.fn(() => run.promise) });
+    const service = createSummaryService(deps);
+    await service.initialize();
+
+    const result = service.requestRefresh({ manual: true });
+
+    expect(result).toEqual({
+      accepted: true,
+      state: "running",
+      cooldownUntilJST: "2026-08-01 10:10:00 JST",
+    });
+    expect(result).not.toBeInstanceOf(Promise);
+    expect(service.getPublicState().state).toBe("running");
+
+    run.resolve({ summary: validSummary(), usage: null });
+    await deps.flush();
+  });
+
+  it("merges automatic and manual requests into one active promise", async () => {
+    const run = deferred();
+    const deps = serviceDependencies({ requestSummaryOnce: vi.fn(() => run.promise) });
+    const service = createSummaryService(deps);
+    await service.initialize();
+
+    const first = service.requestRefresh({ manual: true });
+    const second = service.requestRefresh({ manual: false });
+    await deps.flush();
+
+    expect(first.accepted).toBe(true);
+    expect(second.accepted).toBe(false);
+    expect(deps.requestSummaryOnce).toHaveBeenCalledTimes(1);
+
+    run.resolve({ summary: validSummary(), usage: null });
+    await deps.flush();
+  });
+
+  it("enforces persisted manual cooldown with a 429-ready deadline", async () => {
+    const deps = serviceDependencies({
+      persisted: persistedState({
+        manualCooldownUntilJST: "2026-08-01 10:10:00 JST",
+      }),
+      now: Date.parse("2026-08-01T10:05:00+09:00"),
+    });
+    const service = createSummaryService(deps);
+    await service.initialize();
+
+    expect(service.requestRefresh({ manual: true })).toEqual({
+      accepted: false,
+      state: "cooldown",
+      cooldownUntilJST: "2026-08-01 10:10:00 JST",
+    });
+  });
+
+  it("does not call the model with fewer than two valid sources", async () => {
+    const deps = serviceDependencies({
+      persisted: persistedState({ latest: null }),
+      analysis: analysisBundle({ valid: 1, dataQuality: "insufficient" }),
+    });
+    const service = createSummaryService(deps);
+    await service.initialize();
+    service.requestRefresh({ manual: false });
+    await deps.flush();
+
+    expect(deps.requestSummaryOnce).not.toHaveBeenCalled();
+    expect(service.getPublicState()).toMatchObject({
+      state: "error",
+      dataQuality: "insufficient",
+      lastError: "source_unavailable",
+    });
+  });
+
+  it("publishes partial state when only three sources are usable", async () => {
+    const deps = serviceDependencies({
+      analysis: analysisBundle({ valid: 3, dataQuality: "partial" }),
+    });
+    const service = createSummaryService(deps);
+    await service.initialize();
+
+    service.requestRefresh({ manual: false });
+    await deps.flush();
+
+    expect(deps.requestSummaryOnce).toHaveBeenCalledTimes(1);
+    expect(service.getPublicState()).toMatchObject({
+      state: "partial",
+      dataQuality: "partial",
+      sourceCoverage: { valid: 3, total: 4 },
+    });
+  });
+
+  it("retries one retryable model failure and never retries configuration failures", async () => {
+    const retryable = Object.assign(new Error("temporary"), {
+      code: "model_http",
+      retryable: true,
+    });
+    const requestSummaryOnce = vi
+      .fn()
+      .mockRejectedValueOnce(retryable)
+      .mockResolvedValueOnce({ summary: validSummary(), usage: null });
+    const deps = serviceDependencies({ requestSummaryOnce });
+    const service = createSummaryService(deps);
+    await service.initialize();
+    service.requestRefresh({ manual: false });
+    await deps.flush();
+    expect(requestSummaryOnce).toHaveBeenCalledTimes(2);
+
+    const configuration = Object.assign(new Error("bad key"), {
+      code: "configuration",
+      retryable: false,
+    });
+    const nonRetryingRequest = vi.fn().mockRejectedValue(configuration);
+    const nonRetryingDeps = serviceDependencies({
+      requestSummaryOnce: nonRetryingRequest,
+    });
+    const nonRetryingService = createSummaryService(nonRetryingDeps);
+    await nonRetryingService.initialize();
+    nonRetryingService.requestRefresh({ manual: false });
+    await nonRetryingDeps.flush();
+    expect(nonRetryingRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops after the single allowed retry when both model attempts fail", async () => {
+    const retryable = Object.assign(new Error("temporary"), {
+      code: "model_http",
+      retryable: true,
+    });
+    const requestSummaryOnce = vi.fn().mockRejectedValue(retryable);
+    const deps = serviceDependencies({ requestSummaryOnce });
+    const service = createSummaryService(deps);
+    await service.initialize();
+
+    service.requestRefresh({ manual: false });
+    await deps.flush();
+
+    expect(requestSummaryOnce).toHaveBeenCalledTimes(2);
+    expect(service.getPublicState()).toMatchObject({
+      state: "stale",
+      lastError: "model_http",
+    });
+  });
+
+  it("keeps the last good summary stale after a failed generation", async () => {
+    const failure = Object.assign(new Error("bad output"), {
+      code: "model_schema",
+      retryable: false,
+    });
+    const deps = serviceDependencies({
+      requestSummaryOnce: vi.fn().mockRejectedValue(failure),
+    });
+    const service = createSummaryService(deps);
+    await service.initialize();
+    const cachedSummary = service.getPublicState().summary;
+
+    service.requestRefresh({ manual: false });
+    await deps.flush();
+
+    expect(service.getPublicState()).toMatchObject({
+      state: "stale",
+      summary: cachedSummary,
+      lastError: "model_schema",
+      nextScheduledAtJST: "2026-08-01 11:00:00 JST",
+    });
+  });
+
+  it("restores a persisted failed summary as stale after restart", async () => {
+    const deps = serviceDependencies({
+      persisted: persistedState({ lastError: "model_http" }),
+    });
+    const service = createSummaryService(deps);
+
+    await service.initialize();
+
+    expect(service.getPublicState()).toMatchObject({
+      state: "stale",
+      dataQuality: "stale",
+      summary: validSummary(),
+      lastError: "model_http",
+    });
+  });
+
+  it("resets the hourly schedule after a successful manual refresh", async () => {
+    const deps = serviceDependencies({
+      persisted: persistedState({ nextScheduledAtJST: "2026-08-01 10:30:00 JST" }),
+    });
+    const service = createSummaryService(deps);
+    await service.initialize();
+
+    service.requestRefresh({ manual: true });
+    await deps.flush();
+
+    expect(service.getPublicState()).toMatchObject({
+      state: "ready",
+      nextScheduledAtJST: "2026-08-01 11:00:00 JST",
+      cooldownUntilJST: "2026-08-01 10:10:00 JST",
+    });
+    expect(deps.timers.clearTimeout).toHaveBeenCalledTimes(1);
+    expect(deps.timers.setTimeout.mock.calls.at(-1)[1]).toBe(3600000);
+  });
+
+  it("returns a detached public whitelist without configuration or model internals", async () => {
+    const analysis = analysisBundle();
+    analysis.modelInput.privatePrompt = "MODEL_INPUT_PRIVATE";
+    const deps = serviceDependencies({
+      analysis,
+      requestSummaryOnce: vi.fn(async () => ({
+        summary: validSummary(),
+        usage: { total_tokens: 100 },
+        rawOutput: "RAW_OUTPUT_PRIVATE",
+      })),
+    });
+    const service = createSummaryService(deps);
+    await service.initialize();
+    service.requestRefresh({ manual: false });
+    await deps.flush();
+
+    const first = service.getPublicState();
+    expect(Object.keys(first).sort()).toEqual(
+      [
+        "cooldownUntilJST",
+        "dataQuality",
+        "generatedAtJST",
+        "lastError",
+        "metricDisplay",
+        "nextScheduledAtJST",
+        "severity",
+        "sourceCoverage",
+        "sourceFreshness",
+        "state",
+        "summary",
+      ].sort(),
+    );
+    expect(JSON.stringify(first)).not.toContain("secret");
+    expect(JSON.stringify(first)).not.toContain("https://ai.example.test");
+    expect(JSON.stringify(first)).not.toContain("gpt-5.6-luna");
+    expect(JSON.stringify(first)).not.toContain("MODEL_INPUT_PRIVATE");
+    expect(JSON.stringify(first)).not.toContain("RAW_OUTPUT_PRIVATE");
+
+    first.summary.headline.zh = "mutated";
+    expect(service.getPublicState().summary.headline.zh).toBe("请确认待办。");
+  });
+
+  it("clears its timer without cancelling an active request", async () => {
+    const run = deferred();
+    const deps = serviceDependencies({ requestSummaryOnce: vi.fn(() => run.promise) });
+    const service = createSummaryService(deps);
+    await service.initialize();
+    service.requestRefresh({ manual: true });
+    await deps.flush();
+
+    service.stop();
+
+    expect(deps.timers.clearTimeout).toHaveBeenCalledTimes(1);
+    expect(service.getPublicState().state).toBe("running");
+
+    run.resolve({ summary: validSummary(), usage: null });
+    await deps.flush();
+    expect(service.getPublicState().state).toBe("ready");
+    expect(deps.timers.setTimeout).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not reschedule after a stopped active request fails", async () => {
+    const run = deferred();
+    const deps = serviceDependencies({ requestSummaryOnce: vi.fn(() => run.promise) });
+    const service = createSummaryService(deps);
+    await service.initialize();
+    service.requestRefresh({ manual: true });
+    await deps.flush();
+    service.stop();
+
+    const failure = Object.assign(new Error("bad output"), {
+      code: "model_schema",
+      retryable: false,
+    });
+    run.reject(failure);
+    await deps.flush();
+
+    expect(service.getPublicState().state).toBe("stale");
+    expect(deps.timers.setTimeout).toHaveBeenCalledTimes(1);
+  });
+});
