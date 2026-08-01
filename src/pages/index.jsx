@@ -46,6 +46,7 @@ const rightAlignedWidgets = ["weatherapi", "openweathermap", "weather", "openmet
 const LANGUAGE_ALIASES = {
   "zh-cn": "zh-Hans",
 };
+const FIXED_UI_LOCALES = ["ja", "zh-Hans", "en"];
 
 const normalizeLanguage = (language) => {
   if (!language) return "en";
@@ -75,7 +76,7 @@ export async function getStaticProps() {
           "/api/announcements": announcements,
           "/api/hash": false,
         },
-        ...(await serverSideTranslations(language)),
+        ...(await serverSideTranslations(language, ["common"], null, FIXED_UI_LOCALES)),
       },
     };
   } catch (e) {
@@ -92,7 +93,7 @@ export async function getStaticProps() {
           "/api/announcements": { enabled: false, label: "公告", speedSeconds: 28, items: [] },
           "/api/hash": false,
         },
-        ...(await serverSideTranslations("en")),
+        ...(await serverSideTranslations("en", ["common"], null, FIXED_UI_LOCALES)),
       },
     };
   }

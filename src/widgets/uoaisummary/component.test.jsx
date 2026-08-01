@@ -91,6 +91,27 @@ function renderSummary() {
   return renderWithProviders(<Component service={service} />);
 }
 
+function withoutSummary(state, overrides = {}) {
+  return {
+    ...ready,
+    state,
+    severity: "unknown",
+    dataQuality: state === "error" ? "insufficient" : "complete",
+    summary: null,
+    metricDisplay: {},
+    lastError: state === "error" ? "configuration" : null,
+    ...overrides,
+  };
+}
+
+function deferred() {
+  let resolve;
+  const promise = new Promise((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockSummary();
@@ -113,6 +134,9 @@ describe("widgets/uoaisummary/component", () => {
     expect(screen.getByText("请优先处理待办事项。")).toBeInTheDocument();
     expect(screen.getByText("未处理合计 64件 (+4件)")).toBeInTheDocument();
     expect(screen.queryByText("未対応合計 64件 (+4件)")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "AI重新分析" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "查看详情" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "日本語" })).toBeInTheDocument();
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
@@ -168,6 +192,34 @@ describe("widgets/uoaisummary/component", () => {
   });
 
   it.each([
+    ["cached summary", ready],
+    ["no-summary waiting", withoutSummary("empty")],
+  ])("locks the %s refresh button synchronously until fetch and revalidation finish", async (_label, data) => {
+    const request = deferred();
+    const mutate = mockSummary(data);
+    global.fetch.mockReturnValue(request.promise);
+    renderSummary();
+
+    const refresh = screen.getByRole("button", { name: "AI再分析" });
+    fireEvent.click(refresh);
+    fireEvent.click(refresh);
+
+    expect(refresh).toBeDisabled();
+    expect(refresh).toHaveAttribute("aria-busy", "true");
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+
+    request.resolve({
+      ok: true,
+      status: 202,
+      json: async () => ({ accepted: true, state: "running" }),
+    });
+
+    await waitFor(() => expect(mutate).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(refresh).toBeEnabled());
+    expect(refresh).toHaveAttribute("aria-busy", "false");
+  });
+
+  it.each([
     ["running", "complete", "AI分析中"],
     ["stale", "stale", "前回の結果を表示中"],
     ["partial", "partial", "一部データで分析"],
@@ -180,8 +232,28 @@ describe("widgets/uoaisummary/component", () => {
     expect(screen.getByText("対応待ち案件を優先してください。")).toBeInTheDocument();
   });
 
+  it("shows first-analysis progress instead of an error when no summary is running", () => {
+    mockSummary(withoutSummary("running"));
+    renderSummary();
+
+    expect(screen.getByRole("status")).toHaveTextContent("AI分析中");
+    expect(screen.getByText("最初のサマリーを生成しています")).toBeInTheDocument();
+    expect(screen.queryByText("AIサマリーを生成できません")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "AI再分析" })).toBeDisabled();
+  });
+
+  it("shows an actionable waiting state when no summary has been generated", () => {
+    mockSummary(withoutSummary("empty"));
+    renderSummary();
+
+    expect(screen.getByRole("status")).toHaveTextContent("AIサマリーはまだありません");
+    expect(screen.getByText("初回分析を開始してください")).toBeInTheDocument();
+    expect(screen.queryByText("AIサマリーを生成できません")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "AI再分析" })).toBeEnabled();
+  });
+
   it("shows an actionable error panel when no cached summary exists", async () => {
-    const mutate = mockSummary({ ...ready, state: "error", summary: null, lastError: "configuration" });
+    const mutate = mockSummary(withoutSummary("error"));
     renderSummary();
 
     expect(screen.getByRole("alert")).toHaveTextContent("AIサマリーを生成できません");
@@ -192,6 +264,34 @@ describe("widgets/uoaisummary/component", () => {
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
     expect(mutate).toHaveBeenCalledTimes(1);
+  });
+
+  it("announces cooldown feedback from the no-summary waiting state", async () => {
+    const mutate = mockSummary(withoutSummary("empty"));
+    global.fetch.mockResolvedValue({
+      ok: false,
+      status: 429,
+      json: async () => ({ accepted: false, state: "cooldown" }),
+    });
+    renderSummary();
+
+    fireEvent.click(screen.getByRole("button", { name: "AI再分析" }));
+
+    const feedback = await screen.findByText("再分析はしばらくお待ちください");
+    expect(feedback).toHaveAttribute("role", "status");
+    expect(mutate).toHaveBeenCalledTimes(1);
+  });
+
+  it("announces unexpected refresh feedback from the no-summary error state", async () => {
+    mockSummary(withoutSummary("error"));
+    global.fetch.mockRejectedValue(new Error("offline"));
+    renderSummary();
+
+    fireEvent.click(screen.getByRole("button", { name: "AI再分析" }));
+
+    const feedback = await screen.findByText("再分析を開始できませんでした");
+    expect(feedback).toHaveAttribute("role", "status");
+    expect(screen.getByRole("alert")).toHaveTextContent("AIサマリーを生成できません");
   });
 
   it("announces an unexpected refresh failure while retaining the cached summary", async () => {

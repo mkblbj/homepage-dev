@@ -1,6 +1,6 @@
 import Container from "components/services/widget/container";
 import { useTranslation } from "next-i18next/pages";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { formatProxyUrl } from "utils/proxy/api-helpers";
 import useWidgetAPI from "utils/proxy/use-widget-api";
@@ -18,6 +18,16 @@ const TONES = {
 const CONTROL_CLASS =
   "rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 focus-visible:ring-offset-theme-50 dark:focus-visible:ring-violet-300 dark:focus-visible:ring-offset-theme-900";
 
+function RefreshFeedback({ refreshError, t }) {
+  const refreshKey = refreshError === "cooldown" ? "cooldown" : refreshError === "unexpected" ? "refreshFailed" : null;
+
+  return refreshKey ? (
+    <p role="status" className="rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+      {t(`uoaisummary.${refreshKey}`)}
+    </p>
+  ) : null;
+}
+
 function Cockpit({
   data,
   detailsOpen,
@@ -26,6 +36,7 @@ function Cockpit({
   onSwitchLanguage,
   onToggleDetails,
   refreshError,
+  refreshPending,
   service,
   t,
 }) {
@@ -37,8 +48,6 @@ function Cockpit({
         : data.state === "partial" || data.dataQuality === "partial"
           ? "partial"
           : null;
-  const refreshKey = refreshError === "cooldown" ? "cooldown" : refreshError === "unexpected" ? "refreshFailed" : null;
-
   return (
     <Container service={service}>
       <div className="@container flex w-full min-w-0 flex-col gap-3 p-1.5">
@@ -82,7 +91,8 @@ function Cockpit({
             <button
               type="button"
               onClick={onRefresh}
-              disabled={data.state === "running"}
+              disabled={data.state === "running" || refreshPending}
+              aria-busy={data.state === "running" || refreshPending}
               className={`${CONTROL_CLASS} border-violet-400/50 bg-violet-500/10 text-violet-700 hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:opacity-50 dark:text-violet-300`}
             >
               {t("uoaisummary.reanalyze")}
@@ -90,11 +100,7 @@ function Cockpit({
           </div>
         </header>
 
-        {refreshKey ? (
-          <p role="status" className="rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-            {t(`uoaisummary.${refreshKey}`)}
-          </p>
-        ) : null}
+        <RefreshFeedback refreshError={refreshError} t={t} />
 
         <section className="rounded-2xl border border-theme-300/40 bg-theme-200/30 p-5 dark:border-theme-600/40 dark:bg-white/10">
           <p className="text-lg font-bold leading-relaxed text-theme-900 dark:text-theme-50">
@@ -198,12 +204,45 @@ function Cockpit({
   );
 }
 
+function NoSummary({ data, onRefresh, refreshError, refreshPending, service, t }) {
+  const isRunning = data.state === "running";
+  const isError = data.state === "error";
+  const titleKey = isRunning ? "analyzing" : isError ? "cannotGenerate" : "noSummary";
+  const descriptionKey = isRunning ? "analyzingFirst" : isError ? "insufficient" : "waiting";
+  const tone = isError
+    ? "border-amber-400/40 bg-amber-500/10 text-amber-800 dark:text-amber-200"
+    : "border-violet-400/40 bg-violet-500/10 text-theme-800 dark:text-theme-100";
+
+  return (
+    <Container service={service}>
+      <div className="flex w-full flex-col gap-3">
+        <div role={isError ? "alert" : "status"} className={`w-full rounded-2xl border p-5 ${tone}`}>
+          <h2 className="font-bold">{t(`uoaisummary.${titleKey}`)}</h2>
+          <p className="mt-1 text-sm">{t(`uoaisummary.${descriptionKey}`)}</p>
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={isRunning || refreshPending}
+            aria-busy={isRunning || refreshPending}
+            className={`${CONTROL_CLASS} mt-3 border-theme-400/50 hover:bg-theme-200/40 disabled:cursor-not-allowed disabled:opacity-50 dark:border-theme-500/50 dark:hover:bg-theme-700/40`}
+          >
+            {t("uoaisummary.reanalyze")}
+          </button>
+        </div>
+        <RefreshFeedback refreshError={refreshError} t={t} />
+      </div>
+    </Container>
+  );
+}
+
 export default function Component({ service }) {
   const { i18n } = useTranslation();
   const { widget } = service;
   const [language, setLanguage] = useState("ja");
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [refreshError, setRefreshError] = useState(null);
+  const [refreshPending, setRefreshPending] = useState(false);
+  const refreshLockRef = useRef(false);
   const refreshInterval = Math.max(1000, Number(widget.refreshInterval) || DEFAULT_REFRESH_INTERVAL);
   const { data, error, mutate } = useWidgetAPI(widget, "summary", { refreshInterval });
   const t = useMemo(() => i18n.getFixedT(language === "ja" ? "ja" : "zh-Hans", "common"), [i18n, language]);
@@ -212,6 +251,10 @@ export default function Component({ service }) {
     async (event) => {
       event.preventDefault();
       event.stopPropagation();
+      if (refreshLockRef.current) return null;
+
+      refreshLockRef.current = true;
+      setRefreshPending(true);
       setRefreshError(null);
 
       try {
@@ -228,6 +271,9 @@ export default function Component({ service }) {
       } catch {
         setRefreshError("unexpected");
         return null;
+      } finally {
+        refreshLockRef.current = false;
+        setRefreshPending(false);
       }
     },
     [mutate, widget],
@@ -260,23 +306,14 @@ export default function Component({ service }) {
   }
   if (!data.summary) {
     return (
-      <Container service={service}>
-        <div
-          role="alert"
-          className="w-full rounded-2xl border border-amber-400/40 bg-amber-500/10 p-5 text-amber-800 dark:text-amber-200"
-        >
-          <h2 className="font-bold">{t("uoaisummary.cannotGenerate")}</h2>
-          <p className="mt-1 text-sm">{t("uoaisummary.insufficient")}</p>
-          <button
-            type="button"
-            onClick={refresh}
-            disabled={data.state === "running"}
-            className={`${CONTROL_CLASS} mt-3 border-amber-500/50 hover:bg-amber-500/10 disabled:cursor-not-allowed disabled:opacity-50`}
-          >
-            {t("uoaisummary.reanalyze")}
-          </button>
-        </div>
-      </Container>
+      <NoSummary
+        data={data}
+        onRefresh={refresh}
+        refreshError={refreshError}
+        refreshPending={refreshPending}
+        service={service}
+        t={t}
+      />
     );
   }
 
@@ -289,6 +326,7 @@ export default function Component({ service }) {
       onSwitchLanguage={switchLanguage}
       onToggleDetails={() => setDetailsOpen((value) => !value)}
       refreshError={refreshError}
+      refreshPending={refreshPending}
       service={service}
       t={t}
     />
