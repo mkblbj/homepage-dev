@@ -212,12 +212,14 @@ AI 总结同时参考：
 
 职责：
 
+- 使用官方 `openai` JavaScript/TypeScript SDK；不自行维护通用 HTTP、超时和 SDK 错误类型。
+- 从配置的完整 `.../responses` endpoint 推导 SDK `baseURL`，确保自定义 host 和路径前缀仍可用。
 - 生成固定的系统指令和结构化输入。
 - 调用配置的 Responses API。
 - 设置 `reasoning.effort: xhigh`。
 - 要求严格 JSON Schema 输出。
 - 校验语言字段、数组数量、证据键和字符串长度。
-- 在超时、网络错误或非法结构时重试一次。
+- SDK 设置 `maxRetries: 0`、`logLevel: "off"` 和 `redirect: "manual"`；业务服务在超时、网络错误或非法结构时统一重试一次。
 
 ### 6. 调度与存储层
 
@@ -478,6 +480,7 @@ Node 服务启动时注册一个进程级单例调度器。
 
 - 每个业务来源设置独立短超时，避免一个来源拖住全部聚合。
 - Responses 请求超时默认 180,000 ms，以适配 xhigh 推理。
+- SDK 自带重试关闭，避免和业务层的一次重试叠加成多次调用。
 - 模型调用在后台完成，HTTP 页面读取请求不等待该超时。
 
 ---
@@ -537,7 +540,7 @@ config/uo-ai-summary.json
 
 字段含义：
 
-- `apiUrl`：完整 Responses API URL，不是只包含 host 的 base URL。
+- `apiUrl`：完整 Responses API URL，不是只包含 host 的 base URL；首版要求路径以 `/responses` 结尾且不带 query/hash，服务端据此推导 SDK `baseURL`。
 - `apiKey`：Bearer Key；既支持 `HOMEPAGE_VAR_*`，也支持更推荐的 `HOMEPAGE_FILE_*`。
 - `model`：接口实际接受的模型名。
 - `reasoningEffort`：首版固定允许 `xhigh`。
