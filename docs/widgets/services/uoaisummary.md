@@ -47,13 +47,15 @@ The `立即重新分析` / reanalysis button submits background work and returns
 
 ## Data and privacy
 
-The server reads shipping, operating attention, Rakuten sales, and company performance through their existing read-only endpoints. It normalizes facts and renders business numbers from server-owned metric keys; model prose is not the source of displayed numbers.
+The server reads shipping output, operating attention, Rakuten sales, and company performance through their existing read-only endpoints. It normalizes them into one fact set: fifteen company-level metrics, at most five shops that are currently flagged as attention or critical, and at most ten low-rating review samples. Shipment counts, courier distribution, product rankings, and per-day sales trends are not sent to the model.
 
-Low-rating review samples are capped at ten, normalized, and truncated to 300 characters each before model submission. Their business content is otherwise preserved, so the operator controls which review data the configured model endpoint may receive. Raw ranking payloads are reduced to a small deduplicated product set.
+Displayed numbers come from server-owned metric keys; model prose is not the source of any figure. Metric labels are rendered from the locale files in the browser, so the model never receives or produces them.
 
-The API credential and private model URL remain server-only. The browser and summary cache receive only the generated bilingual summary, referenced display metrics, safe status fields, and usage counts; they do not receive the raw model request or response.
+Low-rating review samples are capped at ten, normalized, and truncated to 300 characters each before model submission. Their business content is otherwise preserved, so the operator controls which review data the configured model endpoint may receive.
 
-Model output is checked only for the required bilingual JSON structure and evidence `metricKey` values that exist in the collected metrics. The operator is responsible for any additional content policy applied through source selection, prompts, or the configured model endpoint.
+The API credential and private model URL remain server-only. The browser and summary cache receive only the generated bilingual summary, the fifteen metrics, safe status fields, and usage counts; they do not receive the raw model request or response.
+
+Model output is checked only for the required bilingual JSON structure and, when an action references one, a `metricKey` that exists in the collected metrics. The operator is responsible for any additional content policy applied through source selection, prompts, or the configured model endpoint.
 
 ## Failure states
 
@@ -67,7 +69,7 @@ Public errors contain only a safe category such as `configuration`, `source_time
 
 ## Cache recovery
 
-The local cache is `config/uo-ai-summary.json`, which is also Git-ignored. Writes use a temporary file and atomic rename. Only validated bilingual summaries, safe display metrics, usage counts, and up to 24 compact snapshots are retained; raw reviews and model bodies are not stored.
+The local cache is `config/uo-ai-summary.json`, which is also Git-ignored. Writes use a temporary file and atomic rename. Only validated bilingual summaries, the fifteen metrics, usage counts, and up to 24 compact snapshots are retained; raw reviews and model bodies are not stored. The cache carries a schema version: a file written by an older release is silently discarded and regenerated, without being renamed.
 
 If the cache contains invalid JSON, startup automatically renames it with a `.corrupt-<timestamp>` suffix, starts from a clean state, and submits background regeneration. For manual recovery, stop the server process, move the cache aside to a private local backup, and start the process again. Do not commit or share the cache or its corrupt backup.
 

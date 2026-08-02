@@ -330,6 +330,21 @@ async function waitForState(service, expected) {
   });
 }
 
+async function runFullSummaryFlow(options = {}) {
+  const externalFetch = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("unexpected external request"));
+  const harness = integrationHarness(options);
+
+  await harness.service.initialize();
+  await waitForState(harness.service, "ready");
+  harness.service.stop();
+
+  return {
+    modelRequests: harness.modelRequestBodies.map((body) => ({ body })),
+    harness,
+    externalFetch,
+  };
+}
+
 it("collects, compacts, validates, persists, restores, and exposes only public state", async () => {
   const externalFetch = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("unexpected external request"));
   const harness = integrationHarness();
@@ -467,4 +482,33 @@ it("keeps the last good summary stale after two retryable model failures", async
   expect(harness.modelRequestCount()).toBe(2);
   expect(externalFetch).not.toHaveBeenCalled();
   harness.service.stop();
+});
+
+it("sends one fact set and never the restructured modules", async () => {
+  const { modelRequests } = await runFullSummaryFlow();
+  const modelInput = JSON.parse(modelRequests[0].body.input);
+
+  expect(Object.keys(modelInput).sort()).toEqual([
+    "attentionShops",
+    "capturedAtJST",
+    "caveats",
+    "comparisonWindow",
+    "dataQuality",
+    "metrics",
+    "reviewSamples",
+    "severity",
+    "sourceCoverage",
+    "sourceFreshness",
+  ]);
+  expect(Buffer.byteLength(modelRequests[0].body.input, "utf8")).toBeLessThan(16000);
+});
+
+it("never exposes 出荷 quantities to the model", async () => {
+  const { modelRequests } = await runFullSummaryFlow();
+  const modelInput = JSON.parse(modelRequests[0].body.input);
+
+  expect(modelInput.metrics.map((entry) => entry.key).filter((key) => key.startsWith("shipping.shipping."))).toEqual(
+    [],
+  );
+  expect(modelRequests[0].body.input).not.toContain("courier");
 });
