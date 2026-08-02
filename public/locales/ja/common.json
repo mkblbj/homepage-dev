@@ -1251,7 +1251,7 @@
             "attention.unanswered_inquiries": "未回答問い合わせ",
             "attention.overdue_inquiries": "期限超過問い合わせ",
             "attention.unreplied_reviews": "未返信レビュー",
-            "sales.realtime_yen": "実時売上",
+            "sales.realtime_yen": "リアルタイム売上",
             "sales.orders": "注文数",
             "sales.aov_yen": "平均注文額",
             "sales.realtime_vs_seven_day_avg_percent": "7日平均比",
