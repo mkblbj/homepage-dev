@@ -1223,6 +1223,79 @@
         "markRead": "标记已读",
         "markUnread": "标记未读"
     },
+    "uoaisummary": {
+        "title": "AI 经营总结",
+        "subtitle": "基于全公司数据，每小时更新",
+        "updatedAt": "生成时间",
+        "nextUpdate": "下次更新",
+        "reanalyze": "AI重新分析",
+        "switchToChinese": "中文",
+        "switchToJapanese": "日本語",
+        "analyzing": "AI分析中",
+        "analyzingFirst": "正在生成首份总结",
+        "noSummary": "暂无AI总结",
+        "waiting": "请开始首次分析",
+        "stale": "正在显示上次结果",
+        "partial": "基于部分数据分析",
+        "cooldown": "请稍后再重新分析",
+        "cooldownUntil": "请等待至 {{deadline}} 后再重新分析",
+        "refreshFailed": "无法开始重新分析",
+        "cannotGenerate": "无法生成AI总结",
+        "insufficient": "缺少分析所需的数据",
+        "errorConfiguration": "请检查AI设置",
+        "errorSources": "无法获取源数据",
+        "errorModel": "AI分析服务发生错误",
+        "errorCache": "保存总结失败",
+        "errorUnexpected": "发生了意外错误",
+        "metrics": "指标",
+        "baseline": "基准100%",
+        "metricNote": {
+            "predicted": "预测值"
+        },
+        "sourceAllFresh": "{{valid}}/{{total}} 最新",
+        "sourceWorst": "{{valid}}/{{total}} · {{source}} {{state}}",
+        "sourceWorstMore": "{{valid}}/{{total}} · {{source}} {{state}} +{{count}}",
+        "metric": {
+            "output.today.total": "今日输出",
+            "output.active_shops": "活跃店铺",
+            "output.tomorrow.total": "明日计划",
+            "attention.open_total": "未处理",
+            "attention.pending_orders": "待确认订单",
+            "attention.unanswered_inquiries": "未回复咨询",
+            "attention.overdue_inquiries": "逾期咨询",
+            "attention.unreplied_reviews": "未回复评价",
+            "sales.realtime_yen": "实时销售额",
+            "sales.orders": "订单数",
+            "sales.aov_yen": "平均订单金额",
+            "sales.realtime_vs_seven_day_avg_percent": "7日均值比",
+            "performance.traffic.visit": "访问数",
+            "performance.traffic.delta_percent": "基准差",
+            "performance.mix.new_sales_share": "新客销售占比"
+        },
+        "source": {
+            "shipping": "输出",
+            "attention": "运营待办",
+            "sales": "乐天销售",
+            "performance": "经营表现"
+        },
+        "sourceState": {
+            "fresh": "最新",
+            "delayed": "延迟",
+            "stale": "已过期",
+            "unavailable": "不可用"
+        },
+        "severity": {
+            "normal": "正常",
+            "attention": "关注",
+            "critical": "重要",
+            "unknown": "无法判断"
+        },
+        "priority": {
+            "high": "最高优先",
+            "medium": "优先",
+            "low": "确认"
+        }
+    },
     "uoattention": {
         "title": "运营待办",
         "subtitle": "RMS 首页 + 低星评价 · 共 {{count}} 家店铺",
@@ -1309,7 +1382,7 @@
         "vsMedian": "对比同星期中位数（{{value}}）",
         "vsMedianShort": "对中位",
         "median": "同星期中位数",
-        "medianLegend": "同星期中位数（访问）",
+        "medianLegend": "同星期中位数（{{weekday}}・访问）",
         "sampleOk": "同星期样本 {{n}}/4 · 与中位数比较",
         "sampleShort": "同星期样本 {{n}}/4 · 无法比较（既非零访问也非故障）",
         "sampleShortShort": "样本不足",

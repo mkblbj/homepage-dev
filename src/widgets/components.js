@@ -152,6 +152,7 @@ const components = {
   tubearchivist: dynamic(() => import("./tubearchivist/component")),
   truenas: dynamic(() => import("./truenas/component")),
   uoattendance: dynamic(() => import("./uoattendance/component")),
+  uoaisummary: dynamic(() => import("./uoaisummary/component")),
   uoattention: dynamic(() => import("./uoattention/component")),
   uoperformance: dynamic(() => import("./uoperformance/component")),
   uoprinters: dynamic(() => import("./uoprinters/component")),

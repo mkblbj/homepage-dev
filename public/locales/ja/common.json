@@ -1210,6 +1210,79 @@
         "max": "最高",
         "now": "現在"
     },
+    "uoaisummary": {
+        "title": "AI 経営サマリー",
+        "subtitle": "全社データをもとに1時間ごとに更新",
+        "updatedAt": "生成時刻",
+        "nextUpdate": "次回",
+        "reanalyze": "AI再分析",
+        "switchToChinese": "中文",
+        "switchToJapanese": "日本語",
+        "analyzing": "AI分析中",
+        "analyzingFirst": "最初のサマリーを生成しています",
+        "noSummary": "AIサマリーはまだありません",
+        "waiting": "初回分析を開始してください",
+        "stale": "前回の結果を表示中",
+        "partial": "一部データで分析",
+        "cooldown": "再分析はしばらくお待ちください",
+        "cooldownUntil": "再分析は {{deadline}} までお待ちください",
+        "refreshFailed": "再分析を開始できませんでした",
+        "cannotGenerate": "AIサマリーを生成できません",
+        "insufficient": "分析に必要なデータが不足しています",
+        "errorConfiguration": "AIの設定を確認してください",
+        "errorSources": "元データを取得できませんでした",
+        "errorModel": "AI分析サービスでエラーが発生しました",
+        "errorCache": "サマリーの保存に失敗しました",
+        "errorUnexpected": "予期しないエラーが発生しました",
+        "metrics": "指標",
+        "baseline": "基準100%",
+        "metricNote": {
+            "predicted": "予測値"
+        },
+        "sourceAllFresh": "{{valid}}/{{total}} 最新",
+        "sourceWorst": "{{valid}}/{{total}} · {{source}} {{state}}",
+        "sourceWorstMore": "{{valid}}/{{total}} · {{source}} {{state}} +{{count}}",
+        "metric": {
+            "output.today.total": "今日出力",
+            "output.active_shops": "稼働店舗",
+            "output.tomorrow.total": "明日予定",
+            "attention.open_total": "未対応",
+            "attention.pending_orders": "未確認注文",
+            "attention.unanswered_inquiries": "未回答問い合わせ",
+            "attention.overdue_inquiries": "期限超過問い合わせ",
+            "attention.unreplied_reviews": "未返信レビュー",
+            "sales.realtime_yen": "リアルタイム売上",
+            "sales.orders": "注文数",
+            "sales.aov_yen": "平均注文額",
+            "sales.realtime_vs_seven_day_avg_percent": "7日平均比",
+            "performance.traffic.visit": "訪問数",
+            "performance.traffic.delta_percent": "基準差",
+            "performance.mix.new_sales_share": "新規売上比率"
+        },
+        "source": {
+            "shipping": "出力",
+            "attention": "運営対応",
+            "sales": "楽天売上",
+            "performance": "経営表現"
+        },
+        "sourceState": {
+            "fresh": "最新",
+            "delayed": "遅延",
+            "stale": "期限切れ",
+            "unavailable": "取得不可"
+        },
+        "severity": {
+            "normal": "正常",
+            "attention": "注意",
+            "critical": "重要",
+            "unknown": "判定不可"
+        },
+        "priority": {
+            "high": "最優先",
+            "medium": "優先",
+            "low": "確認"
+        }
+    },
     "uoattention": {
         "title": "運営対応",
         "subtitle": "RMS トップ ＋ 低評価レビュー · 全{{count}}店舗",
@@ -1296,7 +1369,7 @@
         "vsMedian": "対 同曜日中位数（{{value}}）",
         "vsMedianShort": "対中位",
         "median": "同曜日中位数",
-        "medianLegend": "同曜日中位数（訪問）",
+        "medianLegend": "同曜日中位数（{{weekday}}・訪問）",
         "sampleOk": "同曜日サンプル {{n}}/4 · 中位数で比較",
         "sampleShort": "同曜日サンプル {{n}}/4 · 比較不可（訪問ゼロでも障害でもない）",
         "sampleShortShort": "サンプル不足",
@@ -1385,7 +1458,7 @@
         "waitingForUpdate": "更新を待機中",
         "willAppearNextRefresh": "次回更新で反映されます",
         "output": "出力",
-        "shipping": "出荷",
+        "shipping": "出力",
         "notStarted": "未開始",
         "vsYesterday": "前日比",
         "channelMix": "チャンネル構成",

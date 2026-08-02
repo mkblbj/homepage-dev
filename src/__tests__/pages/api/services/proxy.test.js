@@ -1,15 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { state, getServiceWidget, calendarProxy } = vi.hoisted(() => ({
+const { state, getServiceWidget, calendarProxy, logger } = vi.hoisted(() => ({
   state: {
     genericResult: { ok: true },
   },
   getServiceWidget: vi.fn(),
   calendarProxy: vi.fn(),
+  logger: { debug: vi.fn(), error: vi.fn() },
 }));
 
 vi.mock("utils/logger", () => ({
-  default: () => ({ debug: vi.fn(), error: vi.fn() }),
+  default: () => logger,
 }));
 
 vi.mock("utils/config/service-helpers", () => ({ default: getServiceWidget }));
@@ -333,21 +334,28 @@ describe("pages/api/services/proxy", () => {
     expect(res.body).toEqual({ error: "Unknown proxy service type" });
   });
 
-  it("returns 500 on unexpected errors", async () => {
-    getServiceWidget.mockRejectedValueOnce(new Error("boom"));
+  it("returns a redacted 503 when service configuration loading fails", async () => {
+    const error = new Error(
+      "synthetic-private-key https://private.invalid/v1/responses YAML: apiKey/model/reasoningEffort",
+    );
+    getServiceWidget.mockRejectedValueOnce(error);
 
     const req = { method: "GET", query: { group: "g", service: "s", index: "0", endpoint: "collections" } };
     const res = createMockRes();
 
     await servicesProxy(req, res);
 
-    expect(res.statusCode).toBe(500);
-    expect(res.body).toEqual({ error: "Unexpected error" });
+    expect(res.statusCode).toBe(503);
+    expect(res.body).toEqual({ error: "configuration" });
+    expect(logger.error).toHaveBeenCalledWith("Service proxy configuration load failed");
+    const publicOutput = JSON.stringify({ response: res.body, logArguments: logger.error.mock.calls });
+    expect(publicOutput).not.toMatch(/synthetic-private|private\.invalid|apiKey|apiUrl|model|reasoningEffort|YAML/);
   });
 
   it("returns 500 when an async proxy handler throws", async () => {
+    const error = new Error("proxy boom");
     getServiceWidget.mockResolvedValue({ type: "linkwarden" });
-    handlerFn.handler.mockRejectedValueOnce(new Error("proxy boom"));
+    handlerFn.handler.mockRejectedValueOnce(error);
 
     const req = { method: "GET", query: { group: "g", service: "s", index: "0" } };
     const res = createMockRes();
@@ -356,5 +364,23 @@ describe("pages/api/services/proxy", () => {
 
     expect(res.statusCode).toBe(500);
     expect(res.body).toEqual({ error: "Unexpected error" });
+    expect(logger.error).toHaveBeenCalledWith(error);
+  });
+
+  it("preserves the runtime 500 boundary before configuration loading", async () => {
+    const error = new Error("runtime query failure");
+    const req = {};
+    Object.defineProperty(req, "query", {
+      get() {
+        throw error;
+      },
+    });
+    const res = createMockRes();
+
+    await servicesProxy(req, res);
+
+    expect(res.statusCode).toBe(500);
+    expect(res.body).toEqual({ error: "Unexpected error" });
+    expect(logger.error).toHaveBeenCalledWith(error);
   });
 });

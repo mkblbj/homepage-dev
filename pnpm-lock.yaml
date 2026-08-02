@@ -56,6 +56,9 @@ importers:
       next-i18next:
         specifier: ^16.0.7
         version: 16.0.7(@types/react@19.0.10)(i18next@26.3.0(typescript@5.7.3))(next@16.2.6(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(sass@1.99.0))(react-i18next@15.5.3(i18next@26.3.0(typescript@5.7.3))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(typescript@5.7.3))(react@19.2.5)
+      openai:
+        specifier: ^7.3.0
+        version: 7.3.0(ws@8.20.1)
       ping:
         specifier: ^0.4.4
         version: 0.4.4
@@ -3015,6 +3018,27 @@ packages:
 
   one-time@1.0.0:
     resolution: {integrity: sha512-5DXOiRKwuSEcQ/l0kGCF6Q3jcADFv5tSmRaJck/OqkVFcOzutB134KRSfF0xDrL39MNnqxbHBbUUcjZIhTgb2g==}
+
+  openai@7.3.0:
+    resolution: {integrity: sha512-FLnIAkDEP3grs+BSDpqxEWVR37yG97/hs95lajF8SnHuA5nqtssh0uJVXbPhODNEoZqar+nEd+fIeGJgwoLUmg==}
+    engines: {node: '>=22.0.0'}
+    peerDependencies:
+      '@aws-sdk/credential-provider-node': '>=3.972.0 <4'
+      '@smithy/hash-node': '>=4.3.0 <5'
+      '@smithy/signature-v4': '>=5.4.0 <6'
+      ws: ^8.18.0
+      zod: ^3.25 || ^4.0
+    peerDependenciesMeta:
+      '@aws-sdk/credential-provider-node':
+        optional: true
+      '@smithy/hash-node':
+        optional: true
+      '@smithy/signature-v4':
+        optional: true
+      ws:
+        optional: true
+      zod:
+        optional: true
 
   openid-client@6.3.0:
     resolution: {integrity: sha512-68LMqb/Whtq214B9c9kCtuniCKQrEqWJRTEoOEZlv2QV5VgqhjySCpBe4RXeU+pj/VNOi7erP/ixxfHtqR7FOw==}
@@ -6782,6 +6806,10 @@ snapshots:
   one-time@1.0.0:
     dependencies:
       fn.name: 1.1.0
+
+  openai@7.3.0(ws@8.20.1):
+    optionalDependencies:
+      ws: 8.20.1
 
   openid-client@6.3.0:
     dependencies:

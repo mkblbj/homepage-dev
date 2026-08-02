@@ -312,6 +312,11 @@ function TrafficChart({ days, series, expected, t }) {
   const path = spark(vals, CHART_WIDTH, CHART_HEIGHT, lo, hi);
   const yAt = (v) => SPARK_PADDING + (1 - (v - lo) / (hi - lo || 1)) * (CHART_HEIGHT - SPARK_PADDING * 2);
   const xPct = (i) => (days.length === 1 ? 50 : (i / (days.length - 1)) * 100);
+  // expectedVisitCount is one figure for the latest business day, not a per-day series.
+  // Spanning the whole chart invited comparing it against the other six days, each of which
+  // falls on a different weekday and so has a different median of its own — so it covers
+  // only the final segment, where the comparison actually holds.
+  const medianLeft = days.length > 1 ? xPct(days.length - 2) : 0;
   const tipTx = hover === 0 ? "0%" : hover === days.length - 1 ? "-100%" : "-50%";
 
   return (
@@ -319,8 +324,13 @@ function TrafficChart({ days, series, expected, t }) {
       <div className="relative h-[124px]">
         {showMedian ? (
           <div
-            className="pointer-events-none absolute inset-x-0 z-[3] border-t-[1.5px] border-dashed"
-            style={{ bottom: `${CHART_HEIGHT - yAt(expected)}px`, borderColor: "rgba(198,54,43,.7)" }}
+            data-testid="median-baseline"
+            className="pointer-events-none absolute right-0 z-[3] border-t-[1.5px] border-dashed"
+            style={{
+              left: `${medianLeft}%`,
+              bottom: `${CHART_HEIGHT - yAt(expected)}px`,
+              borderColor: "rgba(198,54,43,.7)",
+            }}
           />
         ) : null}
         <svg
@@ -581,7 +591,7 @@ export default function Component({ service }) {
                       className="mr-1 inline-block w-3 border-t-[1.5px] border-dashed align-middle"
                       style={{ borderColor: ACCENT }}
                     />
-                    {t(`${NS}.medianLegend`)}
+                    {t(`${NS}.medianLegend`, { weekday: weekdayJp(model.dataDateJST) })}
                   </span>
                 ) : null}
                 <Segmented

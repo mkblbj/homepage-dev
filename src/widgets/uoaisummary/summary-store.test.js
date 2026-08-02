@@ -1,0 +1,354 @@
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+import { HASHED_CONFIGS } from "../../pages/api/hash-configs.mjs";
+import { appendSnapshot, createSummaryStore, emptySummaryState, getSummaryStorePath } from "./summary-store.mjs";
+
+let dir;
+
+beforeEach(() => {
+  dir = mkdtempSync(join(tmpdir(), "uo-ai-summary-"));
+});
+
+afterEach(() => {
+  rmSync(dir, { recursive: true, force: true });
+});
+
+function persistedLatest() {
+  return {
+    severity: "attention",
+    dataQuality: "partial",
+    generatedAtJST: "2026-08-01 10:00:00 JST",
+    sourceCoverage: { valid: 3, total: 4 },
+    sourceFreshness: {
+      shipping: { state: "fresh", updatedAtJST: "2026-08-01 09:59:00+09:00" },
+      attention: { state: "delayed", updatedAtJST: "2026-08-01 09:50:00 JST" },
+      sales: { state: "stale", updatedAtJST: "2026-08-01 09:45:00 JST" },
+      performance: { state: "unavailable", updatedAtJST: null },
+    },
+    summary: {
+      headline: { ja: "対応を確認してください。", zh: "请确认待办。" },
+      assessment: { ja: "優先順を確認してください。", zh: "请确认优先级。" },
+      actions: [
+        {
+          priority: "high",
+          module: "attention",
+          shopName: null,
+          metricKey: "attention.open_total",
+          title: { ja: "未対応を整理", zh: "梳理待办" },
+          reason: { ja: "優先度を確認してください。", zh: "请确认优先级。" },
+        },
+      ],
+    },
+    metrics: [
+      {
+        key: "attention.open_total",
+        unit: "count",
+        value: 1,
+        previousValue: null,
+        delta: null,
+        deltaPercent: null,
+        note: null,
+      },
+      {
+        key: "sales.orders",
+        unit: "count",
+        value: 20,
+        previousValue: 18,
+        delta: 2,
+        deltaPercent: 11.1,
+        note: null,
+      },
+    ],
+  };
+}
+
+describe("summary store", () => {
+  it("returns an empty versioned state when the cache is missing", () => {
+    expect(createSummaryStore({ configDir: dir }).read()).toEqual(emptySummaryState());
+  });
+
+  it("isolates corrupt JSON and starts clean", () => {
+    writeFileSync(getSummaryStorePath(dir), "{broken", "utf8");
+
+    const state = createSummaryStore({ configDir: dir, now: () => 123 }).read();
+
+    expect(state).toEqual(emptySummaryState());
+    expect(readdirSync(dir)).toContain("uo-ai-summary.json.corrupt-123");
+  });
+
+  it("isolates structurally invalid latest data and resets its future deadline", () => {
+    writeFileSync(
+      getSummaryStorePath(dir),
+      JSON.stringify({
+        ...emptySummaryState(),
+        latest: {
+          severity: "normal",
+          dataQuality: "complete",
+          generatedAtJST: "2026-08-01 10:00:00 JST",
+          sourceCoverage: { valid: 4, total: 4 },
+          sourceFreshness: {},
+          summary: { headline: null },
+          metrics: [],
+        },
+        nextScheduledAtJST: "2026-08-01 11:00:00 JST",
+      }),
+      "utf8",
+    );
+
+    const state = createSummaryStore({ configDir: dir, now: () => 456 }).read();
+
+    expect(state).toEqual(emptySummaryState());
+    expect(readdirSync(dir)).toContain("uo-ai-summary.json.corrupt-456");
+  });
+
+  it("drops an action whose metric key is not whitelisted", () => {
+    writeFileSync(
+      getSummaryStorePath(dir),
+      JSON.stringify({
+        ...emptySummaryState(),
+        latest: {
+          ...persistedLatest(),
+          summary: {
+            headline: { ja: "a", zh: "b" },
+            assessment: { ja: "c", zh: "d" },
+            actions: [
+              {
+                priority: "high",
+                module: "sales",
+                shopName: null,
+                metricKey: "sales.seven_day_cvr",
+                title: { ja: "e", zh: "f" },
+                reason: { ja: "g", zh: "h" },
+              },
+            ],
+          },
+        },
+      }),
+      "utf8",
+    );
+
+    const state = createSummaryStore({ configDir: dir }).read();
+
+    expect(state.latest).toBeNull();
+  });
+
+  it("atomically writes readable state without persisting running", () => {
+    const store = createSummaryStore({ configDir: dir, now: () => 123 });
+    store.write({ ...emptySummaryState(), running: true, lastAttemptAtJST: "2026-08-01 10:00:00 JST" });
+
+    expect(store.read()).toMatchObject({ lastAttemptAtJST: "2026-08-01 10:00:00 JST" });
+    expect(store.read()).not.toHaveProperty("running");
+    expect(readdirSync(dir).some((name) => name.endsWith(".tmp"))).toBe(false);
+  });
+
+  it("keeps only the newest 24 compact snapshots", () => {
+    let state = emptySummaryState();
+    for (let index = 0; index < 30; index += 1) {
+      state = appendSnapshot(state, {
+        capturedAtJST: "2026-08-01 " + String(index).padStart(2, "0") + ":00:00 JST",
+        metrics: { "sales.realtime_yen": index },
+      });
+    }
+
+    expect(state.snapshots).toHaveLength(24);
+    expect(state.snapshots[0].metrics["sales.realtime_yen"]).toBe(6);
+    expect(state.snapshots[23].metrics["sales.realtime_yen"]).toBe(29);
+  });
+
+  it("does not serialize an Error as lastError", () => {
+    const store = createSummaryStore({ configDir: dir });
+    store.write({ ...emptySummaryState(), lastError: new Error("private failure") });
+
+    expect(store.read().lastError).toBeNull();
+  });
+
+  it("writes only whitelisted nested summary, snapshot, and usage fields", () => {
+    const store = createSummaryStore({ configDir: dir });
+    const latest = persistedLatest();
+    const nestedError = Object.assign(new Error("synthetic-error-message"), {
+      details: "synthetic-error-details",
+      apiKey: "synthetic-api-key",
+    });
+    latest.reviewSamples = [{ excerpt: "synthetic-review-text" }];
+    latest.apiUrl = "https://synthetic.invalid/private";
+    latest.modelInput = { request: "synthetic-model-request" };
+    latest.rawResponse = { response: "synthetic-model-response", nestedError };
+    latest.sourceFreshness.sales.url = "https://synthetic.invalid/source";
+    latest.summary.actions[0].review = "synthetic-review-text";
+    latest.metrics.find((entry) => entry.key === "sales.orders").modelOutput = "synthetic-model-response";
+
+    const snapshot = {
+      capturedAtJST: "2026-08-01 10:00:00 JST",
+      metrics: { "sales.orders": 20, "attention.open_total": 1, private_metric: "synthetic-review-text" },
+      reviews: [{ excerpt: "synthetic-review-text" }],
+      error: nestedError,
+    };
+    const usage = {
+      input_tokens: 100,
+      output_tokens: 20,
+      total_tokens: 120,
+      apiKey: "synthetic-api-key",
+      rawRequest: "synthetic-model-request",
+      rawResponse: "synthetic-model-response",
+      error: nestedError,
+    };
+
+    store.write({ ...emptySummaryState(), latest, snapshots: [snapshot], usage });
+
+    const onDisk = JSON.parse(readFileSync(getSummaryStorePath(dir), "utf8"));
+    expect(onDisk.latest).toEqual(persistedLatest());
+    expect(onDisk.snapshots).toEqual([
+      { capturedAtJST: "2026-08-01 10:00:00 JST", metrics: { "sales.orders": 20, "attention.open_total": 1 } },
+    ]);
+    expect(onDisk.usage).toEqual({ input_tokens: 100, output_tokens: 20, total_tokens: 120 });
+    expect(store.read()).toMatchObject({ latest: persistedLatest(), snapshots: onDisk.snapshots, usage: onDisk.usage });
+    expect(JSON.stringify(onDisk)).not.toMatch(/synthetic-(?:api-key|error|model|review)|https:\/\/synthetic\.invalid/);
+  });
+
+  it("keeps only whitelisted metric entries", () => {
+    const store = createSummaryStore({ configDir: dir });
+    store.write({
+      ...emptySummaryState(),
+      latest: {
+        ...persistedLatest(),
+        metrics: [
+          {
+            key: "sales.orders",
+            unit: "count",
+            value: 20,
+            previousValue: 18,
+            delta: 2,
+            deltaPercent: 11.1,
+            note: null,
+          },
+          {
+            key: "sales.seven_day_cvr",
+            unit: "percent",
+            value: 3.2,
+            previousValue: null,
+            delta: null,
+            deltaPercent: null,
+            note: null,
+          },
+          {
+            key: "sales.orders",
+            unit: "furlong",
+            value: 1,
+            previousValue: null,
+            delta: null,
+            deltaPercent: null,
+            note: null,
+          },
+        ],
+      },
+    });
+
+    expect(store.read().latest.metrics).toEqual([
+      { key: "sales.orders", unit: "count", value: 20, previousValue: 18, delta: 2, deltaPercent: 11.1, note: null },
+    ]);
+  });
+
+  it("keeps only the last entry when a metric key repeats", () => {
+    const store = createSummaryStore({ configDir: dir });
+    store.write({
+      ...emptySummaryState(),
+      latest: {
+        ...persistedLatest(),
+        metrics: [
+          {
+            key: "sales.orders",
+            unit: "count",
+            value: 1,
+            previousValue: null,
+            delta: null,
+            deltaPercent: null,
+            note: null,
+          },
+          {
+            key: "attention.open_total",
+            unit: "count",
+            value: 5,
+            previousValue: null,
+            delta: null,
+            deltaPercent: null,
+            note: null,
+          },
+          {
+            key: "sales.orders",
+            unit: "count",
+            value: 99,
+            previousValue: 90,
+            delta: 9,
+            deltaPercent: 10,
+            note: null,
+          },
+        ],
+      },
+    });
+
+    expect(store.read().latest.metrics).toEqual([
+      { key: "sales.orders", unit: "count", value: 99, previousValue: 90, delta: 9, deltaPercent: 10, note: null },
+      {
+        key: "attention.open_total",
+        unit: "count",
+        value: 5,
+        previousValue: null,
+        delta: null,
+        deltaPercent: null,
+        note: null,
+      },
+    ]);
+  });
+
+  it("does not include the generated cache in the browser config hash", () => {
+    expect(HASHED_CONFIGS).not.toContain("uo-ai-summary.json");
+  });
+});
+
+describe("cache version migration", () => {
+  it("stamps new state with version 2", () => {
+    expect(emptySummaryState().version).toBe(2);
+  });
+
+  it("resets a version 1 cache without marking it corrupt", () => {
+    const configDir = mkdtempSync(join(tmpdir(), "uoai-v1-"));
+    writeFileSync(
+      join(configDir, "uo-ai-summary.json"),
+      JSON.stringify({
+        version: 1,
+        latest: {
+          severity: "attention",
+          dataQuality: "complete",
+          generatedAtJST: "2026-08-01 10:00:00 JST",
+          sourceCoverage: { valid: 4, total: 4 },
+          sourceFreshness: {
+            shipping: { state: "fresh", updatedAtJST: null },
+            attention: { state: "fresh", updatedAtJST: null },
+            sales: { state: "fresh", updatedAtJST: null },
+            performance: { state: "fresh", updatedAtJST: null },
+          },
+          summary: { headline: { ja: "a", zh: "b" }, assessment: { ja: "c", zh: "d" }, actions: [] },
+          metrics: [],
+        },
+        snapshots: [],
+      }),
+      "utf8",
+    );
+
+    const state = createSummaryStore({ configDir, now: () => 1 }).read();
+
+    expect(state).toEqual(emptySummaryState());
+    expect(readdirSync(configDir).filter((name) => name.includes("corrupt"))).toEqual([]);
+  });
+
+  it("still quarantines a version 2 file that cannot be parsed", () => {
+    const configDir = mkdtempSync(join(tmpdir(), "uoai-bad-"));
+    writeFileSync(join(configDir, "uo-ai-summary.json"), "{ not json", "utf8");
+
+    expect(createSummaryStore({ configDir, now: () => 1 }).read()).toEqual(emptySummaryState());
+    expect(readdirSync(configDir).filter((name) => name.includes("corrupt"))).toHaveLength(1);
+  });
+});

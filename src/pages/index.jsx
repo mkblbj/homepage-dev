@@ -9,7 +9,6 @@ import Tab, { slugifyAndEncode } from "components/tab";
 import Revalidate from "components/toggles/revalidate";
 import Widget from "components/widgets/widget";
 import { useTranslation } from "next-i18next/pages";
-import { serverSideTranslations } from "next-i18next/pages/serverSideTranslations";
 import dynamic from "next/dynamic";
 import Head from "next/head";
 import { useRouter } from "next/router";
@@ -24,6 +23,7 @@ import { ThemeContext } from "utils/contexts/theme";
 
 import { announcementsResponse, bookmarksResponse, servicesResponse, widgetsResponse } from "utils/config/api-response";
 import { getSettings } from "utils/config/config";
+import { loadHomeTranslations } from "utils/home-translations";
 import useWindowFocus from "utils/hooks/window-focus";
 import createLogger from "utils/logger";
 import themes from "utils/styles/themes";
@@ -75,7 +75,7 @@ export async function getStaticProps() {
           "/api/announcements": announcements,
           "/api/hash": false,
         },
-        ...(await serverSideTranslations(language)),
+        ...(await loadHomeTranslations(language)),
       },
     };
   } catch (e) {
@@ -92,7 +92,7 @@ export async function getStaticProps() {
           "/api/announcements": { enabled: false, label: "公告", speedSeconds: 28, items: [] },
           "/api/hash": false,
         },
-        ...(await serverSideTranslations("en")),
+        ...(await loadHomeTranslations("en")),
       },
     };
   }

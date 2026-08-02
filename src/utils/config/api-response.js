@@ -39,9 +39,8 @@ export async function bookmarksResponse() {
 
   try {
     initialSettings = await getSettings();
-  } catch (e) {
+  } catch {
     console.error("Failed to load settings.yaml, please check for errors");
-    if (e) console.error(e.toString());
     initialSettings = {};
   }
 
@@ -76,9 +75,8 @@ export async function widgetsResponse() {
 
   try {
     configuredWidgets = cleanWidgetGroups(await widgetsFromConfig());
-  } catch (e) {
+  } catch {
     console.error("Failed to load widgets, please check widgets.yaml for errors or remove example entries.");
-    if (e) console.error(e);
     configuredWidgets = [];
   }
 
@@ -96,9 +94,8 @@ export async function announcementsResponse() {
     const announcements = yaml.load(fileContents) ?? {};
 
     return normalizeAnnouncementConfig(announcements);
-  } catch (e) {
+  } catch {
     console.error("Failed to load announcements.yaml, please check for errors");
-    if (e) console.error(e.toString());
 
     return normalizeAnnouncementConfig({ enabled: false });
   }
@@ -186,33 +183,29 @@ export async function servicesResponse() {
     if (discoveredDockerServices?.length === 0) {
       console.debug("No containers were found with homepage labels.");
     }
-  } catch (e) {
+  } catch {
     console.error("Failed to discover services, please check docker.yaml for errors or remove example entries.");
-    if (e) console.error(e.toString());
     discoveredDockerServices = [];
   }
 
   try {
     discoveredKubernetesServices = cleanServiceGroups(await servicesFromKubernetes());
-  } catch (e) {
+  } catch {
     console.error("Failed to discover services, please check kubernetes.yaml for errors or remove example entries.");
-    if (e) console.error(e.toString());
     discoveredKubernetesServices = [];
   }
 
   try {
     configuredServices = cleanServiceGroups(await servicesFromConfig());
-  } catch (e) {
+  } catch {
     console.error("Failed to load services.yaml, please check for errors");
-    if (e) console.error(e.toString());
     configuredServices = [];
   }
 
   try {
     initialSettings = await getSettings();
-  } catch (e) {
+  } catch {
     console.error("Failed to load settings.yaml, please check for errors");
-    if (e) console.error(e.toString());
     initialSettings = {};
   }
 

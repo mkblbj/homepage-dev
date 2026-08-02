@@ -1210,6 +1210,79 @@
         "max": "Max",
         "now": "Now"
     },
+    "uoaisummary": {
+        "title": "AI Executive Summary",
+        "subtitle": "Updated hourly from company-wide data",
+        "updatedAt": "Generated",
+        "nextUpdate": "Next update",
+        "reanalyze": "Reanalyze",
+        "switchToChinese": "Chinese",
+        "switchToJapanese": "Japanese",
+        "analyzing": "AI analysis in progress",
+        "analyzingFirst": "Generating the first summary",
+        "noSummary": "No AI summary yet",
+        "waiting": "Start the first analysis",
+        "stale": "Showing the previous result",
+        "partial": "Analysis uses partial data",
+        "cooldown": "Please wait before reanalyzing",
+        "cooldownUntil": "Please wait until {{deadline}} before reanalyzing",
+        "refreshFailed": "Could not start reanalysis",
+        "cannotGenerate": "Could not generate an AI summary",
+        "insufficient": "Not enough data to analyze",
+        "errorConfiguration": "Check the AI settings",
+        "errorSources": "Could not retrieve source data",
+        "errorModel": "The AI analysis service encountered an error",
+        "errorCache": "Could not save the summary",
+        "errorUnexpected": "An unexpected error occurred",
+        "metrics": "Metrics",
+        "baseline": "Baseline 100%",
+        "metricNote": {
+            "predicted": "Predicted"
+        },
+        "sourceAllFresh": "{{valid}}/{{total}} fresh",
+        "sourceWorst": "{{valid}}/{{total}} · {{source}} {{state}}",
+        "sourceWorstMore": "{{valid}}/{{total}} · {{source}} {{state}} +{{count}}",
+        "metric": {
+            "output.today.total": "Output today",
+            "output.active_shops": "Active shops",
+            "output.tomorrow.total": "Planned tomorrow",
+            "attention.open_total": "Open items",
+            "attention.pending_orders": "Unconfirmed orders",
+            "attention.unanswered_inquiries": "Unanswered inquiries",
+            "attention.overdue_inquiries": "Overdue inquiries",
+            "attention.unreplied_reviews": "Unreplied reviews",
+            "sales.realtime_yen": "Live sales",
+            "sales.orders": "Orders",
+            "sales.aov_yen": "Average order value",
+            "sales.realtime_vs_seven_day_avg_percent": "vs 7-day average",
+            "performance.traffic.visit": "Visits",
+            "performance.traffic.delta_percent": "vs baseline",
+            "performance.mix.new_sales_share": "New-customer share"
+        },
+        "source": {
+            "shipping": "Output",
+            "attention": "Operations",
+            "sales": "Rakuten sales",
+            "performance": "Performance"
+        },
+        "sourceState": {
+            "fresh": "Fresh",
+            "delayed": "Delayed",
+            "stale": "Stale",
+            "unavailable": "Unavailable"
+        },
+        "severity": {
+            "normal": "Normal",
+            "attention": "Attention",
+            "critical": "Critical",
+            "unknown": "Unknown"
+        },
+        "priority": {
+            "high": "Highest",
+            "medium": "Priority",
+            "low": "Review"
+        }
+    },
     "uoattention": {
         "title": "Operations To-Do",
         "subtitle": "RMS top page + low-rating reviews · {{count}} shops",
@@ -1296,7 +1369,7 @@
         "vsMedian": "vs same-weekday median ({{value}})",
         "vsMedianShort": "vs median",
         "median": "Same-weekday median",
-        "medianLegend": "Same-weekday median (visits)",
+        "medianLegend": "Same-weekday median ({{weekday}}, visits)",
         "sampleOk": "Same-weekday samples {{n}}/4 · compared to the median",
         "sampleShort": "Same-weekday samples {{n}}/4 · no comparison (not zero traffic, not an outage)",
         "sampleShortShort": "Not enough samples",
@@ -1385,7 +1458,7 @@
         "waitingForUpdate": "Waiting for update",
         "willAppearNextRefresh": "Will appear after the next refresh",
         "output": "Output",
-        "shipping": "Shipping",
+        "shipping": "Output",
         "notStarted": "Not started",
         "vsYesterday": "vs. yesterday",
         "channelMix": "Channel mix",
