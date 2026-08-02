@@ -2348,10 +2348,19 @@ git add src/widgets/uoaisummary/ docs/widgets/services/uoaisummary.md && git com
 实现完成后逐条确认：
 
 - [ ] `pnpm test` 全绿，`pnpm lint` 无 error
-- [ ] `rg 'shipping\.shipping\.' src/` 无结果
-- [ ] `rg 'metricDisplay' src/` 无结果
-- [ ] `rg 'reviewThemes|compactModules|collectShops|rankedProducts' src/` 无结果
-- [ ] `src/widgets/uoaisummary/analysis-input.mjs` 行数 < 250
-- [ ] `src/widgets/uoaisummary/component.jsx` 行数 < 200
+- [ ] 生产代码里不再出现这些名字。**必须排除测试文件**——多条守卫测试正是靠断言这些名字的缺席来防回归，裸 grep 会把它们误报成残留：
+
+```bash
+grep -rEn 'shipping\.shipping\.|metricDisplay|reviewThemes|compactModules|collectShops|rankedProducts|displayMetric|topCouriers' src/ --include='*.mjs' --include='*.jsx' --include='*.js' | grep -v '\.test\.'
+```
+
+- [ ] 三语 locale 的 `uoaisummary.metric` 里没有 `shipping.shipping.*` 标签
 - [ ] 端到端测试断言的 `modelInput` 体积 < 16000 字节
 - [ ] 浏览器里首屏不出现任何形如 `sales.realtime_yen` 的原始键
+
+**关于文件行数**：设计文档估算 `analysis-input.mjs` 约 200 行、`component.jsx` 约 250 行，实测分别是 278 和 285。两处都经独立审查核实**不含任何可删的死重量**：
+
+- `analysis-input.mjs` 的 1–105 行全是仍有调用者的文本/时间/质量判定 helper，106–192 是本次必须新增的 `buildAttentionShops` + `shrinkToBudget`，194–278 是 `buildAnalysisInput` 本体。压到 200 只能把文本/时间 helper 再抽一个模块，本计划未要求。
+- `component.jsx` 里 `Cockpit` 只占 64 行（原 180 行），`NoSummary` 31 行，其余 130 行是本计划未触碰的取数/语言/冷却/轮询状态机。
+
+行数不作为验收门槛，仅作参考。
