@@ -153,4 +153,25 @@ describe("source-client", () => {
       error: "source_unavailable",
     });
   });
+
+  it("keeps the shipping source usable when 出荷 data is absent", async () => {
+    const fetcher = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          updated_at: "2026-08-01T09:59:00+09:00",
+          today_output: { total_quantity: 749, active_shops_count: 6, shops: [] },
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+
+    const collected = await collectBusinessSources(
+      { shipping: { widget: { url: "http://shipping.invalid", refreshInterval: 30000 } } },
+      { fetcher, nowTs: Date.parse("2026-08-01T09:59:30+09:00") },
+    );
+
+    expect(collected.shipping.state).toBe("fresh");
+    expect(collected.shipping.error).toBeNull();
+    expect(collected.shipping.data.today_output.total_quantity).toBe(749);
+  });
 });

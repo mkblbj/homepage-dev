@@ -28,7 +28,6 @@ function validatePayload(endpointName, data) {
   if (endpointName === "shipping") {
     requireString(data.updated_at);
     requireRecord(data.today_output);
-    requireRecord(data.today_shipping);
   } else if (endpointName === "attention") {
     requireString(data.generatedAtJST);
     if (!["normal", "attention", "critical"].includes(data.status)) invalidPayload();

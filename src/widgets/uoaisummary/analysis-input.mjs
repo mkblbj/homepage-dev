@@ -1,4 +1,5 @@
 import { AISummaryError } from "./errors.mjs";
+import { METRIC_DEFINITIONS, METRIC_LABELS, metric, numberOrNull, sumNullable, tomorrowOutput } from "./metrics.mjs";
 
 const MAX_REVIEW_COUNT = 10;
 const MAX_REVIEW_CHARS = 300;
@@ -41,19 +42,6 @@ export function sanitizeReview(review) {
   };
 }
 
-function metric(key, source, value, unit, ja, zh, previousMetrics) {
-  const candidate = value === null || value === undefined ? null : Number(value);
-  const normalized = Number.isFinite(candidate) ? candidate : null;
-  const previousCandidate = previousMetrics?.[key];
-  const previousValue =
-    previousCandidate !== null && previousCandidate !== undefined && Number.isFinite(Number(previousCandidate))
-      ? Number(previousCandidate)
-      : null;
-  const delta = normalized === null || previousValue === null ? null : normalized - previousValue;
-  const deltaPercent = delta === null || previousValue === 0 ? null : (delta / Math.abs(previousValue)) * 100;
-  return { key, source, value: normalized, unit, ja, zh, previousValue, delta, deltaPercent };
-}
-
 function dataQuality(collected, validCount) {
   if (validCount < 2) return "insufficient";
   const anyPartial = Object.values(collected).some((source) => source.partial === true);
@@ -75,12 +63,6 @@ function severity(collected, validCount) {
     return "attention";
   }
   return "normal";
-}
-
-function numberOrNull(value) {
-  if (value === null || value === undefined || value === "") return null;
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
 }
 
 function safeText(value, max = 160) {
@@ -105,171 +87,6 @@ function ratingCounts(value) {
   };
 }
 
-function sumNullable(values) {
-  const known = values.map(numberOrNull).filter((value) => value !== null);
-  return known.length ? known.reduce((sum, value) => sum + value, 0) : null;
-}
-
-function tomorrowOutput(data) {
-  const actual = numberOrNull(data?.tomorrow_output?.total_quantity) || 0;
-  const predicted = numberOrNull(data?.tomorrow_output?.total_predicted_quantity) || 0;
-  if (actual > 0) return { mode: "actual", total: actual, source: data.tomorrow_output };
-  if (predicted > 0) return { mode: "predicted", total: predicted, source: data.tomorrow_output };
-  return {
-    mode: "yesterday",
-    total: numberOrNull(data?.yesterday_output?.total_quantity),
-    source: data?.yesterday_output,
-  };
-}
-
-const METRIC_DEFINITIONS = [
-  ["shipping.today_output.total", "shipping", (d) => d.today_output?.total_quantity, "count", "今日出力", "今日输出"],
-  ["shipping.active_shops", "shipping", (d) => d.today_output?.active_shops_count, "count", "稼働店舗", "活跃店铺"],
-  ["shipping.shipping.total", "shipping", (d) => d.today_shipping?.total_quantity, "count", "今日出荷", "今日发货"],
-  [
-    "shipping.shipping.yesterday_total",
-    "shipping",
-    (d) => d.yesterday_shipping?.total_quantity,
-    "count",
-    "昨日出荷",
-    "昨日发货",
-  ],
-  [
-    "shipping.shipping.vs_yesterday_percent",
-    "shipping",
-    (d) => {
-      const today = numberOrNull(d.today_shipping?.total_quantity);
-      const yesterday = numberOrNull(d.yesterday_shipping?.total_quantity);
-      return today !== null && yesterday > 0 ? ((today - yesterday) / Math.abs(yesterday)) * 100 : null;
-    },
-    "percent",
-    "昨日出荷比",
-    "较昨日发货",
-  ],
-  ["shipping.tomorrow.total", "shipping", (d) => tomorrowOutput(d).total, "count", "明日予定", "明日计划"],
-  [
-    "attention.open_total",
-    "attention",
-    (d) =>
-      sumNullable([d.summary?.pendingOrderCount, d.summary?.unansweredInquiryCount, d.summary?.unrepliedReviewCount]),
-    "count",
-    "未対応合計",
-    "未处理合计",
-  ],
-  ["attention.pending_orders", "attention", (d) => d.summary?.pendingOrderCount, "count", "未確認注文", "待确认订单"],
-  [
-    "attention.unanswered_inquiries",
-    "attention",
-    (d) => d.summary?.unansweredInquiryCount,
-    "count",
-    "未回答問い合わせ",
-    "未回复咨询",
-  ],
-  [
-    "attention.overdue_inquiries",
-    "attention",
-    (d) => d.summary?.overdueInquiryCount,
-    "count",
-    "期限超過問い合わせ",
-    "逾期咨询",
-  ],
-  [
-    "attention.unreplied_reviews",
-    "attention",
-    (d) => d.summary?.unrepliedReviewCount,
-    "count",
-    "未返信レビュー",
-    "未回复评价",
-  ],
-  ["attention.rating_1", "attention", (d) => d.summary?.reviewCountByRating?.[1], "count", "星1レビュー", "1星评价"],
-  ["attention.rating_2", "attention", (d) => d.summary?.reviewCountByRating?.[2], "count", "星2レビュー", "2星评价"],
-  ["attention.rating_3", "attention", (d) => d.summary?.reviewCountByRating?.[3], "count", "星3レビュー", "3星评价"],
-  ["sales.realtime_yen", "sales", (d) => d.sales?.totals?.salesYen, "yen", "リアルタイム売上", "实时销售额"],
-  ["sales.orders", "sales", (d) => d.sales?.totals?.orderCount, "count", "注文数", "订单数"],
-  [
-    "sales.aov_yen",
-    "sales",
-    (d) => {
-      const sales = numberOrNull(d.sales?.totals?.salesYen);
-      const orders = numberOrNull(d.sales?.totals?.orderCount);
-      return orders > 0 && sales !== null ? sales / orders : null;
-    },
-    "yen",
-    "平均注文額",
-    "平均订单金额",
-  ],
-  ["sales.seven_day_total_yen", "sales", (d) => d.history?.totals?.salesYen, "yen", "7日売上", "7日销售额"],
-  [
-    "sales.seven_day_avg_yen",
-    "sales",
-    (d) => {
-      const total = numberOrNull(d.history?.totals?.salesYen);
-      const days = d.history?.range?.dates?.length || 0;
-      return total !== null && days > 0 ? total / days : null;
-    },
-    "yen",
-    "7日平均",
-    "7日均值",
-  ],
-  [
-    "sales.realtime_vs_seven_day_avg_percent",
-    "sales",
-    (d) => {
-      const realtime = numberOrNull(d.sales?.totals?.salesYen);
-      const total = numberOrNull(d.history?.totals?.salesYen);
-      const days = d.history?.range?.dates?.length || 0;
-      const average = total !== null && days > 0 ? total / days : null;
-      return realtime !== null && average > 0 ? (realtime / average) * 100 : null;
-    },
-    "percent",
-    "7日完全日平均への到達率",
-    "相对7日完整日均达成率",
-  ],
-  ["sales.seven_day_orders", "sales", (d) => d.history?.totals?.orderCount, "count", "7日注文", "7日订单"],
-  ["sales.seven_day_cvr", "sales", (d) => d.history?.totals?.conversionRate, "percent", "7日CVR", "7日转化率"],
-  ["performance.traffic.visit", "performance", (d) => d.traffic?.visitCount, "count", "訪問数", "访问数"],
-  [
-    "performance.traffic.unique_visitors",
-    "performance",
-    (d) => d.traffic?.uniqueVisitorCount,
-    "count",
-    "ユニーク訪問者",
-    "独立访客",
-  ],
-  [
-    "performance.traffic.expected_visit",
-    "performance",
-    (d) => (Number(d.traffic?.sampleCount) >= 3 ? d.traffic?.expectedVisitCount : null),
-    "count",
-    "同曜日基準",
-    "同星期基准",
-  ],
-  [
-    "performance.traffic.delta_percent",
-    "performance",
-    (d) => (Number(d.traffic?.sampleCount) >= 3 ? d.traffic?.visitDeltaPercent : null),
-    "percent",
-    "基準差",
-    "基准差异",
-  ],
-  [
-    "performance.mix.new_sales_share",
-    "performance",
-    (d) => d.customerMix?.new?.salesSharePercent,
-    "percent",
-    "新規売上比率",
-    "新客销售占比",
-  ],
-  [
-    "performance.mix.repeat_sales_share",
-    "performance",
-    (d) => d.customerMix?.repeat?.salesSharePercent,
-    "percent",
-    "リピート売上比率",
-    "复购销售占比",
-  ],
-];
-
 function formatValue(value, unit) {
   if (value === null) return "—";
   if (unit === "yen") return "¥" + Math.round(value).toLocaleString("ja-JP");
@@ -278,6 +95,7 @@ function formatValue(value, unit) {
 }
 
 function displayMetric(entry, comparisonWindow) {
+  const labels = METRIC_LABELS[entry.key];
   const delta = entry.delta === null ? null : (entry.delta > 0 ? "+" : "") + formatValue(entry.delta, entry.unit);
   const minutes = comparisonWindow?.elapsedMinutes;
   const jaPeriod = Number.isFinite(minutes) ? "前" + minutes + "分" : "前回";
@@ -286,8 +104,8 @@ function displayMetric(entry, comparisonWindow) {
   const zhDelta = delta ? "（" + zhPeriod + " " + delta + "）" : "";
   return {
     rawValue: entry.value,
-    ja: entry.ja + " " + formatValue(entry.value, entry.unit) + jaDelta,
-    zh: entry.zh + " " + formatValue(entry.value, entry.unit) + zhDelta,
+    ja: labels.ja + " " + formatValue(entry.value, entry.unit) + jaDelta,
+    zh: labels.zh + " " + formatValue(entry.value, entry.unit) + zhDelta,
   };
 }
 
@@ -634,9 +452,16 @@ export function buildAnalysisInput(collected, { previousSnapshot, nowTs }) {
   const validCount = Object.values(collected).filter((source) => VALID_STATES.has(source?.state)).length;
   const metrics = Object.fromEntries(
     METRIC_DEFINITIONS.filter(([, source]) => VALID_STATES.has(collected[source]?.state)).map(
-      ([key, source, read, unit, ja, zh]) => [
+      ([key, source, read, unit, noteRead]) => [
         key,
-        metric(key, source, read(collected[source].data), unit, ja, zh, previousMetrics),
+        metric(
+          key,
+          source,
+          read(collected[source].data),
+          unit,
+          previousMetrics,
+          noteRead ? noteRead(collected[source].data) : null,
+        ),
       ],
     ),
   );
