@@ -31,26 +31,16 @@ function validBilingualSummary() {
   return {
     headline: { ja: "運営対応に注意が必要です。", zh: "运营事项需要关注。" },
     assessment: { ja: "待機案件を優先してください。", zh: "请优先处理待办。" },
-    evidence: [
-      {
-        metricKey: "attention.open_total",
-        interpretation: { ja: "滞留があります。", zh: "存在积压。" },
-      },
-      {
-        metricKey: "performance.traffic.delta_percent",
-        interpretation: { ja: "基準を下回ります。", zh: "低于基准。" },
-      },
-    ],
     actions: [
       {
         priority: "high",
         module: "attention",
         shopName: null,
+        metricKey: "attention.open_total",
         title: { ja: "待機案件を整理", zh: "梳理待办" },
         reason: { ja: "優先順を確認してください。", zh: "请确认优先级。" },
       },
     ],
-    reviewThemes: [],
   };
 }
 

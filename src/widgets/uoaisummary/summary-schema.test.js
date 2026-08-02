@@ -2,123 +2,79 @@ import { describe, expect, it } from "vitest";
 
 import { SUMMARY_JSON_SCHEMA, validateModelSummary } from "./summary-schema.mjs";
 
-const valid = {
-  headline: { ja: "営業面に注意が必要です。", zh: "经营侧需要关注。" },
-  assessment: { ja: "集客と運営対応を優先してください。", zh: "应优先改善流量和运营待办。" },
-  evidence: [
-    {
-      metricKey: "performance.traffic.delta_percent",
-      interpretation: { ja: "同曜日基準を下回っています。", zh: "低于同星期基准。" },
-    },
-    {
-      metricKey: "attention.open_total",
-      interpretation: { ja: "運営対応の滞留があります。", zh: "存在运营待办积压。" },
-    },
-  ],
-  actions: [
-    {
-      priority: "high",
-      module: "attention",
-      shopName: null,
-      title: { ja: "未対応案件を整理", zh: "梳理未处理事项" },
-      reason: { ja: "優先度の高い案件から確認してください。", zh: "请从高优先级事项开始处理。" },
-    },
-  ],
-  reviewThemes: [],
-};
+const metricKeys = new Set(["sales.orders", "attention.open_total"]);
 
-function validationContext(overrides = {}) {
+function validSummary(overrides = {}) {
   return {
-    metricKeys: new Set(["performance.traffic.delta_percent", "attention.open_total"]),
-    shopNames: new Set(["3911"]),
-    availableModules: new Set(["shipping", "attention", "sales", "performance"]),
-    hasReviewSamples: false,
+    headline: { ja: "全社は平常運転です。", zh: "全社正常运转。" },
+    assessment: { ja: "売上と流量は基準内です。", zh: "销售与流量在基准内。" },
+    actions: [
+      {
+        priority: "high",
+        module: "attention",
+        shopName: "3911",
+        metricKey: "attention.open_total",
+        title: { ja: "未対応を処理", zh: "处理待办" },
+        reason: { ja: "締切に間に合いません。", zh: "赶不上截止时间。" },
+      },
+    ],
     ...overrides,
   };
 }
 
-describe("executive summary schema", () => {
-  it("uses a strict closed JSON schema", () => {
-    expect(SUMMARY_JSON_SCHEMA.additionalProperties).toBe(false);
-    expect(SUMMARY_JSON_SCHEMA.required).toEqual(["headline", "assessment", "evidence", "actions", "reviewThemes"]);
+describe("SUMMARY_JSON_SCHEMA", () => {
+  it("requires exactly three top-level blocks", () => {
+    expect(SUMMARY_JSON_SCHEMA.required).toEqual(["headline", "assessment", "actions"]);
+    expect(Object.keys(SUMMARY_JSON_SCHEMA.properties).sort()).toEqual(["actions", "assessment", "headline"]);
   });
 
-  it("accepts aligned bilingual output with known evidence", () => {
-    expect(
-      validateModelSummary(valid, {
-        ...validationContext(),
-      }),
-    ).toEqual(valid);
+  it("requires every action property so strict mode accepts it", () => {
+    expect(SUMMARY_JSON_SCHEMA.properties.actions.items.required).toEqual([
+      "priority",
+      "module",
+      "shopName",
+      "metricKey",
+      "title",
+      "reason",
+    ]);
+  });
+});
+
+describe("validateModelSummary", () => {
+  it("accepts a single action", () => {
+    expect(validateModelSummary(validSummary(), { metricKeys })).toEqual(validSummary());
   });
 
-  it("rejects unknown metric keys", () => {
-    const unknownMetric = structuredClone(valid);
-    unknownMetric.evidence[0].metricKey = "invented.value";
-    expect(() => validateModelSummary(unknownMetric, { metricKeys: new Set(), shopNames: new Set() })).toThrow();
+  it("accepts a null metric key", () => {
+    const summary = validSummary();
+    summary.actions[0].metricKey = null;
+    expect(validateModelSummary(summary, { metricKeys }).actions[0].metricKey).toBeNull();
   });
 
-  it("rejects missing bilingual fields and excess arrays", () => {
-    const missingLanguage = structuredClone(valid);
-    delete missingLanguage.headline.zh;
-    expect(() =>
-      validateModelSummary(missingLanguage, {
-        metricKeys: new Set(["performance.traffic.delta_percent", "attention.open_total"]),
-        shopNames: new Set(),
-      }),
-    ).toThrow();
-
-    const excess = structuredClone(valid);
-    excess.actions = Array.from({ length: 4 }, () => valid.actions[0]);
-    expect(() =>
-      validateModelSummary(excess, {
-        metricKeys: new Set(["performance.traffic.delta_percent", "attention.open_total"]),
-        shopNames: new Set(),
-      }),
-    ).toThrow();
+  it("rejects a metric key that was not collected", () => {
+    const summary = validSummary();
+    summary.actions[0].metricKey = "sales.seven_day_cvr";
+    expect(() => validateModelSummary(summary, { metricKeys })).toThrow(/action metric is unknown/);
   });
 
-  it("accepts caller-controlled prose and context when the JSON shape and metric keys are valid", () => {
-    const output = structuredClone(valid);
-    output.headline = { ja: "売上は123件です。", zh: "销售为一百二十三件。" };
-    output.assessment = {
-      ja: "担当者 buyer@synthetic.invalid は https://synthetic.invalid を確認してください。",
-      zh: "请联系 090-1234-5678 并确认订单 TEST-12345。",
-    };
-    output.actions = [
-      {
-        ...output.actions[0],
-        priority: "low",
-        module: "attention",
-        shopName: "caller-controlled-shop",
-      },
-      {
-        ...output.actions[0],
-        priority: "high",
-        module: "shipping",
-      },
-    ];
-    output.reviewThemes = [
-      {
-        theme: { ja: "配送品質", zh: "配送质量" },
-        impact: { ja: "信頼に影響します。", zh: "会影响信任。" },
-        suggestion: { ja: "原因を確認してください。", zh: "请检查原因。" },
-      },
-    ];
-
-    expect(
-      validateModelSummary(output, {
-        metricKeys: validationContext().metricKeys,
-      }),
-    ).toEqual(output);
+  it("rejects leftover evidence or reviewThemes fields", () => {
+    expect(() => validateModelSummary(validSummary({ evidence: [] }), { metricKeys })).toThrow(
+      /summary contains unexpected fields/,
+    );
+    expect(() => validateModelSummary(validSummary({ reviewThemes: [] }), { metricKeys })).toThrow(
+      /summary contains unexpected fields/,
+    );
   });
 
-  it("allows ordinary Japanese and Chinese prose without a quantity claim", () => {
-    const output = structuredClone(valid);
-    output.headline = {
-      ja: "一方で、物流は安定しています。",
-      zh: "另一方面，物流保持稳定。",
-    };
+  it("rejects an empty action list", () => {
+    expect(() => validateModelSummary(validSummary({ actions: [] }), { metricKeys })).toThrow(
+      /actions length is invalid/,
+    );
+  });
 
-    expect(validateModelSummary(output, validationContext())).toEqual(output);
+  it("rejects a headline longer than the budget", () => {
+    const summary = validSummary();
+    summary.headline.ja = "あ".repeat(81);
+    expect(() => validateModelSummary(summary, { metricKeys })).toThrow(/headline\.ja is invalid/);
   });
 });

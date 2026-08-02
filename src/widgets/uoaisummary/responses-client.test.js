@@ -6,26 +6,16 @@ function validSummary() {
   return {
     headline: { ja: "営業面に注意が必要です。", zh: "经营侧需要关注。" },
     assessment: { ja: "集客と運営対応を優先してください。", zh: "应优先改善流量和运营待办。" },
-    evidence: [
-      {
-        metricKey: "performance.traffic.delta_percent",
-        interpretation: { ja: "同曜日基準を下回っています。", zh: "低于同星期基准。" },
-      },
-      {
-        metricKey: "attention.open_total",
-        interpretation: { ja: "運営対応の滞留があります。", zh: "存在运营待办积压。" },
-      },
-    ],
     actions: [
       {
         priority: "high",
         module: "attention",
         shopName: null,
+        metricKey: "attention.open_total",
         title: { ja: "未対応案件を整理", zh: "梳理未处理事项" },
         reason: { ja: "優先度を確認してください。", zh: "请确认处理优先级。" },
       },
     ],
-    reviewThemes: [],
   };
 }
 

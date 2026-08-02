@@ -64,17 +64,6 @@ function normalizeSummary(value) {
 
   const headline = localized(value.headline);
   const assessment = localized(value.assessment);
-  const evidence = Array.isArray(value.evidence)
-    ? value.evidence
-        .map((entry) => {
-          const interpretation = localized(entry?.interpretation);
-          return isRecord(entry) && METRIC_KEYS.has(entry.metricKey) && interpretation
-            ? { metricKey: entry.metricKey, interpretation }
-            : null;
-        })
-        .filter(Boolean)
-        .slice(0, 4)
-    : [];
   const actions = Array.isArray(value.actions)
     ? value.actions
         .map((entry) => {
@@ -84,28 +73,25 @@ function normalizeSummary(value) {
             ["high", "medium", "low"].includes(entry.priority) &&
             SOURCE_KEYS.includes(entry.module) &&
             (entry.shopName === null || typeof entry.shopName === "string") &&
+            (entry.metricKey === null || METRIC_KEYS.has(entry.metricKey)) &&
             title &&
             reason
-            ? { priority: entry.priority, module: entry.module, shopName: entry.shopName, title, reason }
+            ? {
+                priority: entry.priority,
+                module: entry.module,
+                shopName: entry.shopName,
+                metricKey: entry.metricKey,
+                title,
+                reason,
+              }
             : null;
         })
         .filter(Boolean)
         .slice(0, 3)
     : [];
-  const reviewThemes = Array.isArray(value.reviewThemes)
-    ? value.reviewThemes
-        .map((entry) => {
-          const theme = localized(entry?.theme);
-          const impact = localized(entry?.impact);
-          const suggestion = localized(entry?.suggestion);
-          return isRecord(entry) && theme && impact && suggestion ? { theme, impact, suggestion } : null;
-        })
-        .filter(Boolean)
-        .slice(0, 3)
-    : [];
 
-  if (!headline || !assessment || evidence.length < 2 || actions.length < 1) return null;
-  return { headline, assessment, evidence, actions, reviewThemes };
+  if (!headline || !assessment || actions.length < 1) return null;
+  return { headline, assessment, actions };
 }
 
 function normalizeSourceCoverage(value) {

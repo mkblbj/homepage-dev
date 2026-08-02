@@ -31,24 +31,14 @@ function persistedLatest() {
     summary: {
       headline: { ja: "対応を確認してください。", zh: "请确认待办。" },
       assessment: { ja: "優先順を確認してください。", zh: "请确认优先级。" },
-      evidence: [
-        { metricKey: "attention.open_total", interpretation: { ja: "滞留があります。", zh: "存在积压。" } },
-        { metricKey: "sales.orders", interpretation: { ja: "件数を確認してください。", zh: "请确认件数。" } },
-      ],
       actions: [
         {
           priority: "high",
           module: "attention",
           shopName: null,
+          metricKey: "attention.open_total",
           title: { ja: "未対応を整理", zh: "梳理待办" },
           reason: { ja: "優先度を確認してください。", zh: "请确认优先级。" },
-        },
-      ],
-      reviewThemes: [
-        {
-          theme: { ja: "配送", zh: "配送" },
-          impact: { ja: "確認が必要", zh: "需要确认" },
-          suggestion: { ja: "担当を確認", zh: "确认负责人" },
         },
       ],
     },
@@ -114,6 +104,37 @@ describe("summary store", () => {
     expect(readdirSync(dir)).toContain("uo-ai-summary.json.corrupt-456");
   });
 
+  it("drops an action whose metric key is not whitelisted", () => {
+    writeFileSync(
+      getSummaryStorePath(dir),
+      JSON.stringify({
+        ...emptySummaryState(),
+        latest: {
+          ...persistedLatest(),
+          summary: {
+            headline: { ja: "a", zh: "b" },
+            assessment: { ja: "c", zh: "d" },
+            actions: [
+              {
+                priority: "high",
+                module: "sales",
+                shopName: null,
+                metricKey: "sales.seven_day_cvr",
+                title: { ja: "e", zh: "f" },
+                reason: { ja: "g", zh: "h" },
+              },
+            ],
+          },
+        },
+      }),
+      "utf8",
+    );
+
+    const state = createSummaryStore({ configDir: dir }).read();
+
+    expect(state.latest).toBeNull();
+  });
+
   it("atomically writes readable state without persisting running", () => {
     const store = createSummaryStore({ configDir: dir, now: () => 123 });
     store.write({ ...emptySummaryState(), running: true, lastAttemptAtJST: "2026-08-01 10:00:00 JST" });
@@ -156,7 +177,7 @@ describe("summary store", () => {
     latest.modelInput = { request: "synthetic-model-request" };
     latest.rawResponse = { response: "synthetic-model-response", nestedError };
     latest.sourceFreshness.sales.url = "https://synthetic.invalid/source";
-    latest.summary.evidence[0].review = "synthetic-review-text";
+    latest.summary.actions[0].review = "synthetic-review-text";
     latest.metrics.find((entry) => entry.key === "sales.orders").modelOutput = "synthetic-model-response";
 
     const snapshot = {

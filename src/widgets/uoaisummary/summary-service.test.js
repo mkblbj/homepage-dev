@@ -19,26 +19,16 @@ function validSummary() {
   return {
     headline: { ja: "対応を確認してください。", zh: "请确认待办。" },
     assessment: { ja: "運営対応を優先してください。", zh: "请优先处理运营事项。" },
-    evidence: [
-      {
-        metricKey: "attention.open_total",
-        interpretation: { ja: "滞留があります。", zh: "存在积压。" },
-      },
-      {
-        metricKey: "performance.traffic.delta_percent",
-        interpretation: { ja: "基準を下回ります。", zh: "低于基准。" },
-      },
-    ],
     actions: [
       {
         priority: "high",
         module: "attention",
         shopName: null,
+        metricKey: "attention.open_total",
         title: { ja: "未対応を整理", zh: "梳理待办" },
         reason: { ja: "優先順を確認してください。", zh: "请确认优先级。" },
       },
     ],
-    reviewThemes: [],
   };
 }
 

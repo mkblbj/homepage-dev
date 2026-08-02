@@ -1,36 +1,24 @@
 import { AISummaryError } from "./errors.mjs";
 
-const localized = {
-  type: "object",
-  additionalProperties: false,
-  required: ["ja", "zh"],
-  properties: {
-    ja: { type: "string", minLength: 1, maxLength: 400 },
-    zh: { type: "string", minLength: 1, maxLength: 300 },
-  },
-};
+function localized(maxJa, maxZh) {
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: ["ja", "zh"],
+    properties: {
+      ja: { type: "string", minLength: 1, maxLength: maxJa },
+      zh: { type: "string", minLength: 1, maxLength: maxZh },
+    },
+  };
+}
 
 export const SUMMARY_JSON_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["headline", "assessment", "evidence", "actions", "reviewThemes"],
+  required: ["headline", "assessment", "actions"],
   properties: {
-    headline: localized,
-    assessment: localized,
-    evidence: {
-      type: "array",
-      minItems: 2,
-      maxItems: 4,
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["metricKey", "interpretation"],
-        properties: {
-          metricKey: { type: "string" },
-          interpretation: localized,
-        },
-      },
-    },
+    headline: localized(80, 60),
+    assessment: localized(300, 220),
     actions: {
       type: "array",
       minItems: 1,
@@ -38,31 +26,14 @@ export const SUMMARY_JSON_SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["priority", "module", "shopName", "title", "reason"],
+        required: ["priority", "module", "shopName", "metricKey", "title", "reason"],
         properties: {
           priority: { type: "string", enum: ["high", "medium", "low"] },
-          module: {
-            type: "string",
-            enum: ["shipping", "attention", "sales", "performance"],
-          },
+          module: { type: "string", enum: ["shipping", "attention", "sales", "performance"] },
           shopName: { type: ["string", "null"] },
-          title: localized,
-          reason: localized,
-        },
-      },
-    },
-    reviewThemes: {
-      type: "array",
-      minItems: 0,
-      maxItems: 3,
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["theme", "impact", "suggestion"],
-        properties: {
-          theme: localized,
-          impact: localized,
-          suggestion: localized,
+          metricKey: { type: ["string", "null"] },
+          title: localized(80, 60),
+          reason: localized(200, 150),
         },
       },
     },
@@ -83,7 +54,7 @@ function assertKeys(value, expected, label) {
   }
 }
 
-function assertLocalized(value, label, maxJa = 400, maxZh = 300) {
+function assertLocalized(value, label, maxJa, maxZh) {
   assertKeys(value, ["ja", "zh"], label);
   if (typeof value.ja !== "string" || value.ja.length < 1 || value.ja.length > maxJa) {
     schemaFailure(label + ".ja is invalid");
@@ -94,26 +65,16 @@ function assertLocalized(value, label, maxJa = 400, maxZh = 300) {
 }
 
 export function validateModelSummary(value, { metricKeys }) {
-  assertKeys(value, ["headline", "assessment", "evidence", "actions", "reviewThemes"], "summary");
-  assertLocalized(value.headline, "headline");
-  assertLocalized(value.assessment, "assessment");
-
-  if (!Array.isArray(value.evidence) || value.evidence.length < 2 || value.evidence.length > 4) {
-    schemaFailure("evidence length is invalid");
-  }
-  value.evidence.forEach((entry, index) => {
-    assertKeys(entry, ["metricKey", "interpretation"], "evidence[" + index + "]");
-    if (typeof entry.metricKey !== "string" || !metricKeys.has(entry.metricKey)) {
-      schemaFailure("evidence metric is unknown");
-    }
-    assertLocalized(entry.interpretation, "evidence[" + index + "].interpretation");
-  });
+  assertKeys(value, ["headline", "assessment", "actions"], "summary");
+  assertLocalized(value.headline, "headline", 80, 60);
+  assertLocalized(value.assessment, "assessment", 300, 220);
 
   if (!Array.isArray(value.actions) || value.actions.length < 1 || value.actions.length > 3) {
     schemaFailure("actions length is invalid");
   }
   value.actions.forEach((action, index) => {
-    assertKeys(action, ["priority", "module", "shopName", "title", "reason"], "actions[" + index + "]");
+    const label = "actions[" + index + "]";
+    assertKeys(action, ["priority", "module", "shopName", "metricKey", "title", "reason"], label);
     if (!["high", "medium", "low"].includes(action.priority)) {
       schemaFailure("action priority is invalid");
     }
@@ -123,18 +84,11 @@ export function validateModelSummary(value, { metricKeys }) {
     if (action.shopName !== null && typeof action.shopName !== "string") {
       schemaFailure("action shop is invalid");
     }
-    assertLocalized(action.title, "actions[" + index + "].title");
-    assertLocalized(action.reason, "actions[" + index + "].reason");
-  });
-
-  if (!Array.isArray(value.reviewThemes) || value.reviewThemes.length > 3) {
-    schemaFailure("reviewThemes length is invalid");
-  }
-  value.reviewThemes.forEach((theme, index) => {
-    assertKeys(theme, ["theme", "impact", "suggestion"], "reviewThemes[" + index + "]");
-    assertLocalized(theme.theme, "reviewThemes[" + index + "].theme");
-    assertLocalized(theme.impact, "reviewThemes[" + index + "].impact");
-    assertLocalized(theme.suggestion, "reviewThemes[" + index + "].suggestion");
+    if (action.metricKey !== null && (typeof action.metricKey !== "string" || !metricKeys.has(action.metricKey))) {
+      schemaFailure("action metric is unknown");
+    }
+    assertLocalized(action.title, label + ".title", 80, 60);
+    assertLocalized(action.reason, label + ".reason", 200, 150);
   });
 
   return structuredClone(value);
