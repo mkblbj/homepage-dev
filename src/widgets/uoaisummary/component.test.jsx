@@ -25,56 +25,89 @@ const ready = {
   sourceFreshness: {
     shipping: { state: "fresh", updatedAtJST: "2026-08-01 09:59:00 JST" },
     attention: { state: "fresh", updatedAtJST: "2026-08-01 09:50:00 JST" },
-    sales: { state: "fresh", updatedAtJST: "2026-08-01 09:45:00 JST" },
+    sales: { state: "delayed", updatedAtJST: "2026-08-01 09:45:00 JST" },
     performance: { state: "fresh", updatedAtJST: "2026-08-01 07:00:00 JST" },
   },
   cooldownUntilJST: null,
   lastError: null,
   summary: {
     headline: { ja: "対応待ち案件を優先してください。", zh: "请优先处理待办事项。" },
-    assessment: {
-      ja: "全体は安定していますが、運営対応に注意が必要です。",
-      zh: "整体稳定，但运营待办需要关注。",
-    },
-    evidence: [
-      {
-        metricKey: "attention.open_total",
-        interpretation: { ja: "滞留が見られます。", zh: "存在积压。" },
-      },
-      {
-        metricKey: "performance.traffic.delta_percent",
-        interpretation: { ja: "基準を下回っています。", zh: "低于基准。" },
-      },
-    ],
+    assessment: { ja: "全体は安定しています。", zh: "整体稳定。" },
     actions: [
       {
         priority: "high",
         module: "attention",
-        shopName: null,
+        shopName: "3911",
+        metricKey: "attention.open_total",
         title: { ja: "未対応案件を整理", zh: "梳理待办事项" },
         reason: { ja: "優先順を確認してください。", zh: "请确认处理优先级。" },
       },
     ],
-    reviewThemes: [],
   },
   metrics: [
     {
-      key: "attention.open_total",
+      key: "sales.realtime_yen",
+      unit: "yen",
+      value: 1240000,
+      previousValue: 1420000,
+      delta: -180000,
+      deltaPercent: -12.7,
+      note: null,
+    },
+    { key: "sales.orders", unit: "count", value: 248, previousValue: 240, delta: 8, deltaPercent: 3.3, note: null },
+    {
+      key: "sales.realtime_vs_seven_day_avg_percent",
+      unit: "percent",
+      value: 88,
+      previousValue: null,
+      delta: null,
+      deltaPercent: null,
+      note: null,
+    },
+    {
+      key: "performance.traffic.visit",
       unit: "count",
-      value: 64,
-      previousValue: 60,
-      delta: 4,
-      deltaPercent: 6.7,
+      value: 8420,
+      previousValue: null,
+      delta: null,
+      deltaPercent: null,
       note: null,
     },
     {
       key: "performance.traffic.delta_percent",
       unit: "percent",
-      value: -31.8,
+      value: -9,
       previousValue: null,
       delta: null,
       deltaPercent: null,
       note: null,
+    },
+    {
+      key: "attention.open_total",
+      unit: "count",
+      value: 58,
+      previousValue: 46,
+      delta: 12,
+      deltaPercent: 26.1,
+      note: null,
+    },
+    {
+      key: "shipping.today_output.total",
+      unit: "count",
+      value: 1860,
+      previousValue: null,
+      delta: null,
+      deltaPercent: null,
+      note: null,
+    },
+    {
+      key: "shipping.tomorrow.total",
+      unit: "count",
+      value: 2010,
+      previousValue: null,
+      delta: null,
+      deltaPercent: null,
+      note: "predicted",
     },
   ],
 };
@@ -131,58 +164,36 @@ beforeEach(() => {
 });
 
 describe("widgets/uoaisummary/component", () => {
-  it("shows Japanese by default and switches only cached text and metric displays to Chinese", () => {
+  it("shows Japanese by default and switches cached text to Chinese", () => {
     renderSummary();
 
     expect(screen.getByText("対応待ち案件を優先してください。")).toBeInTheDocument();
-    expect(screen.getByText("未対応合計 64件 (+4件)")).toBeInTheDocument();
+    expect(screen.getByText("全体は安定しています。")).toBeInTheDocument();
     expect(screen.getByText("未対応案件を整理")).toBeInTheDocument();
+    expect(screen.getByText(/優先順を確認してください。/)).toBeInTheDocument();
     expect(screen.getByText("最優先")).toBeInTheDocument();
-    expect(screen.queryByText("優先順を確認してください。")).not.toBeInTheDocument();
+    expect(screen.queryByText("请优先处理待办事项。")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "中文" }));
 
     expect(screen.getByText("请优先处理待办事项。")).toBeInTheDocument();
-    expect(screen.getByText("未处理合计 64件 (+4件)")).toBeInTheDocument();
+    expect(screen.getByText("整体稳定。")).toBeInTheDocument();
     expect(screen.getByText("梳理待办事项")).toBeInTheDocument();
+    expect(screen.getByText(/请确认处理优先级。/)).toBeInTheDocument();
     expect(screen.getByText("最高优先")).toBeInTheDocument();
-    expect(screen.queryByText("未対応合計 64件 (+4件)")).not.toBeInTheDocument();
+    expect(screen.queryByText("対応待ち案件を優先してください。")).not.toBeInTheDocument();
     expect(screen.queryByText("未対応案件を整理")).not.toBeInTheDocument();
     expect(screen.getByText("AI 经营总结")).toBeInTheDocument();
-    expect(screen.getByText("关注")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "AI重新分析" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "查看详情" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "日本語" })).toBeInTheDocument();
+
     fireEvent.click(screen.getByRole("button", { name: "日本語" }));
 
     expect(screen.getByText("対応待ち案件を優先してください。")).toBeInTheDocument();
-    expect(screen.getByText("未対応合計 64件 (+4件)")).toBeInTheDocument();
     expect(screen.getByText("AI 経営サマリー")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "AI再分析" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "詳細を見る" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "中文" })).toBeInTheDocument();
     expect(global.fetch).not.toHaveBeenCalled();
-  });
-
-  it("expands and collapses action details with an accessible disclosure button", () => {
-    renderSummary();
-
-    const disclosure = screen.getByRole("button", { name: "詳細を見る" });
-    expect(disclosure).toHaveAttribute("type", "button");
-    expect(disclosure).toHaveAttribute("aria-expanded", "false");
-    expect(disclosure).toHaveAttribute("aria-controls", "uoaisummary-details");
-    expect(screen.getByText("未対応案件を整理")).toBeInTheDocument();
-    expect(screen.queryByText("優先順を確認してください。")).not.toBeInTheDocument();
-
-    fireEvent.click(disclosure);
-
-    expect(screen.getByRole("button", { name: "詳細を閉じる" })).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByText("未対応案件を整理")).toBeInTheDocument();
-    expect(screen.getByText("優先順を確認してください。")).toBeInTheDocument();
-    expect(screen.getByText("データカバレッジ · 4/4")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "詳細を閉じる" }));
-    expect(screen.getByText("未対応案件を整理")).toBeInTheDocument();
-    expect(screen.queryByText("優先順を確認してください。")).not.toBeInTheDocument();
   });
 
   it("posts a manual refresh once and revalidates after a 202 response", async () => {
@@ -383,5 +394,73 @@ describe("widgets/uoaisummary/component", () => {
 
     expect(useWidgetAPI).toHaveBeenCalledWith(service.widget, "summary", { refreshInterval: 60000 });
     expect(screen.getByRole("button", { name: "AI再分析" })).toBeDisabled();
+  });
+});
+
+describe("cockpit layout", () => {
+  beforeEach(() => {
+    useWidgetAPI.mockReturnValue({ data: ready, error: null, mutate: vi.fn() });
+  });
+
+  it("shows the headline, assessment and action reason without expanding anything", () => {
+    renderWithProviders(<Component service={{ widget: { type: "uoaisummary" } }} />);
+
+    expect(screen.getByText("対応待ち案件を優先してください。")).toBeInTheDocument();
+    expect(screen.getByText("全体は安定しています。")).toBeInTheDocument();
+    expect(screen.getByText("未対応案件を整理")).toBeInTheDocument();
+    expect(screen.getByText(/優先順を確認してください。/)).toBeInTheDocument();
+  });
+
+  it("keeps the metric strip closed by default", () => {
+    renderWithProviders(<Component service={{ widget: { type: "uoaisummary" } }} />);
+
+    expect(screen.queryByText("リアルタイム売上")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /指標/ })).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("reveals seven fixed metrics when the strip is opened", () => {
+    renderWithProviders(<Component service={{ widget: { type: "uoaisummary" } }} />);
+    fireEvent.click(screen.getByRole("button", { name: /指標/ }));
+
+    ["リアルタイム売上", "注文数", "7日平均比", "訪問数", "未対応", "今日出力", "明日予定"].forEach((label) => {
+      expect(screen.getByText(label)).toBeInTheDocument();
+    });
+    expect(screen.getByText("¥1,240,000")).toBeInTheDocument();
+    expect(screen.getByText("予測値")).toBeInTheDocument();
+    expect(screen.getByText("基準100%")).toBeInTheDocument();
+  });
+
+  it("uses the traffic baseline delta as the visit secondary line", () => {
+    renderWithProviders(<Component service={{ widget: { type: "uoaisummary" } }} />);
+    fireEvent.click(screen.getByRole("button", { name: /指標/ }));
+
+    expect(screen.getByText("-9.0%")).toBeInTheDocument();
+  });
+
+  it("never renders a raw metric key", () => {
+    const { container } = renderWithProviders(<Component service={{ widget: { type: "uoaisummary" } }} />);
+    fireEvent.click(screen.getByRole("button", { name: /指標/ }));
+
+    expect(container.textContent).not.toMatch(/attention\.open_total/);
+    expect(container.textContent).not.toMatch(/performance\.traffic/);
+  });
+
+  it("names the worst source in the freshness summary", () => {
+    renderWithProviders(<Component service={{ widget: { type: "uoaisummary" } }} />);
+
+    expect(screen.getByText("4/4 · 楽天売上 遅延")).toBeInTheDocument();
+  });
+
+  it("appends the referenced metric to the action reason", () => {
+    renderWithProviders(<Component service={{ widget: { type: "uoaisummary" } }} />);
+
+    expect(screen.getByText(/未対応 58/)).toBeInTheDocument();
+  });
+
+  it("marks the severity with a status dot instead of badges", () => {
+    renderWithProviders(<Component service={{ widget: { type: "uoaisummary" } }} />);
+
+    expect(screen.getByTestId("uoaisummary-status-dot")).toHaveAttribute("data-severity", "attention");
+    expect(screen.queryByText("注意")).not.toBeInTheDocument();
   });
 });
