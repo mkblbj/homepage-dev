@@ -58,7 +58,7 @@ describe("Responses client", () => {
       model: "internal-company-model-v7",
       reasoning: { effort: "custom-effort-level" },
       store: false,
-      max_output_tokens: 12000,
+      max_output_tokens: 3000,
       text: {
         verbosity: "low",
         format: { type: "json_schema", name: "uo_executive_summary", strict: true },
@@ -183,5 +183,33 @@ describe("Responses client", () => {
       code: "model_schema",
       retryable: false,
     });
+  });
+});
+
+describe("buildResponsesBody", () => {
+  const config = {
+    model: "gpt-5.6-terra",
+    reasoningEffort: "high",
+    apiUrl: "https://ai.invalid/v1/responses",
+    apiKey: "k",
+    requestTimeout: 1000,
+  };
+
+  it("caps the output budget at three thousand tokens", () => {
+    expect(buildResponsesBody({ config, modelInput: {} }).max_output_tokens).toBe(3000);
+  });
+
+  it("tells the model that one action is enough", () => {
+    const { instructions } = buildResponsesBody({ config, modelInput: {} });
+    expect(instructions).toMatch(/return exactly one low action instead of padding/i);
+    expect(instructions).toMatch(/metricKey/);
+    expect(instructions).toMatch(/reviewSamples/);
+  });
+
+  it("defines all three priorities", () => {
+    const { instructions } = buildResponsesBody({ config, modelInput: {} });
+    expect(instructions).toMatch(/- high:/);
+    expect(instructions).toMatch(/- medium:/);
+    expect(instructions).toMatch(/- low:/);
   });
 });

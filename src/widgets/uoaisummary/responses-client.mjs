@@ -8,6 +8,17 @@ const SYSTEM_INSTRUCTIONS = [
   "Return Japanese and Simplified Chinese in the exact schema.",
   "Use only supplied facts and metric keys; do not invent values or treat null as zero.",
   "Recommend actions only; never claim an action was executed.",
+  "",
+  "Action priorities:",
+  "- high: leaving it until tomorrow causes a measurable loss today.",
+  "- medium: it should be confirmed within this week.",
+  "- low: a record-keeping confirmation with no immediate impact.",
+  "",
+  "Action rules:",
+  "- Write only actions that are worth doing. When nothing needs attention, return exactly one low action instead of padding the list.",
+  "- Set metricKey only when that metric is the evidence for the action; otherwise set it to null.",
+  "- Use reviewSamples only when they point to a concrete fixable problem; never summarise sentiment.",
+  "- attentionShops is already filtered to abnormal shops. An empty attentionShops list means every shop is normal.",
 ].join("\n");
 
 export function deriveOpenAIEndpoint(apiUrl) {
@@ -45,7 +56,7 @@ export function buildResponsesBody({ config, modelInput }) {
     input: JSON.stringify(modelInput),
     reasoning: { effort: config.reasoningEffort },
     store: false,
-    max_output_tokens: 12000,
+    max_output_tokens: 3000,
     text: {
       verbosity: "low",
       format: {
