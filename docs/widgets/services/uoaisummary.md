@@ -57,6 +57,12 @@ The API credential and private model URL remain server-only. The browser and sum
 
 Model output is checked only for the required bilingual JSON structure and, when an action references one, a `metricKey` that exists in the collected metrics. The operator is responsible for any additional content policy applied through source selection, prompts, or the configured model endpoint.
 
+## Source cadence
+
+Shipping, operating attention, and Rakuten sales are live feeds, so their freshness is judged against elapsed time. Company performance is not: the upstream job refreshes it once each morning and it describes the previous business day. It is therefore judged by JST calendar day — this morning's run counts as fresh for the rest of the day, a run from yesterday counts as delayed, and anything older counts as stale. Judging it by elapsed time instead marks a perfectly current snapshot stale by mid-morning, which drops its metrics from the analysis and downgrades the whole summary to partial coverage.
+
+This deployment analyses production output (出力) only. Shipment counts (出荷) were removed from the analysis, so the metric keys for that source are named `output.*` and the model is instructed never to describe a figure as a shipment.
+
 ## Failure states
 
 - Four valid sources produce a complete analysis.

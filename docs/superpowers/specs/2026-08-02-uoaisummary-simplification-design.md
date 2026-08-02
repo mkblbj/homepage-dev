@@ -323,3 +323,23 @@
 - 不改变配置字段与 `config/services.yaml` 的写法。
 - 不改动四个上游数据源 widget 本身。
 - 不引入新的模型能力（工具调用、多轮、流式）。
+
+---
+
+## 上线后的两处修正（2026-08-02）
+
+首次实际运行暴露了两个本设计没有预见的问题。
+
+### 出力被表述成出荷
+
+模型把 `output` 侧的 892 件写成了「出荷892件」。原因是本设计把人类标签从模型输入里移除后，模型只剩键名可依据，而 `shipping.today_output.total` 的 `shipping.` 前缀命名的是**数据源看板**（uoshippingdashboard），不是指标含义——日语里 shipping 即出荷。恰恰因为本设计把出荷数据删干净了，这个前缀彻底名不副实。
+
+修正：三个指标键改名为 `output.today.total` / `output.active_shops` / `output.tomorrow.total`，键名描述测量对象而非来源看板；`uoaisummary.source.shipping` 的三语标签从「出荷 / 发货 / Shipping」改为「出力 / 输出 / Output」；`SYSTEM_INSTRUCTIONS` 新增词汇约束，明确本部署不含任何出荷数据，禁止把任何数字表述为 出荷 / 発送 / 发货 / shipment。
+
+代价：改名会让指标与已有 snapshot 对不上，升级后第一个周期这三条不显示环比。
+
+### performance 被当作实时流判定新鲜度
+
+`source-client.mjs` 用 10 分钟刷新间隔算 performance 的新鲜度，3.3 小时后判 stale。但该源由上游任务每天早上刷新一次、描述的是前一个营业日，17:19 判它过期是把日快照当实时流看。连锁后果：源判 stale → 三条 performance 指标被排除（UI 上「訪問数」显示 `—`）→ 有效源 3/4 → `dataQuality` 降为 partial → 结论里出现「データは部分的です」。
+
+修正：performance 改用按 JST 日历日判定——当天生成为 fresh，前一天为 delayed，更早为 stale。其余三个源仍按经过时间判定。`SYSTEM_INSTRUCTIONS` 同时说明该源是前一营业日的日快照，不得当作当下数据表述。

@@ -1243,9 +1243,9 @@
         "sourceWorst": "{{valid}}/{{total}} · {{source}} {{state}}",
         "sourceWorstMore": "{{valid}}/{{total}} · {{source}} {{state}} +{{count}}",
         "metric": {
-            "shipping.today_output.total": "Output today",
-            "shipping.active_shops": "Active shops",
-            "shipping.tomorrow.total": "Planned tomorrow",
+            "output.today.total": "Output today",
+            "output.active_shops": "Active shops",
+            "output.tomorrow.total": "Planned tomorrow",
             "attention.open_total": "Open items",
             "attention.pending_orders": "Unconfirmed orders",
             "attention.unanswered_inquiries": "Unanswered inquiries",
@@ -1260,7 +1260,7 @@
             "performance.mix.new_sales_share": "New-customer share"
         },
         "source": {
-            "shipping": "Shipping",
+            "shipping": "Output",
             "attention": "Operations",
             "sales": "Rakuten sales",
             "performance": "Performance"
@@ -1458,7 +1458,7 @@
         "waitingForUpdate": "Waiting for update",
         "willAppearNextRefresh": "Will appear after the next refresh",
         "output": "Output",
-        "shipping": "Shipping",
+        "shipping": "Output",
         "notStarted": "Not started",
         "vsYesterday": "vs. yesterday",
         "channelMix": "Channel mix",

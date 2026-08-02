@@ -160,4 +160,48 @@ describe("source-client", () => {
     expect(collected.shipping.error).toBeNull();
     expect(collected.shipping.data.today_output.total_quantity).toBe(749);
   });
+
+  describe("performance is a daily snapshot, not a live feed", () => {
+    const performanceFetcher = (generatedAtJST) =>
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            generatedAtJST,
+            traffic: { status: "normal", visitCount: 8420, sampleCount: 5 },
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+      );
+
+    const collectPerformance = (generatedAtJST, nowIso) =>
+      collectBusinessSources(
+        { performance: { widget: { type: "uoperformance", url: "http://commerce.test", refreshInterval: 600000 } } },
+        { fetcher: performanceFetcher(generatedAtJST), nowTs: Date.parse(nowIso) },
+      );
+
+    it("stays fresh all day after the morning run", async () => {
+      const collected = await collectPerformance("2026-08-02 07:00:00 JST", "2026-08-02T17:19:35+09:00");
+
+      expect(collected.performance.state).toBe("fresh");
+    });
+
+    it("is delayed once the morning run has not happened today", async () => {
+      const collected = await collectPerformance("2026-08-01 07:00:00 JST", "2026-08-02T17:19:35+09:00");
+
+      expect(collected.performance.state).toBe("delayed");
+    });
+
+    it("is stale only after the job has missed more than a day", async () => {
+      const collected = await collectPerformance("2026-07-30 07:00:00 JST", "2026-08-02T17:19:35+09:00");
+
+      expect(collected.performance.state).toBe("stale");
+    });
+
+    it("keeps the day boundary in JST, not the host timezone", async () => {
+      // 2026-08-02 23:30 UTC is already 2026-08-03 08:30 JST.
+      const collected = await collectPerformance("2026-08-03 08:00:00 JST", "2026-08-02T23:30:00Z");
+
+      expect(collected.performance.state).toBe("fresh");
+    });
+  });
 });

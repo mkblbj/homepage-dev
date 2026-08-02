@@ -92,7 +92,7 @@ const ready = {
       note: null,
     },
     {
-      key: "shipping.today_output.total",
+      key: "output.today.total",
       unit: "count",
       value: 1860,
       previousValue: null,
@@ -101,7 +101,7 @@ const ready = {
       note: null,
     },
     {
-      key: "shipping.tomorrow.total",
+      key: "output.tomorrow.total",
       unit: "count",
       value: 2010,
       previousValue: null,

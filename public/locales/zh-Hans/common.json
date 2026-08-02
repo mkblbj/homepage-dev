@@ -1256,9 +1256,9 @@
         "sourceWorst": "{{valid}}/{{total}} · {{source}} {{state}}",
         "sourceWorstMore": "{{valid}}/{{total}} · {{source}} {{state}} +{{count}}",
         "metric": {
-            "shipping.today_output.total": "今日输出",
-            "shipping.active_shops": "活跃店铺",
-            "shipping.tomorrow.total": "明日计划",
+            "output.today.total": "今日输出",
+            "output.active_shops": "活跃店铺",
+            "output.tomorrow.total": "明日计划",
             "attention.open_total": "未处理",
             "attention.pending_orders": "待确认订单",
             "attention.unanswered_inquiries": "未回复咨询",
@@ -1273,7 +1273,7 @@
             "performance.mix.new_sales_share": "新客销售占比"
         },
         "source": {
-            "shipping": "发货",
+            "shipping": "输出",
             "attention": "运营待办",
             "sales": "乐天销售",
             "performance": "经营表现"

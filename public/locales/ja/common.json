@@ -1243,9 +1243,9 @@
         "sourceWorst": "{{valid}}/{{total}} · {{source}} {{state}}",
         "sourceWorstMore": "{{valid}}/{{total}} · {{source}} {{state}} +{{count}}",
         "metric": {
-            "shipping.today_output.total": "今日出力",
-            "shipping.active_shops": "稼働店舗",
-            "shipping.tomorrow.total": "明日予定",
+            "output.today.total": "今日出力",
+            "output.active_shops": "稼働店舗",
+            "output.tomorrow.total": "明日予定",
             "attention.open_total": "未対応",
             "attention.pending_orders": "未確認注文",
             "attention.unanswered_inquiries": "未回答問い合わせ",
@@ -1260,7 +1260,7 @@
             "performance.mix.new_sales_share": "新規売上比率"
         },
         "source": {
-            "shipping": "出荷",
+            "shipping": "出力",
             "attention": "運営対応",
             "sales": "楽天売上",
             "performance": "経営表現"
@@ -1458,7 +1458,7 @@
         "waitingForUpdate": "更新を待機中",
         "willAppearNextRefresh": "次回更新で反映されます",
         "output": "出力",
-        "shipping": "出荷",
+        "shipping": "出力",
         "notStarted": "未開始",
         "vsYesterday": "前日比",
         "channelMix": "チャンネル構成",

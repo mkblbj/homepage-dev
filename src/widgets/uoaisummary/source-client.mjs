@@ -111,6 +111,30 @@ function timestampFreshness(timestamp, nowTs, refreshInterval) {
   return result.state === "live" ? "fresh" : result.state;
 }
 
+function jstDate(timestamp) {
+  const parsed = Date.parse(
+    String(timestamp || "")
+      .replace(" JST", "+09:00")
+      .replace(" ", "T"),
+  );
+  if (Number.isNaN(parsed)) return null;
+  return new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo", dateStyle: "short" }).format(new Date(parsed));
+}
+
+// The performance source is refreshed once a day by the upstream job and describes
+// the previous business day, so elapsed minutes say nothing about its health — an
+// interval-based check calls a perfectly current snapshot stale by mid-morning, which
+// drops its metrics from the analysis entirely. What matters is which JST day it
+// belongs to: today's run is as fresh as this source ever gets.
+function dailySnapshotFreshness(timestamp, nowTs) {
+  const generated = jstDate(timestamp);
+  const today = jstDate(new Date(nowTs).toISOString());
+  if (!generated || !today) return "delayed";
+  if (generated === today) return "fresh";
+  const yesterday = jstDate(new Date(nowTs - 86400000).toISOString());
+  return generated === yesterday ? "delayed" : "stale";
+}
+
 function worstState(...states) {
   const weight = { fresh: 0, delayed: 1, stale: 2, unavailable: 3 };
   return states.reduce((worst, state) => (weight[state] > weight[worst] ? state : worst), "fresh");
@@ -182,10 +206,7 @@ export async function collectBusinessSources(
     }),
     isolated("performance", sources.performance, async (widget) => {
       const data = validatePayload("performance", await read(endpoint(widget.url, "/api/performance")));
-      const state = worstState(
-        timestampFreshness(data.generatedAtJST, nowTs, widget.refreshInterval || 600000),
-        compositeFreshness(data.sources),
-      );
+      const state = worstState(dailySnapshotFreshness(data.generatedAtJST, nowTs), compositeFreshness(data.sources));
       return {
         key: "performance",
         state,

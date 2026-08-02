@@ -7,9 +7,9 @@ const KEYS = METRIC_DEFINITIONS.map(([key]) => key);
 describe("METRIC_DEFINITIONS", () => {
   it("keeps exactly the fifteen approved metric keys", () => {
     expect(KEYS).toEqual([
-      "shipping.today_output.total",
-      "shipping.active_shops",
-      "shipping.tomorrow.total",
+      "output.today.total",
+      "output.active_shops",
+      "output.tomorrow.total",
       "attention.open_total",
       "attention.pending_orders",
       "attention.unanswered_inquiries",
@@ -35,7 +35,7 @@ describe("METRIC_DEFINITIONS", () => {
 
   it("attaches a note reader only to tomorrow output", () => {
     expect(METRIC_DEFINITIONS.filter(([, , , , noteRead]) => noteRead).map(([key]) => key)).toEqual([
-      "shipping.tomorrow.total",
+      "output.tomorrow.total",
     ]);
   });
 });
@@ -85,7 +85,7 @@ describe("metric", () => {
   });
 
   it("carries the note through", () => {
-    expect(metric("shipping.tomorrow.total", "shipping", 5, "count", {}, "predicted").note).toBe("predicted");
+    expect(metric("output.tomorrow.total", "shipping", 5, "count", {}, "predicted").note).toBe("predicted");
   });
 });
 

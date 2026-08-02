@@ -4,8 +4,8 @@ const STRIP_KEYS = [
   "sales.realtime_vs_seven_day_avg_percent",
   "performance.traffic.visit",
   "attention.open_total",
-  "shipping.today_output.total",
-  "shipping.tomorrow.total",
+  "output.today.total",
+  "output.tomorrow.total",
 ];
 
 const SOURCE_ORDER = ["shipping", "attention", "sales", "performance"];
@@ -29,7 +29,7 @@ function secondaryLine(key, entry, metricsByKey, t) {
     const baseline = metricsByKey["performance.traffic.delta_percent"];
     return baseline && baseline.value !== null ? formatMetricValue(baseline.value, baseline.unit) : null;
   }
-  if (key === "shipping.tomorrow.total" && entry?.note === "predicted") return t("uoaisummary.metricNote.predicted");
+  if (key === "output.tomorrow.total" && entry?.note === "predicted") return t("uoaisummary.metricNote.predicted");
   return deltaText(entry);
 }
 

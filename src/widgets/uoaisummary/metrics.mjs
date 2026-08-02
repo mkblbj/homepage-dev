@@ -31,9 +31,13 @@ export function metric(key, source, value, unit, previousMetrics, note = null) {
 }
 
 export const METRIC_DEFINITIONS = [
-  ["shipping.today_output.total", "shipping", (d) => d.today_output?.total_quantity, "count"],
-  ["shipping.active_shops", "shipping", (d) => d.today_output?.active_shops_count, "count"],
-  ["shipping.tomorrow.total", "shipping", (d) => tomorrowOutput(d).total, "count", (d) => tomorrowOutput(d).mode],
+  // Keys name the measurement, not the dashboard it came from. The source of these
+  // three is the shipping dashboard, but this deployment analyses 出力 (production
+  // output) only — 出荷 (shipment) was removed. A `shipping.*` key led the model to
+  // describe 出力 figures as 出荷 in its prose.
+  ["output.today.total", "shipping", (d) => d.today_output?.total_quantity, "count"],
+  ["output.active_shops", "shipping", (d) => d.today_output?.active_shops_count, "count"],
+  ["output.tomorrow.total", "shipping", (d) => tomorrowOutput(d).total, "count", (d) => tomorrowOutput(d).mode],
   [
     "attention.open_total",
     "attention",

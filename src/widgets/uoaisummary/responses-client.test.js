@@ -215,6 +215,21 @@ describe("buildResponsesBody", () => {
     expect(buildResponsesBody({ config, modelInput: {} }).max_output_tokens).toBe(12000);
   });
 
+  it("forbids describing output figures as shipments", () => {
+    const { instructions } = buildResponsesBody({ config, modelInput: {} });
+
+    expect(instructions).toMatch(/output\.\* counts are 出力/);
+    expect(instructions).toMatch(/carries no 出荷 \(shipment\) data at all/);
+    expect(instructions).toMatch(/Never describe any figure as 出荷, 発送, 发货, or shipment/);
+  });
+
+  it("tells the model that performance data describes the previous day", () => {
+    const { instructions } = buildResponsesBody({ config, modelInput: {} });
+
+    expect(instructions).toMatch(/performance\.\* is a once-daily snapshot of the previous business day/);
+    expect(instructions).toMatch(/Do not present it as current-moment data/);
+  });
+
   it("tells the model that one action is enough", () => {
     const { instructions } = buildResponsesBody({ config, modelInput: {} });
     expect(instructions).toMatch(/return exactly one low action instead of padding/i);
