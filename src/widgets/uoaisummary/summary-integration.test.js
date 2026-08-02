@@ -208,7 +208,7 @@ function performanceFixture() {
 
 function persistedReadyState() {
   return {
-    version: 1,
+    version: 2,
     latest: {
       severity: "normal",
       dataQuality: "complete",

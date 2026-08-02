@@ -34,7 +34,7 @@ function validSummary() {
 
 function persistedState(overrides = {}) {
   return {
-    version: 1,
+    version: 2,
     latest: {
       severity: "attention",
       dataQuality: "complete",
