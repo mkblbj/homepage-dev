@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+const STATE_VERSION = 2;
 const SOURCE_KEYS = ["shipping", "attention", "sales", "performance"];
 const METRIC_KEYS = new Set([
   "shipping.today_output.total",
@@ -214,7 +215,7 @@ function normalizeUsage(value) {
 
 export function emptySummaryState() {
   return {
-    version: 1,
+    version: STATE_VERSION,
     latest: null,
     snapshots: [],
     lastAttemptAtJST: null,
@@ -231,7 +232,7 @@ export function getSummaryStorePath(configDir) {
 
 function normalizeState(value) {
   const empty = emptySummaryState();
-  if (!value || value.version !== 1) return empty;
+  if (!value || value.version !== STATE_VERSION) return empty;
 
   return {
     ...empty,
@@ -266,8 +267,9 @@ export function createSummaryStore({ configDir, now = Date.now }) {
 
       try {
         const parsed = JSON.parse(readFileSync(filePath, "utf8"));
+        if (!parsed || parsed.version !== STATE_VERSION) return emptySummaryState();
         const state = normalizeState(parsed);
-        if (parsed?.latest !== null && parsed?.latest !== undefined && state.latest === null) {
+        if (parsed.latest !== null && parsed.latest !== undefined && state.latest === null) {
           throw new Error("Invalid cached summary");
         }
         return state;

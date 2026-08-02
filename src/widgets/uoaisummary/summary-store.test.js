@@ -307,3 +307,48 @@ describe("summary store", () => {
     expect(HASHED_CONFIGS).not.toContain("uo-ai-summary.json");
   });
 });
+
+describe("cache version migration", () => {
+  it("stamps new state with version 2", () => {
+    expect(emptySummaryState().version).toBe(2);
+  });
+
+  it("resets a version 1 cache without marking it corrupt", () => {
+    const configDir = mkdtempSync(join(tmpdir(), "uoai-v1-"));
+    writeFileSync(
+      join(configDir, "uo-ai-summary.json"),
+      JSON.stringify({
+        version: 1,
+        latest: {
+          severity: "attention",
+          dataQuality: "complete",
+          generatedAtJST: "2026-08-01 10:00:00 JST",
+          sourceCoverage: { valid: 4, total: 4 },
+          sourceFreshness: {
+            shipping: { state: "fresh", updatedAtJST: null },
+            attention: { state: "fresh", updatedAtJST: null },
+            sales: { state: "fresh", updatedAtJST: null },
+            performance: { state: "fresh", updatedAtJST: null },
+          },
+          summary: { headline: { ja: "a", zh: "b" }, assessment: { ja: "c", zh: "d" }, actions: [] },
+          metrics: [],
+        },
+        snapshots: [],
+      }),
+      "utf8",
+    );
+
+    const state = createSummaryStore({ configDir, now: () => 1 }).read();
+
+    expect(state).toEqual(emptySummaryState());
+    expect(readdirSync(configDir).filter((name) => name.includes("corrupt"))).toEqual([]);
+  });
+
+  it("still quarantines a version 2 file that cannot be parsed", () => {
+    const configDir = mkdtempSync(join(tmpdir(), "uoai-bad-"));
+    writeFileSync(join(configDir, "uo-ai-summary.json"), "{ not json", "utf8");
+
+    expect(createSummaryStore({ configDir, now: () => 1 }).read()).toEqual(emptySummaryState());
+    expect(readdirSync(configDir).filter((name) => name.includes("corrupt"))).toHaveLength(1);
+  });
+});
