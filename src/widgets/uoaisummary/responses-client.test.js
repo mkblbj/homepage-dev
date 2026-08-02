@@ -202,8 +202,13 @@ describe("buildResponsesBody", () => {
   it("tells the model that one action is enough", () => {
     const { instructions } = buildResponsesBody({ config, modelInput: {} });
     expect(instructions).toMatch(/return exactly one low action instead of padding/i);
-    expect(instructions).toMatch(/metricKey/);
-    expect(instructions).toMatch(/reviewSamples/);
+  });
+
+  it("states the rule for each field the model has to decide about", () => {
+    const { instructions } = buildResponsesBody({ config, modelInput: {} });
+    expect(instructions).toMatch(/Set metricKey only when that metric is the evidence/i);
+    expect(instructions).toMatch(/reviewSamples only when they point to a concrete fixable problem/i);
+    expect(instructions).toMatch(/empty attentionShops list means every shop is normal/i);
   });
 
   it("defines all three priorities", () => {
