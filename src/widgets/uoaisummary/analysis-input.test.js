@@ -597,6 +597,7 @@ describe("shrinkToBudget", () => {
     shrinkToBudget(modelInput);
 
     expect(modelInput.metrics[0]).not.toHaveProperty("delta");
+    expect(modelInput.attentionShops).toHaveLength(5);
     expect(modelInput.reviewSamples).toHaveLength(10);
   });
 
