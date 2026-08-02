@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect, it } from "vitest";
 
+import { METRIC_DEFINITIONS } from "./metrics.mjs";
+
 function keys(value, prefix = "") {
   return Object.entries(value).flatMap(([key, child]) => {
     const path = prefix ? `${prefix}.${key}` : key;
@@ -18,23 +20,8 @@ it("keeps every uoaisummary UI key aligned across ja, zh-Hans, and en", () => {
   expect(keys(read("en")).sort()).toEqual(ja);
 });
 
-const METRIC_KEYS = [
-  "shipping.today_output.total",
-  "shipping.active_shops",
-  "shipping.tomorrow.total",
-  "attention.open_total",
-  "attention.pending_orders",
-  "attention.unanswered_inquiries",
-  "attention.overdue_inquiries",
-  "attention.unreplied_reviews",
-  "sales.realtime_yen",
-  "sales.orders",
-  "sales.aov_yen",
-  "sales.realtime_vs_seven_day_avg_percent",
-  "performance.traffic.visit",
-  "performance.traffic.delta_percent",
-  "performance.mix.new_sales_share",
-];
+// Derived so that adding a metric without adding its label fails here.
+const METRIC_KEYS = METRIC_DEFINITIONS.map(([key]) => key);
 
 it("labels every metric key in every locale", () => {
   ["ja", "zh-Hans", "en"].forEach((locale) => {

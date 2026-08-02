@@ -19,7 +19,7 @@ describe("source-client", () => {
     expect(fetcher.mock.calls[0][1].redirect).toBe("manual");
   });
 
-  it("collects the six read-only endpoint calls and keeps one failed source isolated", async () => {
+  it("collects the five read-only endpoint calls and keeps one failed source isolated", async () => {
     const fetcher = vi.fn(async (url) => {
       const value = String(url);
       if (value.endsWith("/api/performance")) throw new TypeError("private host details");
@@ -27,12 +27,6 @@ describe("source-client", () => {
         return reply({ generatedAtJST: "2026-08-01 09:45 JST", totals: { salesYen: 100, orderCount: 2 }, shops: [] });
       }
       if (value.endsWith("/api/history/sales")) return reply({ totals: {}, shops: [], range: { dates: [] } });
-      if (value.endsWith("/api/item-rankings")) {
-        return reply({
-          generatedAtJST: "2026-08-01 09:45 JST",
-          rankings: {},
-        });
-      }
       if (value.endsWith("/api/attention")) {
         return reply({ generatedAtJST: "2026-08-01 09:50 JST", status: "attention", sources: {}, summary: {} });
       }
@@ -52,11 +46,12 @@ describe("source-client", () => {
       timeoutMs: 100,
     });
 
-    expect(fetcher).toHaveBeenCalledTimes(6);
+    expect(fetcher).toHaveBeenCalledTimes(5);
+    expect(fetcher.mock.calls.some(([url]) => String(url).includes("/api/item-rankings"))).toBe(false);
     expect(result.shipping.state).toBe("fresh");
     expect(result.sales.data).toHaveProperty("sales");
     expect(result.sales.data).toHaveProperty("history");
-    expect(result.sales.data).toHaveProperty("ranking");
+    expect(result.sales.data).not.toHaveProperty("ranking");
     expect(result.performance).toMatchObject({
       state: "unavailable",
       data: null,
@@ -77,7 +72,6 @@ describe("source-client", () => {
     ["attention", "attention"],
     ["sales", "sales"],
     ["history", "sales"],
-    ["ranking", "sales"],
     ["performance", "performance"],
   ])("marks %s unavailable when its HTTP 200 payload misses the endpoint contract", async (broken, sourceKey) => {
     const fetcher = vi.fn(async (url) => {
@@ -90,9 +84,7 @@ describe("source-client", () => {
             ? "sales"
             : value.endsWith("/api/history/sales")
               ? "history"
-              : value.endsWith("/api/item-rankings")
-                ? "ranking"
-                : "performance";
+              : "performance";
       if (endpoint === broken) return reply({});
       if (endpoint === "shipping") {
         return reply({
@@ -117,12 +109,6 @@ describe("source-client", () => {
       }
       if (endpoint === "history") {
         return reply({ totals: {}, shops: [], range: { dates: [] } });
-      }
-      if (endpoint === "ranking") {
-        return reply({
-          generatedAtJST: "2026-08-01 09:45:00 JST",
-          rankings: {},
-        });
       }
       return reply({
         generatedAtJST: "2026-08-01 09:40:00 JST",

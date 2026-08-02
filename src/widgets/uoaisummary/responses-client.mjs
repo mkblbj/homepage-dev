@@ -56,7 +56,7 @@ export function buildResponsesBody({ config, modelInput }) {
     input: JSON.stringify(modelInput),
     reasoning: { effort: config.reasoningEffort },
     store: false,
-    max_output_tokens: 3000,
+    max_output_tokens: 6000,
     text: {
       verbosity: "low",
       format: {
@@ -106,6 +106,11 @@ export async function requestSummaryOnce({
       maxRetries: 0,
       timeout: config.requestTimeout,
     });
+    if (response?.status === "incomplete" && response.incomplete_details?.reason === "max_output_tokens") {
+      throw new AISummaryError("model_schema", "Model output hit max_output_tokens", {
+        retryable: false,
+      });
+    }
     if (
       response?.status !== "completed" ||
       (response.output || []).some((item) => (item.content || []).some((part) => part?.type === "refusal"))

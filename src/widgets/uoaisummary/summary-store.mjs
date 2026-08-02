@@ -1,25 +1,13 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { METRIC_DEFINITIONS } from "./metrics.mjs";
+
 const STATE_VERSION = 2;
 const SOURCE_KEYS = ["shipping", "attention", "sales", "performance"];
-const METRIC_KEYS = new Set([
-  "shipping.today_output.total",
-  "shipping.active_shops",
-  "shipping.tomorrow.total",
-  "attention.open_total",
-  "attention.pending_orders",
-  "attention.unanswered_inquiries",
-  "attention.overdue_inquiries",
-  "attention.unreplied_reviews",
-  "sales.realtime_yen",
-  "sales.orders",
-  "sales.aov_yen",
-  "sales.realtime_vs_seven_day_avg_percent",
-  "performance.traffic.visit",
-  "performance.traffic.delta_percent",
-  "performance.mix.new_sales_share",
-]);
+// Derived, never copied: an unlisted metricKey makes normalizeSummary drop the action, and
+// dropping every action discards the whole generation.
+const METRIC_KEYS = new Set(METRIC_DEFINITIONS.map(([key]) => key));
 const ERROR_CODES = new Set([
   "configuration",
   "source_timeout",

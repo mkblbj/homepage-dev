@@ -305,7 +305,7 @@ describe("analysis input", () => {
     expect(bundle.sourceFreshness.sales.state).toBe("stale");
   });
 
-  it("stale sources no longer affect severity", () => {
+  it("does not escalate severity from a stale source's business status", () => {
     const collected = fourSourceFixture();
     collected.attention.state = "stale";
     collected.attention.data.status = "critical";
@@ -316,7 +316,8 @@ describe("analysis input", () => {
       nowTs: Date.parse("2026-08-01T10:00:00+09:00"),
     });
 
-    expect(bundle.severity).toBe("normal");
+    expect(bundle.severity).not.toBe("critical");
+    expect(bundle.severity).toBe("unknown");
   });
 
   it("does not include reviews from stale attention", () => {
@@ -376,6 +377,18 @@ describe("severity", () => {
 
     expect(analysis.severity).toBe("normal");
     expect(analysis.sourceFreshness.sales.state).toBe("delayed");
+  });
+
+  it("refuses the all-clear when a status source is unreadable", () => {
+    const collected = fourSourceFixture();
+    collected.attention.state = "stale";
+    collected.attention.data.status = "normal";
+    collected.performance.data.traffic.status = "normal";
+
+    const analysis = buildAnalysisInput(collected, { previousSnapshot: null, nowTs: Date.now() });
+
+    expect(analysis.sourceCoverage).toEqual({ valid: 3, total: 4 });
+    expect(analysis.severity).toBe("unknown");
   });
 
   it("reports critical when a business status is critical", () => {

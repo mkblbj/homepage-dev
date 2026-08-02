@@ -58,7 +58,7 @@ describe("Responses client", () => {
       model: "internal-company-model-v7",
       reasoning: { effort: "custom-effort-level" },
       store: false,
-      max_output_tokens: 3000,
+      max_output_tokens: 6000,
       text: {
         verbosity: "low",
         format: { type: "json_schema", name: "uo_executive_summary", strict: true },
@@ -184,6 +184,22 @@ describe("Responses client", () => {
       retryable: false,
     });
   });
+
+  it("names the output cap in the server-side message when generation is truncated", async () => {
+    const fetcher = vi.fn().mockResolvedValue(
+      reply({
+        status: "incomplete",
+        incomplete_details: { reason: "max_output_tokens" },
+        output: [],
+      }),
+    );
+
+    await expect(configuredRequest(fetcher)).rejects.toMatchObject({
+      code: "model_schema",
+      retryable: false,
+      message: "Model output hit max_output_tokens",
+    });
+  });
 });
 
 describe("buildResponsesBody", () => {
@@ -195,8 +211,8 @@ describe("buildResponsesBody", () => {
     requestTimeout: 1000,
   };
 
-  it("caps the output budget at three thousand tokens", () => {
-    expect(buildResponsesBody({ config, modelInput: {} }).max_output_tokens).toBe(3000);
+  it("leaves the output budget room for reasoning tokens on top of the bilingual answer", () => {
+    expect(buildResponsesBody({ config, modelInput: {} }).max_output_tokens).toBe(6000);
   });
 
   it("tells the model that one action is enough", () => {

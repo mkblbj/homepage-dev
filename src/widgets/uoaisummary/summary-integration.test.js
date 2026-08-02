@@ -166,17 +166,6 @@ function historyFixture() {
   };
 }
 
-function rankingFixture() {
-  return {
-    generatedAtJST: "2026-08-01 09:45:00 JST",
-    rankings: {
-      sales: [{ itemManagementNumber: "item-a", title: "A", rank: 1 }],
-      orderCount: [{ itemManagementNumber: "item-a", title: "A", rank: 1 }],
-      units: [{ itemManagementNumber: "item-b", title: "B", rank: 1 }],
-    },
-  };
-}
-
 function performanceFixture() {
   return {
     generatedAtJST: "2026-08-01 09:40:00 JST",
@@ -305,7 +294,6 @@ function integrationHarness({ failedSources = {}, persisted = null, modelRespons
     if (source === "attention") return reply(attentionFixtureWithPrivateReview());
     if (source === "performance") return reply(performanceFixture());
     if (request.url.endsWith("/api/history/sales")) return reply(historyFixture());
-    if (request.url.endsWith("/api/item-rankings")) return reply(rankingFixture());
     return reply(salesFixture());
   });
 

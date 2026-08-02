@@ -55,7 +55,8 @@ function severity(collected, validCount) {
   ];
   if (statuses.includes("critical")) return "critical";
   if (statuses.includes("attention")) return "attention";
-  return "normal";
+  // An unreadable status source cannot support an all-clear, only an escalation.
+  return statuses.includes(null) ? "unknown" : "normal";
 }
 
 function safeText(value, max = 160) {

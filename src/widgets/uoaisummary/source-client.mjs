@@ -41,9 +41,6 @@ function validatePayload(endpointName, data) {
     requireArray(data.shops);
     requireRecord(data.range);
     requireArray(data.range.dates);
-  } else if (endpointName === "ranking") {
-    requireString(data.generatedAtJST);
-    requireRecord(data.rankings);
   } else if (endpointName === "performance") {
     requireString(data.generatedAtJST);
     requireRecord(data.traffic);
@@ -167,28 +164,19 @@ export async function collectBusinessSources(
       };
     }),
     isolated("sales", sources.sales, async (widget) => {
-      const requests = ["sales", "history", "ranking"].map((name) =>
+      const requests = ["sales", "history"].map((name) =>
         buildSalesProxyRequest({ endpoint: name, baseUrl: widget.url }),
       );
-      const [salesData, history, ranking] = await Promise.all(requests.map(({ url }) => read(url)));
+      const [salesData, history] = await Promise.all(requests.map(({ url }) => read(url)));
       validatePayload("sales", salesData);
       validatePayload("history", history);
-      validatePayload("ranking", ranking);
-      const state = worstState(
-        timestampFreshness(salesData.generatedAtJST, nowTs, widget.refreshInterval || 900000),
-        timestampFreshness(ranking.generatedAtJST, nowTs, widget.refreshInterval || 900000),
-      );
+      const state = timestampFreshness(salesData.generatedAtJST, nowTs, widget.refreshInterval || 900000);
       return {
         key: "sales",
         state,
-        partial: Boolean(
-          salesData.partial ||
-          history.partial ||
-          ranking.partial ||
-          Object.values(ranking.rankings || {}).some((block) => block?.partial),
-        ),
-        updatedAtJST: salesData.generatedAtJST || ranking.generatedAtJST || null,
-        data: { sales: salesData, history, ranking },
+        partial: Boolean(salesData.partial || history.partial),
+        updatedAtJST: salesData.generatedAtJST || null,
+        data: { sales: salesData, history },
         error: null,
       };
     }),
