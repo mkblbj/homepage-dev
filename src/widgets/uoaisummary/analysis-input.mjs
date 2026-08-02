@@ -117,10 +117,9 @@ function buildAttentionShops(collected) {
     ? collected.performance.data?.shops || []
     : [];
   const salesByName = new Map(
-    (VALID_STATES.has(collected.sales?.state) ? collected.sales.data?.sales?.shops || [] : []).map((shop) => [
-      String(shop.shopName || "").trim(),
-      shop,
-    ]),
+    (VALID_STATES.has(collected.sales?.state) ? collected.sales.data?.sales?.shops || [] : [])
+      .map((shop) => [safeText(shop.shopName, 80), shop])
+      .filter(([name]) => name),
   );
 
   const merged = new Map();
@@ -163,17 +162,18 @@ function buildAttentionShops(collected) {
   }
 
   return [...merged.values()]
-    .sort((left, right) => right.rank - left.rank || left.shopName.localeCompare(right.shopName))
+    .sort((left, right) => right.rank - left.rank || (left.shopName < right.shopName ? -1 : 1))
     .slice(0, MAX_ATTENTION_SHOPS)
     .map(({ rank, ...entry }) => ({
       ...entry,
+      issues: [...new Set(entry.issues)],
       salesYen: numberOrNull(salesByName.get(entry.shopName)?.salesYen),
     }));
 }
 
 const MAX_MODEL_INPUT_BYTES = 16000;
 
-function shrinkToBudget(modelInput) {
+export function shrinkToBudget(modelInput) {
   if (byteLength(modelInput) <= MAX_MODEL_INPUT_BYTES) return;
   modelInput.metrics = modelInput.metrics.map(({ key, source, value, unit, note }) => ({
     key,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildAnalysisInput, sanitizeReview } from "./analysis-input.mjs";
+import { buildAnalysisInput, sanitizeReview, shrinkToBudget } from "./analysis-input.mjs";
 
 function fourSourceFixture() {
   return {
@@ -340,22 +340,6 @@ describe("analysis input", () => {
     expect(bundle.modelInput.reviewSamples).toEqual([]);
   });
 
-  it("keeps the serialized model input within 50 KB", () => {
-    const collected = largeFixture();
-    collected.performance.data.traffic.sevenDayTrend = Array.from({ length: 7 }, (_, index) => ({
-      date: "2026-07-" + (25 + index),
-      note: "x".repeat(12000),
-    }));
-
-    const bundle = buildAnalysisInput(collected, {
-      previousSnapshot: null,
-      nowTs: Date.parse("2026-08-01T10:00:00+09:00"),
-    });
-
-    expect(Buffer.byteLength(JSON.stringify(bundle.modelInput), "utf8")).toBeLessThanOrEqual(50000);
-    expect(JSON.stringify(bundle.modelInput)).not.toContain("x".repeat(12000));
-  });
-
   it("copies upstream aggregates into the model input only through leaf allowlists", () => {
     const collected = fourSourceFixture();
     collected.attention.data.summary.unknownAttentionField = "attention-sentinel";
@@ -532,28 +516,91 @@ describe("attentionShops", () => {
   });
 });
 
-describe("size budget", () => {
-  it("drops comparison fields before shops and reviews", () => {
+describe("attentionShops sales join", () => {
+  it("matches shops whose names differ only by full-width characters", () => {
     const collected = fourSourceFixture();
-    collected.attention.data.recentReviews = Array.from({ length: 10 }, (_, index) => ({
-      shopName: "3911",
-      rating: 1,
-      postedAtJST: "2026-08-01 09:00:00 JST",
-      itemManagementNumber: "item-" + index,
-      excerpt: "あ".repeat(300),
-    }));
-    collected.attention.data.shops = Array.from({ length: 5 }, (_, index) => ({
-      shopName: "shop-" + index,
-      status: "critical",
-      pendingOrderCount: 1,
-    }));
+    collected.attention.data.shops = [{ shopName: "３９１１", status: "critical", pendingOrderCount: 4 }];
+    collected.performance.data.shops = [];
+    collected.sales.data.sales.shops = [{ shopName: "３９１１", salesYen: 70000, orderCount: 14 }];
 
-    const analysis = buildAnalysisInput(collected, {
-      previousSnapshot: { capturedAtJST: "2026-08-01 09:00:00 JST", metrics: { "sales.orders": 5 } },
-      nowTs: Date.parse("2026-08-01T10:00:00+09:00"),
-    });
+    const [shop] = buildAnalysisInput(collected, { previousSnapshot: null, nowTs: Date.now() }).modelInput
+      .attentionShops;
 
-    expect(Buffer.byteLength(JSON.stringify(analysis.modelInput), "utf8")).toBeLessThanOrEqual(16000);
-    expect(analysis.modelInput.reviewSamples.length).toBeGreaterThan(0);
+    expect(shop.shopName).toBe("3911");
+    expect(shop.salesYen).toBe(70000);
+  });
+});
+
+describe("shrinkToBudget", () => {
+  function oversized({ excerptChars, reviewCount = 10, shopCount = 5 }) {
+    return {
+      capturedAtJST: "2026-08-01 10:00:00 JST",
+      severity: "attention",
+      dataQuality: "complete",
+      sourceCoverage: { valid: 4, total: 4 },
+      sourceFreshness: {},
+      metrics: Array.from({ length: 15 }, (_, index) => ({
+        key: "metric.number." + index,
+        source: "sales",
+        value: index,
+        unit: "count",
+        previousValue: index,
+        delta: 0,
+        deltaPercent: 0,
+        note: null,
+      })),
+      attentionShops: Array.from({ length: shopCount }, (_, index) => ({
+        shopName: "店".repeat(40) + index,
+        issues: ["orders"],
+        pendingOrderCount: 1,
+      })),
+      reviewSamples: Array.from({ length: reviewCount }, () => ({
+        shopName: "店舗",
+        rating: 1,
+        postedAtJST: "2026-08-01 09:00:00 JST",
+        itemManagementNumber: "item",
+        excerpt: "あ".repeat(excerptChars),
+      })),
+      comparisonWindow: { previousCapturedAtJST: "2026-08-01 09:00:00 JST", elapsedMinutes: 60, isHourly: true },
+      caveats: ["NO_INTRADAY_SALES_BASELINE"],
+    };
+  }
+
+  it("leaves a payload that already fits completely untouched", () => {
+    const modelInput = oversized({ excerptChars: 20 });
+    shrinkToBudget(modelInput);
+
+    expect(modelInput.metrics[0]).toHaveProperty("delta");
+    expect(modelInput.attentionShops).toHaveLength(5);
+    expect(modelInput.reviewSamples).toHaveLength(10);
+  });
+
+  it("drops comparison fields first, then shops, and sacrifices reviews last", () => {
+    const modelInput = oversized({ excerptChars: 600 });
+    expect(Buffer.byteLength(JSON.stringify(modelInput), "utf8")).toBeGreaterThan(16000);
+
+    shrinkToBudget(modelInput);
+
+    expect(modelInput.metrics[0]).not.toHaveProperty("delta");
+    expect(modelInput.metrics[0]).not.toHaveProperty("previousValue");
+    expect(modelInput.metrics[0]).not.toHaveProperty("deltaPercent");
+    expect(modelInput.metrics[0].value).toBe(0);
+    expect(modelInput.attentionShops).toHaveLength(3);
+    expect(modelInput.reviewSamples).toHaveLength(5);
+    expect(Buffer.byteLength(JSON.stringify(modelInput), "utf8")).toBeLessThanOrEqual(16000);
+  });
+
+  it("stops before touching reviews when dropping comparison fields is already enough", () => {
+    const modelInput = oversized({ excerptChars: 400 });
+    expect(Buffer.byteLength(JSON.stringify(modelInput), "utf8")).toBeGreaterThan(16000);
+
+    shrinkToBudget(modelInput);
+
+    expect(modelInput.metrics[0]).not.toHaveProperty("delta");
+    expect(modelInput.reviewSamples).toHaveLength(10);
+  });
+
+  it("refuses to send a payload it cannot shrink below the budget", () => {
+    expect(() => shrinkToBudget(oversized({ excerptChars: 1200 }))).toThrow(/exceeds safe size/);
   });
 });

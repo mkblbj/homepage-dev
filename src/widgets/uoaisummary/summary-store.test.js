@@ -230,6 +230,58 @@ describe("summary store", () => {
     ]);
   });
 
+  it("keeps only the last entry when a metric key repeats", () => {
+    const store = createSummaryStore({ configDir: dir });
+    store.write({
+      ...emptySummaryState(),
+      latest: {
+        ...persistedLatest(),
+        metrics: [
+          {
+            key: "sales.orders",
+            unit: "count",
+            value: 1,
+            previousValue: null,
+            delta: null,
+            deltaPercent: null,
+            note: null,
+          },
+          {
+            key: "attention.open_total",
+            unit: "count",
+            value: 5,
+            previousValue: null,
+            delta: null,
+            deltaPercent: null,
+            note: null,
+          },
+          {
+            key: "sales.orders",
+            unit: "count",
+            value: 99,
+            previousValue: 90,
+            delta: 9,
+            deltaPercent: 10,
+            note: null,
+          },
+        ],
+      },
+    });
+
+    expect(store.read().latest.metrics).toEqual([
+      { key: "sales.orders", unit: "count", value: 99, previousValue: 90, delta: 9, deltaPercent: 10, note: null },
+      {
+        key: "attention.open_total",
+        unit: "count",
+        value: 5,
+        previousValue: null,
+        delta: null,
+        deltaPercent: null,
+        note: null,
+      },
+    ]);
+  });
+
   it("does not include the generated cache in the browser config hash", () => {
     expect(HASHED_CONFIGS).not.toContain("uo-ai-summary.json");
   });

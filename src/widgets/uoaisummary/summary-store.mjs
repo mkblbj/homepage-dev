@@ -146,21 +146,20 @@ const METRIC_NOTES = new Set(["actual", "predicted", "yesterday"]);
 function normalizeMetrics(value) {
   if (!Array.isArray(value)) return [];
 
-  return value
-    .map((entry) =>
-      isRecord(entry) && METRIC_KEYS.has(entry.key) && METRIC_UNITS.has(entry.unit)
-        ? {
-            key: entry.key,
-            unit: entry.unit,
-            value: numberOrNull(entry.value),
-            previousValue: numberOrNull(entry.previousValue),
-            delta: numberOrNull(entry.delta),
-            deltaPercent: numberOrNull(entry.deltaPercent),
-            note: METRIC_NOTES.has(entry.note) ? entry.note : null,
-          }
-        : null,
-    )
-    .filter(Boolean);
+  const byKey = new Map();
+  for (const entry of value) {
+    if (!isRecord(entry) || !METRIC_KEYS.has(entry.key) || !METRIC_UNITS.has(entry.unit)) continue;
+    byKey.set(entry.key, {
+      key: entry.key,
+      unit: entry.unit,
+      value: numberOrNull(entry.value),
+      previousValue: numberOrNull(entry.previousValue),
+      delta: numberOrNull(entry.delta),
+      deltaPercent: numberOrNull(entry.deltaPercent),
+      note: METRIC_NOTES.has(entry.note) ? entry.note : null,
+    });
+  }
+  return [...byKey.values()];
 }
 
 function normalizeLatest(value) {
