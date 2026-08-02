@@ -1348,7 +1348,7 @@
         "vsMedian": "vs same-weekday median ({{value}})",
         "vsMedianShort": "vs median",
         "median": "Same-weekday median",
-        "medianLegend": "Same-weekday median (visits)",
+        "medianLegend": "Same-weekday median ({{weekday}}, visits)",
         "sampleOk": "Same-weekday samples {{n}}/4 · compared to the median",
         "sampleShort": "Same-weekday samples {{n}}/4 · no comparison (not zero traffic, not an outage)",
         "sampleShortShort": "Not enough samples",

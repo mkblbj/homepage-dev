@@ -1361,7 +1361,7 @@
         "vsMedian": "对比同星期中位数（{{value}}）",
         "vsMedianShort": "对中位",
         "median": "同星期中位数",
-        "medianLegend": "同星期中位数（访问）",
+        "medianLegend": "同星期中位数（{{weekday}}・访问）",
         "sampleOk": "同星期样本 {{n}}/4 · 与中位数比较",
         "sampleShort": "同星期样本 {{n}}/4 · 无法比较（既非零访问也非故障）",
         "sampleShortShort": "样本不足",

@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithProviders } from "test-utils/render-with-providers";
 
+import { weekdayJp } from "./performance-model.mjs";
+
 const { useWidgetAPI } = vi.hoisted(() => ({ useWidgetAPI: vi.fn() }));
 
 vi.mock("utils/proxy/use-widget-api", () => ({
@@ -156,6 +158,44 @@ describe("widgets/uoperformance/component", () => {
     fireEvent.click(screen.getByRole("button", { name: "UU" }));
 
     expect(screen.queryByText("uoperformance.medianLegend")).not.toBeInTheDocument();
+  });
+
+  it("confines the median baseline to the segment it actually describes", () => {
+    mockData(snapshot());
+    const { container } = render();
+
+    // the median is one figure for the latest business day, so it must not span days whose
+    // own same-weekday median would be a different number
+    const baseline = container.querySelector('[data-testid="median-baseline"]');
+
+    expect(baseline).toBeTruthy();
+    expect(baseline).toHaveClass("right-0");
+    // two points in the fixture → the line starts at the earlier one
+    expect(parseFloat(baseline.style.left)).toBeCloseTo(0, 4);
+  });
+
+  it("spans the last inter-point gap when a full week is present", () => {
+    const week = ["07-26", "07-27", "07-28", "07-29", "07-30", "07-31", "08-01"].map((md, i) => ({
+      dateJST: `2026-${md}`,
+      visitCount: 15000 + i * 100,
+      uniqueVisitorCount: 14000 + i * 100,
+    }));
+    mockData(snapshot({ traffic: { ...snapshot().traffic, daily: week } }));
+    const { container } = render();
+
+    // 7 points → the second-to-last sits at 5/6 of the width, so the line covers the final day only
+    const left = parseFloat(container.querySelector('[data-testid="median-baseline"]').style.left);
+
+    expect(left).toBeCloseTo((5 / 6) * 100, 4);
+  });
+
+  it("names the weekday the median belongs to", () => {
+    mockData(snapshot());
+    render();
+
+    // 2026-07-30 is a Thursday; the legend has to say so or the line reads as an all-week baseline
+    expect(screen.getByText("uoperformance.medianLegend")).toBeInTheDocument();
+    expect(weekdayJp("2026-07-30")).toBe("木");
   });
 
   it("reports too few samples instead of zero traffic or an outage", () => {

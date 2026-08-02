@@ -1348,7 +1348,7 @@
         "vsMedian": "対 同曜日中位数（{{value}}）",
         "vsMedianShort": "対中位",
         "median": "同曜日中位数",
-        "medianLegend": "同曜日中位数（訪問）",
+        "medianLegend": "同曜日中位数（{{weekday}}・訪問）",
         "sampleOk": "同曜日サンプル {{n}}/4 · 中位数で比較",
         "sampleShort": "同曜日サンプル {{n}}/4 · 比較不可（訪問ゼロでも障害でもない）",
         "sampleShortShort": "サンプル不足",
