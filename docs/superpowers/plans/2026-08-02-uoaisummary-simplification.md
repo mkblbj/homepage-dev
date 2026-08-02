@@ -1691,7 +1691,7 @@ Expected: FAIL，`ja is missing shipping.today_output.total`。
       "attention.unanswered_inquiries": "未回答問い合わせ",
       "attention.overdue_inquiries": "期限超過問い合わせ",
       "attention.unreplied_reviews": "未返信レビュー",
-      "sales.realtime_yen": "実時売上",
+      "sales.realtime_yen": "リアルタイム売上",
       "sales.orders": "注文数",
       "sales.aov_yen": "平均注文額",
       "sales.realtime_vs_seven_day_avg_percent": "7日平均比",
@@ -1864,7 +1864,7 @@ describe("cockpit layout", () => {
   it("keeps the metric strip closed by default", () => {
     renderWithProviders(<Component service={{ widget: { type: "uoaisummary" } }} />);
 
-    expect(screen.queryByText("実時売上")).not.toBeInTheDocument();
+    expect(screen.queryByText("リアルタイム売上")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /指標/ })).toHaveAttribute("aria-expanded", "false");
   });
 
@@ -1872,7 +1872,7 @@ describe("cockpit layout", () => {
     renderWithProviders(<Component service={{ widget: { type: "uoaisummary" } }} />);
     fireEvent.click(screen.getByRole("button", { name: /指標/ }));
 
-    ["実時売上", "注文数", "7日平均比", "訪問数", "未対応", "今日出力", "明日予定"].forEach((label) => {
+    ["リアルタイム売上", "注文数", "7日平均比", "訪問数", "未対応", "今日出力", "明日予定"].forEach((label) => {
       expect(screen.getByText(label)).toBeInTheDocument();
     });
     expect(screen.getByText("¥1,240,000")).toBeInTheDocument();
