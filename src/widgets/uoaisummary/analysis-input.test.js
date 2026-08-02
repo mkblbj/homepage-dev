@@ -308,7 +308,7 @@ describe("analysis input", () => {
     expect(bundle.sourceFreshness.sales.state).toBe("stale");
   });
 
-  it("ignores stale attention status when deriving severity", () => {
+  it("stale sources no longer affect severity", () => {
     const collected = fourSourceFixture();
     collected.attention.state = "stale";
     collected.attention.data.status = "critical";
@@ -319,7 +319,7 @@ describe("analysis input", () => {
       nowTs: Date.parse("2026-08-01T10:00:00+09:00"),
     });
 
-    expect(bundle.severity).toBe("attention");
+    expect(bundle.severity).toBe("normal");
   });
 
   it("does not include reviews from stale attention", () => {
@@ -483,5 +483,43 @@ describe("analysis input", () => {
     const safe = sanitizeReview({ excerpt: "评价".repeat(200) });
 
     expect(Array.from(safe.excerpt)).toHaveLength(300);
+  });
+});
+
+describe("severity", () => {
+  it("stays normal when a source is merely delayed", () => {
+    const collected = fourSourceFixture();
+    collected.sales.state = "delayed";
+    collected.attention.data.status = "normal";
+    collected.performance.data.traffic.status = "normal";
+
+    const analysis = buildAnalysisInput(collected, { previousSnapshot: null, nowTs: Date.now() });
+
+    expect(analysis.severity).toBe("normal");
+    expect(analysis.sourceFreshness.sales.state).toBe("delayed");
+  });
+
+  it("reports critical when a business status is critical", () => {
+    const collected = fourSourceFixture();
+    collected.attention.data.status = "critical";
+
+    expect(buildAnalysisInput(collected, { previousSnapshot: null, nowTs: Date.now() }).severity).toBe("critical");
+  });
+
+  it("reports attention when only traffic is degraded", () => {
+    const collected = fourSourceFixture();
+    collected.attention.data.status = "normal";
+    collected.performance.data.traffic.status = "attention";
+
+    expect(buildAnalysisInput(collected, { previousSnapshot: null, nowTs: Date.now() }).severity).toBe("attention");
+  });
+
+  it("reports unknown when fewer than two sources are usable", () => {
+    const collected = fourSourceFixture();
+    ["attention", "sales", "performance"].forEach((key) => {
+      collected[key].state = "unavailable";
+    });
+
+    expect(buildAnalysisInput(collected, { previousSnapshot: null, nowTs: Date.now() }).severity).toBe("unknown");
   });
 });

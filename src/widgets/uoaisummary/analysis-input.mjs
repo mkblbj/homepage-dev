@@ -50,18 +50,12 @@ function dataQuality(collected, validCount) {
 
 function severity(collected, validCount) {
   if (validCount < 2) return "unknown";
-  const attention = VALID_STATES.has(collected.attention?.state) ? collected.attention?.data?.status : null;
-  const performance = VALID_STATES.has(collected.performance?.state)
-    ? collected.performance?.data?.traffic?.status
-    : null;
-  if (attention === "critical" || performance === "critical") return "critical";
-  if (
-    attention === "attention" ||
-    performance === "attention" ||
-    Object.values(collected).some((source) => source.state !== "fresh")
-  ) {
-    return "attention";
-  }
+  const statuses = [
+    VALID_STATES.has(collected.attention?.state) ? collected.attention?.data?.status : null,
+    VALID_STATES.has(collected.performance?.state) ? collected.performance?.data?.traffic?.status : null,
+  ];
+  if (statuses.includes("critical")) return "critical";
+  if (statuses.includes("attention")) return "attention";
   return "normal";
 }
 
