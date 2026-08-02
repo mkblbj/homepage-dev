@@ -20,15 +20,15 @@ Place the service in `リアルタイム看板` before the shipping dashboard se
       type: uoaisummary
       apiUrl: "https://ai-gateway.example.invalid/v1/responses"
       apiKey: "replace-with-local-api-key"
-      model: "gpt-5.6-luna"
-      reasoningEffort: xhigh
+      model: "gpt-5.6-terra"
+      reasoningEffort: high
       generationInterval: 3600000
       manualCooldown: 600000
       requestTimeout: 180000
       refreshInterval: 60000
 ```
 
-`apiUrl` must be the complete HTTP or HTTPS Responses endpoint, end in `/responses`, and have no query string or fragment. `apiKey` is sent as the Bearer credential. This deployment accepts `gpt-5.6-luna` with `reasoningEffort: xhigh` only.
+`apiUrl` must be the complete HTTP or HTTPS Responses endpoint, end in `/responses`, and have no query string or fragment. `apiKey` is sent as the Bearer credential. `model` and `reasoningEffort` may be any non-empty values; they are passed through unchanged to the configured Responses endpoint, which decides whether the combination is supported.
 
 The timing fields are milliseconds:
 

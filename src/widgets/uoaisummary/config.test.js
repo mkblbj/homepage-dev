@@ -18,8 +18,8 @@ const groups = [
           service("AI 経営サマリー", "uoaisummary", {
             apiUrl: "https://ai.example.test/v1/responses",
             apiKey: "secret",
-            model: "gpt-5.6-luna",
-            reasoningEffort: "xhigh",
+            model: "gpt-5.6-terra",
+            reasoningEffort: "high",
           }),
           service("出荷", "uoshippingdashboard"),
         ],
@@ -44,8 +44,8 @@ describe("discoverSummaryConfiguration", () => {
 
     expect(result.ai).toMatchObject({
       apiUrl: "https://ai.example.test/v1/responses",
-      model: "gpt-5.6-luna",
-      reasoningEffort: "xhigh",
+      model: "gpt-5.6-terra",
+      reasoningEffort: "high",
       generationInterval: 3600000,
       manualCooldown: 600000,
       requestTimeout: 180000,
@@ -83,16 +83,20 @@ describe("discoverSummaryConfiguration", () => {
     expect(() => discoverSummaryConfiguration(invalid)).toThrow(AISummaryError);
   });
 
-  it("rejects reasoning efforts other than xhigh", () => {
-    const invalid = structuredClone(groups);
-    invalid[0].groups[0].services[0].widget.reasoningEffort = "high";
+  it("passes custom model and reasoning effort values through without an allowlist", () => {
+    const custom = structuredClone(groups);
+    custom[0].groups[0].services[0].widget.model = "  internal-company-model-v7  ";
+    custom[0].groups[0].services[0].widget.reasoningEffort = "  custom-effort-level  ";
 
-    expect(() => discoverSummaryConfiguration(invalid)).toThrow(AISummaryError);
+    expect(discoverSummaryConfiguration(custom).ai).toMatchObject({
+      model: "internal-company-model-v7",
+      reasoningEffort: "custom-effort-level",
+    });
   });
 
-  it("rejects models other than gpt-5.6-luna", () => {
+  it.each(["model", "reasoningEffort"])("rejects an empty %s", (field) => {
     const invalid = structuredClone(groups);
-    invalid[0].groups[0].services[0].widget.model = "gpt-5.6-mini";
+    invalid[0].groups[0].services[0].widget[field] = "   ";
 
     expect(() => discoverSummaryConfiguration(invalid)).toThrow(AISummaryError);
   });

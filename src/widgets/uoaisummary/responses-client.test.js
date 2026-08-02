@@ -58,15 +58,15 @@ function reply(body, status = 200) {
 }
 
 describe("Responses client", () => {
-  it("builds the confirmed xhigh structured-output request", () => {
+  it("passes custom model and reasoning effort values into the structured-output request", () => {
     const body = buildResponsesBody({
-      config: { model: "gpt-5.6-luna", reasoningEffort: "xhigh" },
+      config: { model: "internal-company-model-v7", reasoningEffort: "custom-effort-level" },
       modelInput: { severity: "attention" },
     });
 
     expect(body).toMatchObject({
-      model: "gpt-5.6-luna",
-      reasoning: { effort: "xhigh" },
+      model: "internal-company-model-v7",
+      reasoning: { effort: "custom-effort-level" },
       store: false,
       max_output_tokens: 12000,
       text: {
