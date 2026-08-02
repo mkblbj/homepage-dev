@@ -69,20 +69,8 @@ export const SUMMARY_JSON_SCHEMA = {
   },
 };
 
-const BUSINESS_NUMBER = /[0-9０-９]/u;
-const CJK_BUSINESS_NUMBER =
-  /[零〇一二三四五六七八九十百千万億亿兆两兩]+\s*(?:円|元|件|個|个|人|店舗|店铺|店鋪|注文|订单|訂單|レビュー|评价|評價|%|％|成|倍)/u;
-const SENSITIVE_TEXT = [
-  /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/iu,
-  /\b(?:https?:\/\/|www\.)\S+|\b(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/\S*)?/iu,
-  /(?:\+?\d[\d()\-\sー－−‐‑‒–—―・]{7,}\d)/u,
-  /(?:注文番号|受注番号|order(?:\s+id)?)[\s:#-]*[A-Z0-9_-]{5,}/iu,
-  /(?:review|レビュー|評価)(?:\s+id|番号)?[\s:#-]*[A-Z0-9_-]{5,}/iu,
-  /(?:buyer|購入者|顧客)(?:\s+id|番号)?[\s:#-]*[A-Z0-9_-]{5,}/iu,
-];
-
 function schemaFailure(message) {
-  throw new AISummaryError("model_schema", message, { retryable: true });
+  throw new AISummaryError("model_schema", message);
 }
 
 function assertKeys(value, expected, label) {
@@ -95,21 +83,6 @@ function assertKeys(value, expected, label) {
   }
 }
 
-function assertNoBusinessNumbers(localizedValue) {
-  for (const text of [localizedValue.ja, localizedValue.zh]) {
-    if (BUSINESS_NUMBER.test(text) || CJK_BUSINESS_NUMBER.test(text)) {
-      throw new AISummaryError("model_schema", "Business number found in model prose", {
-        retryable: true,
-      });
-    }
-    if (SENSITIVE_TEXT.some((pattern) => pattern.test(text))) {
-      throw new AISummaryError("model_schema", "Sensitive data found in model prose", {
-        retryable: true,
-      });
-    }
-  }
-}
-
 function assertLocalized(value, label, maxJa = 400, maxZh = 300) {
   assertKeys(value, ["ja", "zh"], label);
   if (typeof value.ja !== "string" || value.ja.length < 1 || value.ja.length > maxJa) {
@@ -118,10 +91,9 @@ function assertLocalized(value, label, maxJa = 400, maxZh = 300) {
   if (typeof value.zh !== "string" || value.zh.length < 1 || value.zh.length > maxZh) {
     schemaFailure(label + ".zh is invalid");
   }
-  assertNoBusinessNumbers(value);
 }
 
-export function validateModelSummary(value, { metricKeys, shopNames, availableModules, hasReviewSamples }) {
+export function validateModelSummary(value, { metricKeys }) {
   assertKeys(value, ["headline", "assessment", "evidence", "actions", "reviewThemes"], "summary");
   assertLocalized(value.headline, "headline");
   assertLocalized(value.assessment, "assessment");
@@ -129,41 +101,27 @@ export function validateModelSummary(value, { metricKeys, shopNames, availableMo
   if (!Array.isArray(value.evidence) || value.evidence.length < 2 || value.evidence.length > 4) {
     schemaFailure("evidence length is invalid");
   }
-  const seenMetrics = new Set();
   value.evidence.forEach((entry, index) => {
     assertKeys(entry, ["metricKey", "interpretation"], "evidence[" + index + "]");
     if (typeof entry.metricKey !== "string" || !metricKeys.has(entry.metricKey)) {
       schemaFailure("evidence metric is unknown");
     }
-    if (seenMetrics.has(entry.metricKey)) {
-      schemaFailure("evidence metric is duplicated");
-    }
-    seenMetrics.add(entry.metricKey);
     assertLocalized(entry.interpretation, "evidence[" + index + "].interpretation");
   });
 
   if (!Array.isArray(value.actions) || value.actions.length < 1 || value.actions.length > 3) {
     schemaFailure("actions length is invalid");
   }
-  const priorityOrder = { high: 0, medium: 1, low: 2 };
-  let previousPriority = -1;
   value.actions.forEach((action, index) => {
     assertKeys(action, ["priority", "module", "shopName", "title", "reason"], "actions[" + index + "]");
     if (!["high", "medium", "low"].includes(action.priority)) {
       schemaFailure("action priority is invalid");
     }
-    if (priorityOrder[action.priority] < previousPriority) {
-      schemaFailure("actions are not priority ordered");
-    }
-    previousPriority = priorityOrder[action.priority];
     if (!["shipping", "attention", "sales", "performance"].includes(action.module)) {
       schemaFailure("action module is invalid");
     }
-    if (!(availableModules instanceof Set) || !availableModules.has(action.module)) {
-      schemaFailure("action module is unavailable");
-    }
-    if (action.shopName !== null && !shopNames.has(action.shopName)) {
-      schemaFailure("action shop is unknown");
+    if (action.shopName !== null && typeof action.shopName !== "string") {
+      schemaFailure("action shop is invalid");
     }
     assertLocalized(action.title, "actions[" + index + "].title");
     assertLocalized(action.reason, "actions[" + index + "].reason");
@@ -171,9 +129,6 @@ export function validateModelSummary(value, { metricKeys, shopNames, availableMo
 
   if (!Array.isArray(value.reviewThemes) || value.reviewThemes.length > 3) {
     schemaFailure("reviewThemes length is invalid");
-  }
-  if (value.reviewThemes.length > 0 && hasReviewSamples !== true) {
-    schemaFailure("review themes require review samples");
   }
   value.reviewThemes.forEach((theme, index) => {
     assertKeys(theme, ["theme", "impact", "suggestion"], "reviewThemes[" + index + "]");

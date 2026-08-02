@@ -11,24 +11,10 @@ function truncateChars(value, max) {
     .join("");
 }
 
-function sanitizeUntrustedText(value, max) {
+function compactText(value, max) {
   const text = String(value ?? "")
     .normalize("NFKC")
     .replace(/\p{Cf}/gu, "")
-    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, "[redacted email]")
-    .replace(/\b(?:https?:\/\/|www\.)\S+|\b(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/\S*)?/gi, "[redacted url]")
-    .replace(/(?:\+?\d[\d()\-\sー－−‐‑‒–—―・]{7,}\d)/g, "[redacted phone]")
-    .replace(/(?:注文番号|受注番号|order(?:\s+id)?)[\s:#-]*[A-Z0-9-]{5,}/gi, "[redacted order]")
-    .replace(/(?:review|レビュー|評価)(?:\s+id|番号)?[\s:#-]*[A-Z0-9_-]{5,}/gi, "[redacted review]")
-    .replace(/(?:buyer|購入者|顧客)(?:\s+id|番号)?[\s:#-]*[A-Z0-9_-]{5,}/gi, "[redacted buyer]")
-    .replace(
-      /(?:(?:system|assistant|developer|user)\s*:|[\[【<]\s*(?:system|assistant|developer|user)\s*[\]】>](?:\s*:)?|#{1,6}\s*(?:system|assistant|developer|user)(?:\s*:)?)/gi,
-      "[redacted instruction]",
-    )
-    .replace(/<\|[^|]{1,80}\|>|\[\/?INST\]/gi, "[redacted instruction]")
-    .replace(/ignore\s+(?:all\s+)?previous\s+instructions/gi, "[redacted instruction]")
-    .replace(/(?:disregard|override)\s+(?:all\s+)?(?:prior|previous)\s+instructions/gi, "[redacted instruction]")
-    .replace(/(?:you are|act as)\s+(?:chatgpt|an ai|system|assistant)/gi, "[redacted instruction]")
     .replace(/[\u0000-\u001f\u007f-\u009f]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -47,11 +33,11 @@ function safeTimestamp(value) {
 export function sanitizeReview(review) {
   const numericRating = Number(review?.rating);
   return {
-    shopName: sanitizeUntrustedText(review?.shopName, 80) || null,
+    shopName: compactText(review?.shopName, 80) || null,
     rating: Number.isInteger(numericRating) && numericRating >= 1 && numericRating <= 5 ? numericRating : null,
     postedAtJST: safeTimestamp(review?.postedAtJST),
-    itemManagementNumber: sanitizeUntrustedText(review?.itemManagementNumber, 80) || null,
-    excerpt: sanitizeUntrustedText(review?.excerpt, MAX_REVIEW_CHARS),
+    itemManagementNumber: compactText(review?.itemManagementNumber, 80) || null,
+    excerpt: compactText(review?.excerpt, MAX_REVIEW_CHARS),
   };
 }
 
@@ -98,7 +84,7 @@ function numberOrNull(value) {
 }
 
 function safeText(value, max = 160) {
-  const text = sanitizeUntrustedText(value, max);
+  const text = compactText(value, max);
   return text || null;
 }
 

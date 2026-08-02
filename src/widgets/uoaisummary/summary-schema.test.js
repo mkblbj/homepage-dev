@@ -51,45 +51,18 @@ describe("executive summary schema", () => {
     ).toEqual(valid);
   });
 
-  it("rejects unknown metric keys, unknown shops and business numbers in free text", () => {
+  it("rejects unknown metric keys", () => {
     const unknownMetric = structuredClone(valid);
     unknownMetric.evidence[0].metricKey = "invented.value";
     expect(() => validateModelSummary(unknownMetric, { metricKeys: new Set(), shopNames: new Set() })).toThrow();
-
-    const numericClaim = structuredClone(valid);
-    numericClaim.headline.ja = "売上は123件です。";
-    expect(() =>
-      validateModelSummary(numericClaim, {
-        metricKeys: new Set(["performance.traffic.delta_percent", "attention.open_total"]),
-        shopNames: new Set(),
-      }),
-    ).toThrow();
-
-    const unknownShop = structuredClone(valid);
-    unknownShop.actions[0].shopName = "unknown-shop";
-    expect(() =>
-      validateModelSummary(unknownShop, {
-        metricKeys: new Set(["performance.traffic.delta_percent", "attention.open_total"]),
-        shopNames: new Set(["3911"]),
-      }),
-    ).toThrow();
   });
 
-  it("rejects missing bilingual fields, duplicate evidence, and excess arrays", () => {
+  it("rejects missing bilingual fields and excess arrays", () => {
     const missingLanguage = structuredClone(valid);
     delete missingLanguage.headline.zh;
     expect(() =>
       validateModelSummary(missingLanguage, {
         metricKeys: new Set(["performance.traffic.delta_percent", "attention.open_total"]),
-        shopNames: new Set(),
-      }),
-    ).toThrow();
-
-    const duplicate = structuredClone(valid);
-    duplicate.evidence[1].metricKey = duplicate.evidence[0].metricKey;
-    expect(() =>
-      validateModelSummary(duplicate, {
-        metricKeys: new Set(["performance.traffic.delta_percent"]),
         shopNames: new Set(),
       }),
     ).toThrow();
@@ -104,45 +77,39 @@ describe("executive summary schema", () => {
     ).toThrow();
   });
 
-  it("rejects actions for unavailable modules and themes without review samples", () => {
-    const missingModule = structuredClone(valid);
-    expect(() =>
-      validateModelSummary(missingModule, validationContext({ availableModules: new Set(["performance"]) })),
-    ).toThrow("action module is unavailable");
-
-    const unsupportedTheme = structuredClone(valid);
-    unsupportedTheme.reviewThemes = [
+  it("accepts caller-controlled prose and context when the JSON shape and metric keys are valid", () => {
+    const output = structuredClone(valid);
+    output.headline = { ja: "売上は123件です。", zh: "销售为一百二十三件。" };
+    output.assessment = {
+      ja: "担当者 buyer@synthetic.invalid は https://synthetic.invalid を確認してください。",
+      zh: "请联系 090-1234-5678 并确认订单 TEST-12345。",
+    };
+    output.actions = [
+      {
+        ...output.actions[0],
+        priority: "low",
+        module: "attention",
+        shopName: "caller-controlled-shop",
+      },
+      {
+        ...output.actions[0],
+        priority: "high",
+        module: "shipping",
+      },
+    ];
+    output.reviewThemes = [
       {
         theme: { ja: "配送品質", zh: "配送质量" },
         impact: { ja: "信頼に影響します。", zh: "会影响信任。" },
         suggestion: { ja: "原因を確認してください。", zh: "请检查原因。" },
       },
     ];
-    expect(() => validateModelSummary(unsupportedTheme, validationContext({ hasReviewSamples: false }))).toThrow(
-      "review themes require review samples",
-    );
-  });
 
-  it.each([
-    ["email", "buyer@synthetic.invalid"],
-    ["URL", "https://synthetic.invalid/private"],
-    ["order identifier", "注文番号 ABCDE-SECRET"],
-    ["review identifier", "review id PRIVATE_TOKEN"],
-  ])("rejects %s-shaped text in model prose", (_label, unsafeText) => {
-    const output = structuredClone(valid);
-    output.assessment.zh = `请联系 ${unsafeText}`;
-
-    expect(() => validateModelSummary(output, validationContext())).toThrow("Sensitive data found in model prose");
-  });
-
-  it.each([
-    ["Japanese", "未対応は三件あります。"],
-    ["Chinese", "待办共有十件。"],
-  ])("rejects %s business number words", (_label, numericText) => {
-    const output = structuredClone(valid);
-    output.headline.zh = numericText;
-
-    expect(() => validateModelSummary(output, validationContext())).toThrow("Business number found in model prose");
+    expect(
+      validateModelSummary(output, {
+        metricKeys: validationContext().metricKeys,
+      }),
+    ).toEqual(output);
   });
 
   it("allows ordinary Japanese and Chinese prose without a quantity claim", () => {

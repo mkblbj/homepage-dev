@@ -116,21 +116,11 @@ export function createSummaryService(dependencies) {
     }
 
     persisted = appendSnapshot(persisted, analysis.snapshot);
-    const shopNames = new Set(analysis.modelInput.shops?.map((shop) => shop.name) || []);
-    const availableModules = new Set(
-      Object.entries(analysis.modelInput.modules || {})
-        .filter(([, module]) => module !== null)
-        .map(([key]) => key),
-    );
-    const hasReviewSamples = (analysis.modelInput.reviewSamples?.length || 0) > 0;
     const generated = await onceWithRetry(() =>
       requestSummaryOnce({
         config: ai,
         modelInput: analysis.modelInput,
         metricKeys,
-        shopNames,
-        availableModules,
-        hasReviewSamples,
       }),
     );
     const generatedAtJST = clock.toJST(clock.now());

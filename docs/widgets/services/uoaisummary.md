@@ -49,16 +49,18 @@ The `立即重新分析` / reanalysis button submits background work and returns
 
 The server reads shipping, operating attention, Rakuten sales, and company performance through their existing read-only endpoints. It normalizes facts and renders business numbers from server-owned metric keys; model prose is not the source of displayed numbers.
 
-Low-rating review samples are treated as untrusted data. Before model submission they are capped at ten, truncated to 300 characters each, and stripped of buyer identifiers, contact details, order and review identifiers, URLs, control text, and prompt-like instructions. Raw ranking payloads are reduced to a small deduplicated product set.
+Low-rating review samples are capped at ten, normalized, and truncated to 300 characters each before model submission. Their business content is otherwise preserved, so the operator controls which review data the configured model endpoint may receive. Raw ranking payloads are reduced to a small deduplicated product set.
 
-The browser and summary cache never receive the API credential, private model URL, raw model request or response, buyer identifiers, review URLs, or unredacted review text. Do not log or copy these private values when troubleshooting.
+The API credential and private model URL remain server-only. The browser and summary cache receive only the generated bilingual summary, referenced display metrics, safe status fields, and usage counts; they do not receive the raw model request or response.
+
+Model output is checked only for the required bilingual JSON structure and evidence `metricKey` values that exist in the collected metrics. The operator is responsible for any additional content policy applied through source selection, prompts, or the configured model endpoint.
 
 ## Failure states
 
 - Four valid sources produce a complete analysis.
 - Two or three valid sources, or any internally partial source, produce a partial analysis with the missing coverage shown.
 - Fewer than two valid sources skip the model request. The last good summary stays visible as stale when available; otherwise the widget shows an error state.
-- A retryable timeout, network failure, temporary HTTP response, or invalid model structure is retried once. A second failure retains the last good summary as stale.
+- A retryable timeout, network failure, or temporary HTTP response is retried once. Invalid model JSON or structure is not automatically retried; use manual reanalysis after correcting the prompt or endpoint behavior.
 - Configuration and authentication failures are not retried. Correct the local configuration, then use manual reanalysis or restart the single server process.
 
 Public errors contain only a safe category such as `configuration`, `source_timeout`, `source_unavailable`, `model_timeout`, `model_http`, `model_schema`, `cache`, or `unexpected`.

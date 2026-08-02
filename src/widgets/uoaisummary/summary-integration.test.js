@@ -340,7 +340,7 @@ async function waitForState(service, expected) {
   });
 }
 
-it("collects, sanitizes, validates, persists, restores, and exposes only public state", async () => {
+it("collects, compacts, validates, persists, restores, and exposes only public state", async () => {
   const externalFetch = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("unexpected external request"));
   const harness = integrationHarness();
 
@@ -368,12 +368,11 @@ it("collects, sanitizes, validates, persists, restores, and exposes only public 
     sourceCoverage: { valid: 4, total: 4 },
     summary: validBilingualSummary(),
   });
-  expect(modelInput.reviewSamples[0].excerpt).toContain("[redacted email]");
-  expect(modelInput.reviewSamples[0].excerpt).toContain("[redacted phone]");
-  expect(modelInput.reviewSamples[0].excerpt).toContain("[redacted order]");
-  expect(modelInput.reviewSamples[0].excerpt).toContain("[redacted url]");
+  expect(modelInput.reviewSamples[0].excerpt).toContain("buyer@synthetic.invalid");
+  expect(modelInput.reviewSamples[0].excerpt).toContain("090-0000-0000");
+  expect(modelInput.reviewSamples[0].excerpt).toContain("TEST-12345");
+  expect(modelInput.reviewSamples[0].excerpt).toContain("https://review.synthetic.invalid/private");
   for (const marker of privateMarkers) {
-    expect(JSON.stringify(modelInput)).not.toContain(marker);
     expect(publicJson).not.toContain(marker);
     expect(cacheJson).not.toContain(marker);
   }

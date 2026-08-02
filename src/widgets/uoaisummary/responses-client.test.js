@@ -46,8 +46,6 @@ function configuredRequest(fetcher) {
     modelInput: {},
     metricKeys: new Set(["performance.traffic.delta_percent", "attention.open_total"]),
     shopNames: new Set(),
-    availableModules: new Set(["attention", "performance"]),
-    hasReviewSamples: false,
     fetcher,
   });
 }
@@ -113,8 +111,6 @@ describe("Responses client", () => {
       modelInput: {},
       metricKeys: new Set(["performance.traffic.delta_percent", "attention.open_total"]),
       shopNames: new Set(),
-      availableModules: new Set(["attention", "performance"]),
-      hasReviewSamples: false,
       fetcher,
     });
 
@@ -195,7 +191,7 @@ describe("Responses client", () => {
     const fetcher = vi.fn().mockResolvedValue(reply(payload));
     await expect(configuredRequest(fetcher)).rejects.toMatchObject({
       code: "model_schema",
-      retryable: true,
+      retryable: false,
     });
   });
 });

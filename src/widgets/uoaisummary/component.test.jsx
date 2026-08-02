@@ -202,14 +202,14 @@ describe("widgets/uoaisummary/component", () => {
       json: async () => ({
         accepted: false,
         state: "cooldown",
-        cooldownUntilJST: "2026-08-01 23:59:00 JST",
+        cooldownUntilJST: "2099-08-01 23:59:00 JST",
       }),
     });
     renderSummary();
 
     fireEvent.click(screen.getByRole("button", { name: "AI再分析" }));
 
-    expect(await screen.findByRole("status")).toHaveTextContent("再分析は 2026-08-01 23:59:00 JST までお待ちください");
+    expect(await screen.findByRole("status")).toHaveTextContent("再分析は 2099-08-01 23:59:00 JST までお待ちください");
     expect(screen.getByRole("button", { name: "AI再分析" })).toBeDisabled();
     expect(mutate).toHaveBeenCalledTimes(1);
   });
@@ -299,14 +299,14 @@ describe("widgets/uoaisummary/component", () => {
       json: async () => ({
         accepted: false,
         state: "cooldown",
-        cooldownUntilJST: "2026-08-01 23:59:00 JST",
+        cooldownUntilJST: "2099-08-01 23:59:00 JST",
       }),
     });
     renderSummary();
 
     fireEvent.click(screen.getByRole("button", { name: "AI再分析" }));
 
-    const feedback = await screen.findByText("再分析は 2026-08-01 23:59:00 JST までお待ちください");
+    const feedback = await screen.findByText("再分析は 2099-08-01 23:59:00 JST までお待ちください");
     expect(feedback).toHaveAttribute("role", "status");
     expect(screen.getByRole("button", { name: "AI再分析" })).toBeDisabled();
     expect(mutate).toHaveBeenCalledTimes(1);
@@ -340,10 +340,10 @@ describe("widgets/uoaisummary/component", () => {
   });
 
   it("honors a persisted cooldown while displaying a cached summary", () => {
-    mockSummary({ ...ready, cooldownUntilJST: "2026-08-01 23:59:00 JST" });
+    mockSummary({ ...ready, cooldownUntilJST: "2099-08-01 23:59:00 JST" });
     renderSummary();
 
-    expect(screen.getByRole("status")).toHaveTextContent("再分析は 2026-08-01 23:59:00 JST までお待ちください");
+    expect(screen.getByRole("status")).toHaveTextContent("再分析は 2099-08-01 23:59:00 JST までお待ちください");
     expect(screen.getByRole("button", { name: "AI再分析" })).toBeDisabled();
   });
 

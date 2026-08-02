@@ -459,7 +459,7 @@ describe("summary generation service", () => {
     });
   });
 
-  it("passes the available modules and review-sample presence to model validation", async () => {
+  it("passes only non-null metric keys required by minimal model validation", async () => {
     const analysis = analysisBundle({ valid: 2, dataQuality: "partial" });
     analysis.modelInput = {
       modules: {
@@ -480,10 +480,11 @@ describe("summary generation service", () => {
 
     expect(deps.requestSummaryOnce).toHaveBeenCalledWith(
       expect.objectContaining({
-        availableModules: new Set(["attention", "performance"]),
-        hasReviewSamples: true,
+        metricKeys: new Set(["attention.open_total", "performance.traffic.delta_percent"]),
       }),
     );
+    expect(deps.requestSummaryOnce.mock.calls[0][0]).not.toHaveProperty("availableModules");
+    expect(deps.requestSummaryOnce.mock.calls[0][0]).not.toHaveProperty("hasReviewSamples");
   });
 
   it("retries one retryable model failure and never retries configuration failures", async () => {
