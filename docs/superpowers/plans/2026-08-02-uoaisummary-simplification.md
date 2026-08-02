@@ -587,7 +587,11 @@ git add src/widgets/uoaisummary/ && git commit -m "fix(uoaisummary): keep source
 
 - [ ] **Step 1: 写失败测试**
 
-把 `src/widgets/uoaisummary/analysis-input.test.js` 里所有针对 `modelInput.modules` / `modelInput.shops` / `modelInput.otherShops` / `modelInput.rankedProducts` / `metricDisplay` 的用例整体删除，追加：
+把 `src/widgets/uoaisummary/analysis-input.test.js` 里所有针对 `modelInput.modules` / `modelInput.shops` / `modelInput.otherShops` / `modelInput.rankedProducts` / `metricDisplay` 的用例整体删除。
+
+同时**删除**那条断言 `toBeLessThanOrEqual(50000)` 的旧体积用例——上限已降到 16000，该断言现在恒真，且它构造的压力字段 `performance.traffic.sevenDayTrend` 从来没有任何函数读取。它的职责由下面新增的 `shrinkToBudget` 用例组接手。
+
+把导入行改为 `import { buildAnalysisInput, sanitizeReview, shrinkToBudget } from "./analysis-input.mjs";`，然后追加：
 
 ```js
 describe("modelInput shape", () => {
@@ -703,32 +707,97 @@ describe("attentionShops", () => {
   });
 });
 
-describe("size budget", () => {
-  it("drops comparison fields before shops and reviews", () => {
+describe("attentionShops sales join", () => {
+  it("matches shops whose names differ only by full-width characters", () => {
     const collected = fourSourceFixture();
-    collected.attention.data.recentReviews = Array.from({ length: 10 }, (_, index) => ({
-      shopName: "3911",
-      rating: 1,
-      postedAtJST: "2026-08-01 09:00:00 JST",
-      itemManagementNumber: "item-" + index,
-      excerpt: "あ".repeat(300),
-    }));
-    collected.attention.data.shops = Array.from({ length: 5 }, (_, index) => ({
-      shopName: "shop-" + index,
-      status: "critical",
-      pendingOrderCount: 1,
-    }));
+    collected.attention.data.shops = [{ shopName: "３９１１", status: "critical", pendingOrderCount: 4 }];
+    collected.performance.data.shops = [];
+    collected.sales.data.sales.shops = [{ shopName: "３９１１", salesYen: 70000, orderCount: 14 }];
 
-    const analysis = buildAnalysisInput(collected, {
-      previousSnapshot: { capturedAtJST: "2026-08-01 09:00:00 JST", metrics: { "sales.orders": 5 } },
-      nowTs: Date.parse("2026-08-01T10:00:00+09:00"),
-    });
+    const [shop] = buildAnalysisInput(collected, { previousSnapshot: null, nowTs: Date.now() }).modelInput
+      .attentionShops;
 
-    expect(Buffer.byteLength(JSON.stringify(analysis.modelInput), "utf8")).toBeLessThanOrEqual(16000);
-    expect(analysis.modelInput.reviewSamples.length).toBeGreaterThan(0);
+    expect(shop.shopName).toBe("3911");
+    expect(shop.salesYen).toBe(70000);
+  });
+});
+
+describe("shrinkToBudget", () => {
+  function oversized({ excerptChars, reviewCount = 10, shopCount = 5 }) {
+    return {
+      capturedAtJST: "2026-08-01 10:00:00 JST",
+      severity: "attention",
+      dataQuality: "complete",
+      sourceCoverage: { valid: 4, total: 4 },
+      sourceFreshness: {},
+      metrics: Array.from({ length: 15 }, (_, index) => ({
+        key: "metric.number." + index,
+        source: "sales",
+        value: index,
+        unit: "count",
+        previousValue: index,
+        delta: 0,
+        deltaPercent: 0,
+        note: null,
+      })),
+      attentionShops: Array.from({ length: shopCount }, (_, index) => ({
+        shopName: "店".repeat(40) + index,
+        issues: ["orders"],
+        pendingOrderCount: 1,
+      })),
+      reviewSamples: Array.from({ length: reviewCount }, () => ({
+        shopName: "店舗",
+        rating: 1,
+        postedAtJST: "2026-08-01 09:00:00 JST",
+        itemManagementNumber: "item",
+        excerpt: "あ".repeat(excerptChars),
+      })),
+      comparisonWindow: { previousCapturedAtJST: "2026-08-01 09:00:00 JST", elapsedMinutes: 60, isHourly: true },
+      caveats: ["NO_INTRADAY_SALES_BASELINE"],
+    };
+  }
+
+  it("leaves a payload that already fits completely untouched", () => {
+    const modelInput = oversized({ excerptChars: 20 });
+    shrinkToBudget(modelInput);
+
+    expect(modelInput.metrics[0]).toHaveProperty("delta");
+    expect(modelInput.attentionShops).toHaveLength(5);
+    expect(modelInput.reviewSamples).toHaveLength(10);
+  });
+
+  it("drops comparison fields first, then shops, and sacrifices reviews last", () => {
+    const modelInput = oversized({ excerptChars: 600 });
+    expect(Buffer.byteLength(JSON.stringify(modelInput), "utf8")).toBeGreaterThan(16000);
+
+    shrinkToBudget(modelInput);
+
+    expect(modelInput.metrics[0]).not.toHaveProperty("delta");
+    expect(modelInput.metrics[0]).not.toHaveProperty("previousValue");
+    expect(modelInput.metrics[0]).not.toHaveProperty("deltaPercent");
+    expect(modelInput.metrics[0].value).toBe(0);
+    expect(modelInput.attentionShops).toHaveLength(3);
+    expect(modelInput.reviewSamples).toHaveLength(5);
+    expect(Buffer.byteLength(JSON.stringify(modelInput), "utf8")).toBeLessThanOrEqual(16000);
+  });
+
+  it("stops before touching reviews when dropping comparison fields is already enough", () => {
+    const modelInput = oversized({ excerptChars: 380 });
+    expect(Buffer.byteLength(JSON.stringify(modelInput), "utf8")).toBeGreaterThan(16000);
+
+    shrinkToBudget(modelInput);
+
+    expect(modelInput.metrics[0]).not.toHaveProperty("delta");
+    expect(modelInput.reviewSamples).toHaveLength(10);
+  });
+
+  it("refuses to send a payload it cannot shrink below the budget", () => {
+    expect(() => shrinkToBudget(oversized({ excerptChars: 1200 }))).toThrow(/exceeds safe size/);
   });
 });
 ```
+
+`excerptChars` 的四个数值（20 / 380 / 600 / 1200）是按 UTF-8 下每个日文字符 3 字节估算的，用来把载荷分别落在「已达标」「只需第一级」「需要三级」「无法压到达标」四个区间。每个用例里的 `toBeGreaterThan(16000)` 前置断言就是这个估算的守卫：**如果任何一条前置断言或长度断言不成立，调整 `excerptChars`，不要调整被断言的行为**。断言表达的顺序契约（比较字段先丢、店铺其次、评论最后、压不下去必抛）是本组用例的意图，不可改动。
 
 - [ ] **Step 2: 跑测试确认失败**
 
@@ -762,10 +831,9 @@ function buildAttentionShops(collected) {
     ? collected.performance.data?.shops || []
     : [];
   const salesByName = new Map(
-    (VALID_STATES.has(collected.sales?.state) ? collected.sales.data?.sales?.shops || [] : []).map((shop) => [
-      String(shop.shopName || "").trim(),
-      shop,
-    ]),
+    (VALID_STATES.has(collected.sales?.state) ? collected.sales.data?.sales?.shops || [] : [])
+      .map((shop) => [safeText(shop.shopName, 80), shop])
+      .filter(([name]) => name),
   );
 
   const merged = new Map();
@@ -824,7 +892,7 @@ function buildAttentionShops(collected) {
 ```js
 const MAX_MODEL_INPUT_BYTES = 16000;
 
-function shrinkToBudget(modelInput) {
+export function shrinkToBudget(modelInput) {
   if (byteLength(modelInput) <= MAX_MODEL_INPUT_BYTES) return;
   modelInput.metrics = modelInput.metrics.map(({ key, source, value, unit, note }) => ({
     key,
