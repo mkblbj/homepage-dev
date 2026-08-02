@@ -197,7 +197,11 @@
 - 差评样本的用法：只在能指向具体可行动的问题时写进 action，不做泛化的情绪总结。
 - `metricKey` 只在该数字确实是这条 action 的依据时填，否则填 `null`。
 
-`max_output_tokens` 从 12000 降到 3000。
+`max_output_tokens` 保持 12000。
+
+设计阶段原本打算把它降到 3000——理由是输出块从 5 减到 3，用不了那么多。这个推理是错的：Responses API 的这个额度同时覆盖**推理 token 和可见输出**，而按 schema 上限估算，双语的 headline + assessment + 最多 3 条 action 本身就要 2000–2300 token，配上文档示例里的 `reasoningEffort: high` 几乎没有余量。一旦触顶，`responses-client.mjs` 会把它归为不可重试的 `model_schema`，表现为每小时静默失败一次。
+
+维持 12000 意味着上限与重构前一致，但可见输出占掉的更少，留给推理的余量反而比重构前更大。另外增加了一条判定：响应因输出上限被截断时（`status === "incomplete"` 且 `incomplete_details.reason === "max_output_tokens"`），公开错误码仍是 `model_schema`，但服务端消息会点明原因，便于诊断。
 
 ---
 
@@ -288,7 +292,7 @@
 | `summary-store.mjs` | 白名单与归一化同步，版本号 1 → 2 |
 | `summary-service.mjs` | `persisted.latest` 由 `metricDisplay` 改为 `metrics` |
 | `source-client.mjs` | shipping 校验放开 `today_shipping` |
-| `responses-client.mjs` | 提示词补强，`max_output_tokens` 12000 → 3000 |
+| `responses-client.mjs` | 提示词补强；`max_output_tokens` 维持 12000，新增输出截断的诊断分支 |
 | `component.jsx` | 407 → 约 250，另拆 3 个子组件 |
 
 ### 文案

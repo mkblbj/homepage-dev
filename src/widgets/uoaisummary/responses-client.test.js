@@ -58,7 +58,7 @@ describe("Responses client", () => {
       model: "internal-company-model-v7",
       reasoning: { effort: "custom-effort-level" },
       store: false,
-      max_output_tokens: 6000,
+      max_output_tokens: 12000,
       text: {
         verbosity: "low",
         format: { type: "json_schema", name: "uo_executive_summary", strict: true },
@@ -212,7 +212,7 @@ describe("buildResponsesBody", () => {
   };
 
   it("leaves the output budget room for reasoning tokens on top of the bilingual answer", () => {
-    expect(buildResponsesBody({ config, modelInput: {} }).max_output_tokens).toBe(6000);
+    expect(buildResponsesBody({ config, modelInput: {} }).max_output_tokens).toBe(12000);
   });
 
   it("tells the model that one action is enough", () => {

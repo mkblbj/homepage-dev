@@ -56,7 +56,7 @@ export function buildResponsesBody({ config, modelInput }) {
     input: JSON.stringify(modelInput),
     reasoning: { effort: config.reasoningEffort },
     store: false,
-    max_output_tokens: 6000,
+    max_output_tokens: 12000,
     text: {
       verbosity: "low",
       format: {
