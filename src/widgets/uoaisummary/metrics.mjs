@@ -78,21 +78,3 @@ export const METRIC_DEFINITIONS = [
   ],
   ["performance.mix.new_sales_share", "performance", (d) => d.customerMix?.new?.salesSharePercent, "percent"],
 ];
-
-export const METRIC_LABELS = {
-  "shipping.today_output.total": { ja: "今日出力", zh: "今日输出" },
-  "shipping.active_shops": { ja: "稼働店舗", zh: "活跃店铺" },
-  "shipping.tomorrow.total": { ja: "明日予定", zh: "明日计划" },
-  "attention.open_total": { ja: "未対応合計", zh: "未处理合计" },
-  "attention.pending_orders": { ja: "未確認注文", zh: "待确认订单" },
-  "attention.unanswered_inquiries": { ja: "未回答問い合わせ", zh: "未回复咨询" },
-  "attention.overdue_inquiries": { ja: "期限超過問い合わせ", zh: "逾期咨询" },
-  "attention.unreplied_reviews": { ja: "未返信レビュー", zh: "未回复评价" },
-  "sales.realtime_yen": { ja: "リアルタイム売上", zh: "实时销售额" },
-  "sales.orders": { ja: "注文数", zh: "订单数" },
-  "sales.aov_yen": { ja: "平均注文額", zh: "平均订单金额" },
-  "sales.realtime_vs_seven_day_avg_percent": { ja: "7日完全日平均への到達率", zh: "相对7日完整日均达成率" },
-  "performance.traffic.visit": { ja: "訪問数", zh: "访问数" },
-  "performance.traffic.delta_percent": { ja: "基準差", zh: "基准差异" },
-  "performance.mix.new_sales_share": { ja: "新規売上比率", zh: "新客销售占比" },
-};

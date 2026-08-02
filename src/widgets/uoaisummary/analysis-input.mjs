@@ -1,9 +1,8 @@
 import { AISummaryError } from "./errors.mjs";
-import { METRIC_DEFINITIONS, METRIC_LABELS, metric, numberOrNull, sumNullable, tomorrowOutput } from "./metrics.mjs";
+import { METRIC_DEFINITIONS, metric, numberOrNull } from "./metrics.mjs";
 
 const MAX_REVIEW_COUNT = 10;
 const MAX_REVIEW_CHARS = 300;
-const MAX_PRODUCT_COUNT = 20;
 const VALID_STATES = new Set(["fresh", "delayed"]);
 
 function truncateChars(value, max) {
@@ -64,45 +63,6 @@ function safeText(value, max = 160) {
   return text || null;
 }
 
-function safeDate(value) {
-  const text = String(value || "");
-  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : null;
-}
-
-function enumOrNull(value, allowed) {
-  return allowed.includes(value) ? value : null;
-}
-
-function ratingCounts(value) {
-  return {
-    1: numberOrNull(value?.[1]),
-    2: numberOrNull(value?.[2]),
-    3: numberOrNull(value?.[3]),
-  };
-}
-
-function formatValue(value, unit) {
-  if (value === null) return "—";
-  if (unit === "yen") return "¥" + Math.round(value).toLocaleString("ja-JP");
-  if (unit === "percent") return Number(value).toFixed(1) + "%";
-  return Math.round(value).toLocaleString("ja-JP") + "件";
-}
-
-function displayMetric(entry, comparisonWindow) {
-  const labels = METRIC_LABELS[entry.key];
-  const delta = entry.delta === null ? null : (entry.delta > 0 ? "+" : "") + formatValue(entry.delta, entry.unit);
-  const minutes = comparisonWindow?.elapsedMinutes;
-  const jaPeriod = Number.isFinite(minutes) ? "前" + minutes + "分" : "前回";
-  const zhPeriod = Number.isFinite(minutes) ? "较" + minutes + "分钟前" : "较上次";
-  const jaDelta = delta ? " (" + jaPeriod + " " + delta + ")" : "";
-  const zhDelta = delta ? "（" + zhPeriod + " " + delta + "）" : "";
-  return {
-    rawValue: entry.value,
-    ja: labels.ja + " " + formatValue(entry.value, entry.unit) + jaDelta,
-    zh: labels.zh + " " + formatValue(entry.value, entry.unit) + zhDelta,
-  };
-}
-
 function parseJST(value) {
   const parsed = Date.parse(
     String(value || "")
@@ -140,296 +100,95 @@ function formatJST(timestamp) {
   );
 }
 
-function collectShops(collected) {
-  const merged = new Map();
-  for (const source of Object.values(collected)) {
-    if (!VALID_STATES.has(source?.state)) continue;
-    const rows = source.data?.shops || source.data?.sales?.shops || source.data?.today_output?.shops || [];
-    for (const shop of rows) {
-      const name = safeText(shop.name || shop.shopName || shop.shop_name, 80);
-      if (!name) continue;
-      const previous = merged.get(name) || {
-        name,
-        anomaly: false,
-        volume: 0,
-        sources: [],
-      };
-      previous.anomaly ||= ["critical", "attention"].includes(shop.status);
-      previous.volume += Number(
-        shop.salesYen ||
-          shop.total_quantity ||
-          shop.traffic?.visitCount ||
-          sumNullable([shop.pendingOrderCount, shop.unansweredInquiryCount, shop.unrepliedReviewCount]) ||
-          0,
-      );
-      previous.sources.push(source.key);
-      merged.set(name, previous);
-    }
-  }
-  const ranked = [...merged.values()].sort(
-    (left, right) => Number(right.anomaly) - Number(left.anomaly) || right.volume - left.volume,
-  );
-  return {
-    shops: ranked.slice(0, 20),
-    otherShops:
-      ranked.length > 20
-        ? {
-            count: ranked.length - 20,
-            aggregateVolume: ranked.slice(20).reduce((sum, shop) => sum + shop.volume, 0),
-          }
-        : null,
-  };
-}
-
-function collectProducts(collected) {
-  if (!VALID_STATES.has(collected.sales?.state)) return [];
-  const ranking = collected.sales?.data?.ranking?.rankings || collected.sales?.data?.ranking || {};
-  const merged = new Map();
-  const dimensions = ["sales", "orderCount", "units"];
-  const itemsByDimension = Object.fromEntries(
-    dimensions.map((dimension) => {
-      const block = ranking[dimension];
-      const items = Array.isArray(block) ? block : block?.overall?.items || block?.overall || [];
-      return [dimension, items.slice(0, 10)];
-    }),
-  );
-  for (let index = 0; index < 10 && merged.size < MAX_PRODUCT_COUNT; index += 1) {
-    for (const dimension of dimensions) {
-      const product = itemsByDimension[dimension][index];
-      if (!product) continue;
-      const key = safeText(product.itemManagementNumber, 80);
-      if (!key) continue;
-      const existing = merged.get(key) || {
-        itemManagementNumber: key,
-        title: safeText(product.title || product.itemName, 160),
-        dimensions: [],
-      };
-      existing.dimensions.push({ dimension, rank: Number(product.rank) || null });
-      merged.set(key, existing);
-      if (merged.size >= MAX_PRODUCT_COUNT) break;
-    }
-  }
-  return [...merged.values()];
-}
-
-function topRows(rows, limit, volumeKeys) {
-  return [...(rows || [])]
-    .sort(
-      (left, right) =>
-        volumeKeys.reduce((sum, key) => sum + Number(right?.[key] || 0), 0) -
-        volumeKeys.reduce((sum, key) => sum + Number(left?.[key] || 0), 0),
-    )
-    .slice(0, limit);
-}
-
-function keepAllowedShops(rows, allowedShopNames) {
-  return (rows || []).filter((shop) =>
-    allowedShopNames.has(String(shop.shopName || shop.shop_name || shop.name || "").trim()),
-  );
-}
-
-function compactSourceStates(sources, keys) {
-  return Object.fromEntries(
-    keys.map((key) => {
-      const source = sources?.[key];
-      return [
-        key,
-        {
-          stale: Boolean(source?.stale),
-          error: source?.error || source?.lastError ? "source_unavailable" : null,
-        },
-      ];
-    }),
-  );
-}
-
-function aggregateSalesDaily(history) {
-  return (history?.range?.dates || []).slice(-7).map((date) => {
-    const rows = (history?.shops || []).flatMap((shop) => shop.daily || []).filter((entry) => entry?.date === date);
-    return {
-      date: safeDate(date),
-      salesYen: sumNullable(rows.map((entry) => entry.salesYen)),
-      orderCount: sumNullable(rows.map((entry) => entry.orderCount)),
-    };
-  });
-}
-
-function compactSalesShops(sales, allowedShopNames) {
-  const realtimeTotal = numberOrNull(sales.sales?.totals?.salesYen);
-  const sevenDayTotal = numberOrNull(sales.history?.totals?.salesYen);
-  const historyByName = new Map((sales.history?.shops || []).map((shop) => [String(shop.shopName || "").trim(), shop]));
-  return topRows(keepAllowedShops(sales.sales?.shops, allowedShopNames), 20, ["salesYen", "orderCount"]).map((shop) => {
-    const shopName = safeText(shop.shopName, 80);
-    const salesYen = numberOrNull(shop.salesYen);
-    const history = historyByName.get(String(shop.shopName || "").trim());
-    const sevenDaySalesYen = numberOrNull(history?.totals?.salesYen);
-    return {
-      shopName,
-      salesYen,
-      orderCount: numberOrNull(shop.orderCount),
-      realtimeSharePercent: salesYen !== null && realtimeTotal > 0 ? (salesYen / realtimeTotal) * 100 : null,
-      sevenDaySalesYen,
-      sevenDayOrderCount: numberOrNull(history?.totals?.orderCount),
-      sevenDaySharePercent:
-        sevenDaySalesYen !== null && sevenDayTotal > 0 ? (sevenDaySalesYen / sevenDayTotal) * 100 : null,
-    };
-  });
-}
-
-function compactModules(collected, allowedShopNames) {
-  const shipping = collected.shipping?.data || {};
-  const attention = collected.attention?.data || {};
-  const sales = collected.sales?.data || {};
-  const performance = collected.performance?.data || {};
-  const rankingBlocks = sales.ranking?.rankings || sales.ranking || {};
-  return {
-    shipping: VALID_STATES.has(collected.shipping?.state)
-      ? {
-          updatedAtJST: collected.shipping.updatedAtJST,
-          businessDateJST: shipping.today_output?.date || shipping.today_shipping?.date || null,
-          todayOutput: shipping.today_output?.total_quantity ?? null,
-          yesterdayShipping: shipping.yesterday_shipping?.total_quantity ?? null,
-          todayShipping: shipping.today_shipping?.total_quantity ?? null,
-          tomorrow: {
-            mode: tomorrowOutput(shipping).mode,
-            total: tomorrowOutput(shipping).total,
-          },
-          activeShopCount: shipping.today_output?.active_shops_count ?? null,
-          topShops: topRows(keepAllowedShops(shipping.today_output?.shops, allowedShopNames), 10, [
-            "total_quantity",
-          ]).map((shop) => ({
-            shopName: safeText(shop.shop_name || shop.shopName, 80),
-            totalQuantity: numberOrNull(shop.total_quantity),
-          })),
-          topCouriers: topRows(shipping.today_shipping?.couriers || shipping.couriers, 10, ["total_quantity"]).map(
-            (courier) => ({
-              courierName: safeText(courier.courier_name, 80),
-              totalQuantity: numberOrNull(courier.total_quantity),
-            }),
-          ),
-        }
-      : null,
-    attention: VALID_STATES.has(collected.attention?.state)
-      ? {
-          generatedAtJST: collected.attention.updatedAtJST,
-          status: attention.status || null,
-          partial: Boolean(attention.partial),
-          summary: {
-            pendingOrderCount: numberOrNull(attention.summary?.pendingOrderCount),
-            unansweredInquiryCount: numberOrNull(attention.summary?.unansweredInquiryCount),
-            overdueInquiryCount: numberOrNull(attention.summary?.overdueInquiryCount),
-            unrepliedReviewCount: numberOrNull(attention.summary?.unrepliedReviewCount),
-            reviewCountByRating: ratingCounts(attention.summary?.reviewCountByRating),
-          },
-          topShops: topRows(keepAllowedShops(attention.shops, allowedShopNames), 20, [
-            "pendingOrderCount",
-            "unansweredInquiryCount",
-            "unrepliedReviewCount",
-          ]).map((shop) => ({
-            shopName: safeText(shop.shopName, 80),
-            status: enumOrNull(shop.status, ["normal", "attention", "critical"]),
-            pendingOrderCount: numberOrNull(shop.pendingOrderCount),
-            unansweredInquiryCount: numberOrNull(shop.unansweredInquiryCount),
-            overdueInquiryCount: numberOrNull(shop.overdueInquiryCount),
-            unrepliedReviewCount: numberOrNull(shop.unrepliedReviewCount),
-            reviewCountByRating: ratingCounts(shop.reviewCountByRating),
-          })),
-          sources: compactSourceStates(attention.sources, ["mainMenu", "reviews"]),
-        }
-      : null,
-    sales: VALID_STATES.has(collected.sales?.state)
-      ? {
-          generatedAtJST: collected.sales.updatedAtJST,
-          realtime: {
-            salesYen: numberOrNull(sales.sales?.totals?.salesYen),
-            orderCount: numberOrNull(sales.sales?.totals?.orderCount),
-            averageOrderValueYen: numberOrNull(sales.sales?.totals?.averageOrderValueYen),
-          },
-          shops: compactSalesShops(sales, allowedShopNames),
-          sevenDay: {
-            totals: {
-              salesYen: numberOrNull(sales.history?.totals?.salesYen),
-              orderCount: numberOrNull(sales.history?.totals?.orderCount),
-              conversionRate: numberOrNull(sales.history?.totals?.conversionRate),
-            },
-            dailyTrend: aggregateSalesDaily(sales.history),
-          },
-          ranking: {
-            generatedAtJST: sales.ranking?.generatedAtJST || null,
-            partial: Boolean(sales.ranking?.partial),
-            failedShopCount: Object.values(rankingBlocks).reduce(
-              (sum, block) => sum + Number(block?.failedShopCount || 0),
-              0,
-            ),
-          },
-        }
-      : null,
-    performance: VALID_STATES.has(collected.performance?.state)
-      ? {
-          generatedAtJST: collected.performance.updatedAtJST,
-          businessDateJST: performance.traffic?.dataDateJST || null,
-          status: performance.status || performance.traffic?.status || null,
-          partial: Boolean(performance.partial),
-          traffic: {
-            status: enumOrNull(performance.traffic?.status, ["normal", "attention", "critical"]),
-            dataDateJST: safeDate(performance.traffic?.dataDateJST),
-            visitCount: numberOrNull(performance.traffic?.visitCount),
-            uniqueVisitorCount: numberOrNull(performance.traffic?.uniqueVisitorCount),
-            expectedVisitCount:
-              Number(performance.traffic?.sampleCount) >= 3
-                ? numberOrNull(performance.traffic?.expectedVisitCount)
-                : null,
-            visitDeltaPercent:
-              Number(performance.traffic?.sampleCount) >= 3
-                ? numberOrNull(performance.traffic?.visitDeltaPercent)
-                : null,
-            sampleCount: numberOrNull(performance.traffic?.sampleCount),
-            sevenDayTrend: (performance.traffic?.daily || []).slice(-7).map((entry) => ({
-              dateJST: safeDate(entry?.dateJST),
-              visitCount: numberOrNull(entry?.visitCount),
-              uniqueVisitorCount: numberOrNull(entry?.uniqueVisitorCount),
-            })),
-          },
-          customerMix: {
-            new: {
-              salesYen: numberOrNull(performance.customerMix?.new?.salesYen),
-              orderCount: numberOrNull(performance.customerMix?.new?.orderCount),
-              salesSharePercent: numberOrNull(performance.customerMix?.new?.salesSharePercent),
-              orderSharePercent: numberOrNull(performance.customerMix?.new?.orderSharePercent),
-            },
-            repeat: {
-              salesYen: numberOrNull(performance.customerMix?.repeat?.salesYen),
-              orderCount: numberOrNull(performance.customerMix?.repeat?.orderCount),
-              salesSharePercent: numberOrNull(performance.customerMix?.repeat?.salesSharePercent),
-              orderSharePercent: numberOrNull(performance.customerMix?.repeat?.orderSharePercent),
-            },
-          },
-          shops: keepAllowedShops(performance.shops, allowedShopNames)
-            .sort((left, right) => Number(right.traffic?.visitCount || 0) - Number(left.traffic?.visitCount || 0))
-            .slice(0, 20)
-            .map((shop) => ({
-              shopName: safeText(shop.shopName, 80),
-              status: enumOrNull(shop.status, ["normal", "attention", "critical"]),
-              traffic: {
-                status: enumOrNull(shop.traffic?.status, ["normal", "attention", "critical"]),
-                visitCount: numberOrNull(shop.traffic?.visitCount),
-                uniqueVisitorCount: numberOrNull(shop.traffic?.uniqueVisitorCount),
-                expectedVisitCount:
-                  Number(shop.traffic?.sampleCount) >= 3 ? numberOrNull(shop.traffic?.expectedVisitCount) : null,
-                visitDeltaPercent:
-                  Number(shop.traffic?.sampleCount) >= 3 ? numberOrNull(shop.traffic?.visitDeltaPercent) : null,
-                sampleCount: numberOrNull(shop.traffic?.sampleCount),
-              },
-              newSalesSharePercent: numberOrNull(shop.customerMix?.new?.salesSharePercent),
-            })),
-          sources: compactSourceStates(performance.sources, ["traffic", "customerMix"]),
-        }
-      : null,
-  };
-}
-
 function byteLength(value) {
   return Buffer.byteLength(JSON.stringify(value), "utf8");
+}
+
+const SEVERITY_RANK = { critical: 2, attention: 1 };
+const MAX_ATTENTION_SHOPS = 5;
+
+function abnormal(status) {
+  return status === "critical" || status === "attention";
+}
+
+function buildAttentionShops(collected) {
+  const attentionRows = VALID_STATES.has(collected.attention?.state) ? collected.attention.data?.shops || [] : [];
+  const performanceRows = VALID_STATES.has(collected.performance?.state)
+    ? collected.performance.data?.shops || []
+    : [];
+  const salesByName = new Map(
+    (VALID_STATES.has(collected.sales?.state) ? collected.sales.data?.sales?.shops || [] : []).map((shop) => [
+      String(shop.shopName || "").trim(),
+      shop,
+    ]),
+  );
+
+  const merged = new Map();
+  const upsert = (name, rank) => {
+    const existing = merged.get(name) || {
+      shopName: name,
+      rank: 0,
+      issues: [],
+      pendingOrderCount: null,
+      unansweredInquiryCount: null,
+      overdueInquiryCount: null,
+      unrepliedReviewCount: null,
+      visitDeltaPercent: null,
+    };
+    existing.rank = Math.max(existing.rank, rank);
+    merged.set(name, existing);
+    return existing;
+  };
+
+  for (const shop of attentionRows) {
+    const name = safeText(shop.shopName, 80);
+    if (!name || !abnormal(shop.status)) continue;
+    const entry = upsert(name, SEVERITY_RANK[shop.status]);
+    entry.pendingOrderCount = numberOrNull(shop.pendingOrderCount);
+    entry.unansweredInquiryCount = numberOrNull(shop.unansweredInquiryCount);
+    entry.overdueInquiryCount = numberOrNull(shop.overdueInquiryCount);
+    entry.unrepliedReviewCount = numberOrNull(shop.unrepliedReviewCount);
+    if (entry.pendingOrderCount > 0) entry.issues.push("orders");
+    if (entry.unansweredInquiryCount > 0 || entry.overdueInquiryCount > 0) entry.issues.push("inquiries");
+    if (entry.unrepliedReviewCount > 0) entry.issues.push("reviews");
+  }
+
+  for (const shop of performanceRows) {
+    const name = safeText(shop.shopName, 80);
+    if (!name || !abnormal(shop.traffic?.status)) continue;
+    const entry = upsert(name, SEVERITY_RANK[shop.traffic.status]);
+    entry.visitDeltaPercent =
+      Number(shop.traffic?.sampleCount) >= 3 ? numberOrNull(shop.traffic?.visitDeltaPercent) : null;
+    entry.issues.push("traffic");
+  }
+
+  return [...merged.values()]
+    .sort((left, right) => right.rank - left.rank || left.shopName.localeCompare(right.shopName))
+    .slice(0, MAX_ATTENTION_SHOPS)
+    .map(({ rank, ...entry }) => ({
+      ...entry,
+      salesYen: numberOrNull(salesByName.get(entry.shopName)?.salesYen),
+    }));
+}
+
+const MAX_MODEL_INPUT_BYTES = 16000;
+
+function shrinkToBudget(modelInput) {
+  if (byteLength(modelInput) <= MAX_MODEL_INPUT_BYTES) return;
+  modelInput.metrics = modelInput.metrics.map(({ key, source, value, unit, note }) => ({
+    key,
+    source,
+    value,
+    unit,
+    note,
+  }));
+  if (byteLength(modelInput) <= MAX_MODEL_INPUT_BYTES) return;
+  modelInput.attentionShops = modelInput.attentionShops.slice(0, 3);
+  if (byteLength(modelInput) <= MAX_MODEL_INPUT_BYTES) return;
+  modelInput.reviewSamples = modelInput.reviewSamples.slice(0, 5);
+  if (byteLength(modelInput) > MAX_MODEL_INPUT_BYTES) {
+    throw new AISummaryError("source_unavailable", "Normalized AI input exceeds safe size");
+  }
 }
 
 export function buildAnalysisInput(collected, { previousSnapshot, nowTs }) {
@@ -468,10 +227,6 @@ export function buildAnalysisInput(collected, { previousSnapshot, nowTs }) {
           elapsedMinutes: Math.max(0, Math.round((nowTs - previousTs) / 60000)),
           isHourly: Math.abs(nowTs - previousTs - 3600000) <= 15 * 60000,
         };
-  const metricDisplay = Object.fromEntries(
-    Object.entries(metrics).map(([key, entry]) => [key, displayMetric(entry, comparisonWindow)]),
-  );
-  const shopData = collectShops(collected);
   const reviewSamples = (
     VALID_STATES.has(collected.attention?.state) ? collected.attention?.data?.recentReviews || [] : []
   )
@@ -494,28 +249,17 @@ export function buildAnalysisInput(collected, { previousSnapshot, nowTs }) {
     dataQuality: quality,
     sourceCoverage,
     sourceFreshness,
-    modules: compactModules(collected, new Set(shopData.shops.map((shop) => shop.name))),
     metrics: Object.values(metrics),
-    comparisonWindow,
-    shops: shopData.shops,
-    otherShops: shopData.otherShops,
-    rankedProducts: collectProducts(collected),
+    attentionShops: buildAttentionShops(collected),
     reviewSamples,
+    comparisonWindow,
     caveats: ["NO_INTRADAY_SALES_BASELINE"],
   };
   if (comparisonWindow && !comparisonWindow.isHourly) {
     modelInput.caveats.push("PREVIOUS_SNAPSHOT_INTERVAL_IS_NOT_ONE_HOUR");
   }
 
-  while (byteLength(modelInput) > 50000 && modelInput.rankedProducts.length > 5) {
-    modelInput.rankedProducts.pop();
-  }
-  while (byteLength(modelInput) > 50000 && modelInput.reviewSamples.length > 3) {
-    modelInput.reviewSamples.pop();
-  }
-  if (byteLength(modelInput) > 50000) {
-    throw new AISummaryError("source_unavailable", "Normalized AI input exceeds safe size");
-  }
+  shrinkToBudget(modelInput);
 
   const snapshot = {
     capturedAtJST: modelInput.capturedAtJST,
@@ -528,7 +272,6 @@ export function buildAnalysisInput(collected, { previousSnapshot, nowTs }) {
     sourceFreshness,
     comparisonWindow,
     metrics,
-    metricDisplay,
     modelInput,
     snapshot,
   };

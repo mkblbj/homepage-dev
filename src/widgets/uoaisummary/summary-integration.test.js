@@ -231,7 +231,7 @@ function persistedReadyState() {
         performance: { state: "fresh", updatedAtJST: "2026-08-01 09:40:00 JST" },
       },
       summary: validBilingualSummary(),
-      metricDisplay: {},
+      metrics: [],
     },
     snapshots: [],
     lastAttemptAtJST: "2026-08-01 09:00:00 JST",

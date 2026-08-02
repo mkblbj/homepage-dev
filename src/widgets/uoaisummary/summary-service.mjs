@@ -131,9 +131,7 @@ export function createSummaryService(dependencies) {
       sourceCoverage: analysis.sourceCoverage,
       sourceFreshness: analysis.sourceFreshness,
       summary: generated.summary,
-      metricDisplay: Object.fromEntries(
-        generated.summary.evidence.map(({ metricKey }) => [metricKey, analysis.metricDisplay[metricKey]]),
-      ),
+      metrics: Object.values(analysis.metrics),
     };
     persisted.usage = generated.usage || null;
     persisted.lastError = null;
@@ -211,7 +209,7 @@ export function createSummaryService(dependencies) {
       sourceCoverage: publicRecord?.sourceCoverage || { valid: 0, total: 4 },
       sourceFreshness: publicRecord?.sourceFreshness || {},
       summary: persisted.latest?.summary || null,
-      metricDisplay: persisted.latest?.metricDisplay || {},
+      metrics: persisted.latest?.metrics || [],
       cooldownUntilJST: persisted.manualCooldownUntilJST,
       lastError: persisted.lastError,
     });

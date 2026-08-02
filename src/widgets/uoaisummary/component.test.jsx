@@ -57,18 +57,26 @@ const ready = {
     ],
     reviewThemes: [],
   },
-  metricDisplay: {
-    "attention.open_total": {
-      rawValue: 64,
-      ja: "未対応合計 64件 (+4件)",
-      zh: "未处理合计 64件 (+4件)",
+  metrics: [
+    {
+      key: "attention.open_total",
+      unit: "count",
+      value: 64,
+      previousValue: 60,
+      delta: 4,
+      deltaPercent: 6.7,
+      note: null,
     },
-    "performance.traffic.delta_percent": {
-      rawValue: -31.8,
-      ja: "同曜日中央値比 -31.8%",
-      zh: "较同星期中位数 -31.8%",
+    {
+      key: "performance.traffic.delta_percent",
+      unit: "percent",
+      value: -31.8,
+      previousValue: null,
+      delta: null,
+      deltaPercent: null,
+      note: null,
     },
-  },
+  ],
 };
 
 const service = {
@@ -98,7 +106,7 @@ function withoutSummary(state, overrides = {}) {
     severity: "unknown",
     dataQuality: state === "error" ? "insufficient" : "complete",
     summary: null,
-    metricDisplay: {},
+    metrics: [],
     lastError: state === "error" ? "configuration" : null,
     ...overrides,
   };

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { METRIC_DEFINITIONS, METRIC_LABELS, metric, numberOrNull, sumNullable, tomorrowOutput } from "./metrics.mjs";
+import { METRIC_DEFINITIONS, metric, numberOrNull, sumNullable, tomorrowOutput } from "./metrics.mjs";
 
 const KEYS = METRIC_DEFINITIONS.map(([key]) => key);
 
@@ -31,14 +31,6 @@ describe("METRIC_DEFINITIONS", () => {
 
   it("uses only the three approved units", () => {
     expect([...new Set(METRIC_DEFINITIONS.map(([, , , unit]) => unit))].sort()).toEqual(["count", "percent", "yen"]);
-  });
-
-  it("labels every metric in both languages", () => {
-    expect(Object.keys(METRIC_LABELS).sort()).toEqual([...KEYS].sort());
-    KEYS.forEach((key) => {
-      expect(METRIC_LABELS[key].ja.length).toBeGreaterThan(0);
-      expect(METRIC_LABELS[key].zh.length).toBeGreaterThan(0);
-    });
   });
 
   it("attaches a note reader only to tomorrow output", () => {

@@ -140,21 +140,27 @@ function normalizeSourceFreshness(value) {
   );
 }
 
-function normalizeMetricDisplay(value) {
-  if (!isRecord(value)) return {};
+const METRIC_UNITS = new Set(["count", "yen", "percent"]);
+const METRIC_NOTES = new Set(["actual", "predicted", "yesterday"]);
 
-  return Object.fromEntries(
-    Object.entries(value)
-      .map(([key, entry]) => {
-        const ja = stringOrNull(entry?.ja);
-        const zh = stringOrNull(entry?.zh);
-        const rawValue = numberOrNull(entry?.rawValue);
-        return METRIC_KEYS.has(key) && ja !== null && zh !== null && (rawValue !== null || entry?.rawValue === null)
-          ? [key, { rawValue, ja, zh }]
-          : null;
-      })
-      .filter(Boolean),
-  );
+function normalizeMetrics(value) {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((entry) =>
+      isRecord(entry) && METRIC_KEYS.has(entry.key) && METRIC_UNITS.has(entry.unit)
+        ? {
+            key: entry.key,
+            unit: entry.unit,
+            value: numberOrNull(entry.value),
+            previousValue: numberOrNull(entry.previousValue),
+            delta: numberOrNull(entry.delta),
+            deltaPercent: numberOrNull(entry.deltaPercent),
+            note: METRIC_NOTES.has(entry.note) ? entry.note : null,
+          }
+        : null,
+    )
+    .filter(Boolean);
 }
 
 function normalizeLatest(value) {
@@ -187,7 +193,7 @@ function normalizeLatest(value) {
     sourceCoverage,
     sourceFreshness,
     summary,
-    metricDisplay: normalizeMetricDisplay(value.metricDisplay),
+    metrics: normalizeMetrics(value.metrics),
   };
 }
 

@@ -57,7 +57,7 @@ function persistedState(overrides = {}) {
         performance: { state: "fresh", updatedAtJST: "2026-08-01 07:00:00 JST" },
       },
       summary: validSummary(),
-      metricDisplay: {},
+      metrics: [],
     },
     snapshots: [],
     lastAttemptAtJST: null,
@@ -83,14 +83,6 @@ function analysisBundle({ valid = 4, dataQuality = "complete" } = {}) {
     metrics: {
       "attention.open_total": { value: 1 },
       "performance.traffic.delta_percent": { value: -10 },
-    },
-    metricDisplay: {
-      "attention.open_total": { rawValue: 1, ja: "未対応 1件", zh: "待办 1件" },
-      "performance.traffic.delta_percent": {
-        rawValue: null,
-        ja: "訪問差 —",
-        zh: "访问差 —",
-      },
     },
     modelInput: { severity: "attention" },
     snapshot: { capturedAtJST: "2026-08-01 10:00:00 JST", metrics: {} },
@@ -347,9 +339,17 @@ describe("summary generation service", () => {
       severity: "normal",
       dataQuality: "complete",
       sourceCoverage: { valid: 4, total: 4 },
-      metricDisplay: {
-        "attention.open_total": { rawValue: 7, ja: "未対応 7件", zh: "待办 7件" },
-      },
+      metrics: [
+        {
+          key: "attention.open_total",
+          unit: "count",
+          value: 7,
+          previousValue: null,
+          delta: null,
+          deltaPercent: null,
+          note: null,
+        },
+      ],
     };
     const pendingAnalysis = analysisBundle({ valid: 2, dataQuality: "partial" });
     pendingAnalysis.severity = "critical";
@@ -377,7 +377,7 @@ describe("summary generation service", () => {
       sourceCoverage: { valid: 4, total: 4 },
       sourceFreshness: oldLatest.sourceFreshness,
       summary: oldLatest.summary,
-      metricDisplay: oldLatest.metricDisplay,
+      metrics: oldLatest.metrics,
     });
 
     run.resolve({ summary: validSummary(), usage: null });
@@ -574,14 +574,22 @@ describe("summary generation service", () => {
       code: "model_schema",
       retryable: false,
     });
-    const oldMetricDisplay = {
-      "attention.open_total": { rawValue: 7, ja: "未対応 7件", zh: "待办 7件" },
-    };
+    const oldMetrics = [
+      {
+        key: "attention.open_total",
+        unit: "count",
+        value: 7,
+        previousValue: null,
+        delta: null,
+        deltaPercent: null,
+        note: null,
+      },
+    ];
     const oldLatest = {
       ...persistedState().latest,
       severity: "normal",
       sourceCoverage: { valid: 4, total: 4 },
-      metricDisplay: oldMetricDisplay,
+      metrics: oldMetrics,
     };
     const newAnalysis = analysisBundle({ valid: 2, dataQuality: "partial" });
     newAnalysis.severity = "critical";
@@ -610,7 +618,7 @@ describe("summary generation service", () => {
       sourceCoverage: { valid: 4, total: 4 },
       sourceFreshness: oldLatest.sourceFreshness,
       summary: oldLatest.summary,
-      metricDisplay: oldMetricDisplay,
+      metrics: oldMetrics,
       lastError: "model_schema",
       nextScheduledAtJST: "2026-08-01 11:00:00 JST",
     });
@@ -700,7 +708,7 @@ describe("summary generation service", () => {
         "dataQuality",
         "generatedAtJST",
         "lastError",
-        "metricDisplay",
+        "metrics",
         "nextScheduledAtJST",
         "severity",
         "sourceCoverage",

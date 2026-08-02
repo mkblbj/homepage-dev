@@ -52,10 +52,26 @@ function persistedLatest() {
         },
       ],
     },
-    metricDisplay: {
-      "attention.open_total": { rawValue: 1, ja: "未対応 1件", zh: "待办 1件" },
-      "sales.orders": { rawValue: 20, ja: "注文 20件", zh: "订单 20件" },
-    },
+    metrics: [
+      {
+        key: "attention.open_total",
+        unit: "count",
+        value: 1,
+        previousValue: null,
+        delta: null,
+        deltaPercent: null,
+        note: null,
+      },
+      {
+        key: "sales.orders",
+        unit: "count",
+        value: 20,
+        previousValue: 18,
+        delta: 2,
+        deltaPercent: 11.1,
+        note: null,
+      },
+    ],
   };
 }
 
@@ -85,7 +101,7 @@ describe("summary store", () => {
           sourceCoverage: { valid: 4, total: 4 },
           sourceFreshness: {},
           summary: { headline: null },
-          metricDisplay: {},
+          metrics: [],
         },
         nextScheduledAtJST: "2026-08-01 11:00:00 JST",
       }),
@@ -141,7 +157,7 @@ describe("summary store", () => {
     latest.rawResponse = { response: "synthetic-model-response", nestedError };
     latest.sourceFreshness.sales.url = "https://synthetic.invalid/source";
     latest.summary.evidence[0].review = "synthetic-review-text";
-    latest.metricDisplay["sales.orders"].modelOutput = "synthetic-model-response";
+    latest.metrics.find((entry) => entry.key === "sales.orders").modelOutput = "synthetic-model-response";
 
     const snapshot = {
       capturedAtJST: "2026-08-01 10:00:00 JST",
@@ -169,6 +185,49 @@ describe("summary store", () => {
     expect(onDisk.usage).toEqual({ input_tokens: 100, output_tokens: 20, total_tokens: 120 });
     expect(store.read()).toMatchObject({ latest: persistedLatest(), snapshots: onDisk.snapshots, usage: onDisk.usage });
     expect(JSON.stringify(onDisk)).not.toMatch(/synthetic-(?:api-key|error|model|review)|https:\/\/synthetic\.invalid/);
+  });
+
+  it("keeps only whitelisted metric entries", () => {
+    const store = createSummaryStore({ configDir: dir });
+    store.write({
+      ...emptySummaryState(),
+      latest: {
+        ...persistedLatest(),
+        metrics: [
+          {
+            key: "sales.orders",
+            unit: "count",
+            value: 20,
+            previousValue: 18,
+            delta: 2,
+            deltaPercent: 11.1,
+            note: null,
+          },
+          {
+            key: "sales.seven_day_cvr",
+            unit: "percent",
+            value: 3.2,
+            previousValue: null,
+            delta: null,
+            deltaPercent: null,
+            note: null,
+          },
+          {
+            key: "sales.orders",
+            unit: "furlong",
+            value: 1,
+            previousValue: null,
+            delta: null,
+            deltaPercent: null,
+            note: null,
+          },
+        ],
+      },
+    });
+
+    expect(store.read().latest.metrics).toEqual([
+      { key: "sales.orders", unit: "count", value: 20, previousValue: 18, delta: 2, deltaPercent: 11.1, note: null },
+    ]);
   });
 
   it("does not include the generated cache in the browser config hash", () => {

@@ -258,21 +258,20 @@ describe("analysis input", () => {
     expect(bundle.sourceCoverage).toEqual({ valid: 3, total: 4 });
   });
 
-  it("caps reviews and deduplicated ranked products without persisting review text", () => {
+  it("caps reviews without persisting review text", () => {
     const bundle = buildAnalysisInput(largeFixture(), {
       previousSnapshot: null,
       nowTs: Date.now(),
     });
 
     expect(bundle.modelInput.reviewSamples).toHaveLength(10);
-    expect(bundle.modelInput.rankedProducts.length).toBeLessThanOrEqual(20);
     expect(JSON.stringify(bundle.snapshot)).not.toContain("excerpt");
     expect(JSON.stringify(bundle.modelInput)).not.toContain("private-");
     expect(JSON.stringify(bundle.modelInput)).not.toContain("review.example.test");
     expect(bundle.modelInput.caveats).toContain("NO_INTRADAY_SALES_BASELINE");
   });
 
-  it("keeps absolute change from zero and labels a non-hour comparison window", () => {
+  it("keeps absolute change from zero and flags a non-hour comparison window", () => {
     const bundle = buildAnalysisInput(fourSourceFixture(), {
       previousSnapshot: {
         capturedAtJST: "2026-08-01 08:00:00 JST",
@@ -291,7 +290,6 @@ describe("analysis input", () => {
       elapsedMinutes: 120,
       isHourly: false,
     });
-    expect(bundle.metricDisplay["sales.orders"].ja).toContain("前120分");
     expect(bundle.modelInput.caveats).toContain("PREVIOUS_SNAPSHOT_INTERVAL_IS_NOT_ONE_HOUR");
   });
 
@@ -304,7 +302,6 @@ describe("analysis input", () => {
     });
 
     expect(bundle.metrics).not.toHaveProperty("sales.realtime_yen");
-    expect(bundle.modelInput.modules.sales).toBeNull();
     expect(bundle.sourceFreshness.sales.state).toBe("stale");
   });
 
@@ -343,18 +340,6 @@ describe("analysis input", () => {
     expect(bundle.modelInput.reviewSamples).toEqual([]);
   });
 
-  it("does not include ranked products from stale sales", () => {
-    const collected = fourSourceFixture();
-    collected.sales.state = "stale";
-
-    const bundle = buildAnalysisInput(collected, {
-      previousSnapshot: null,
-      nowTs: Date.parse("2026-08-01T10:00:00+09:00"),
-    });
-
-    expect(bundle.modelInput.rankedProducts).toEqual([]);
-  });
-
   it("keeps the serialized model input within 50 KB", () => {
     const collected = largeFixture();
     collected.performance.data.traffic.sevenDayTrend = Array.from({ length: 7 }, (_, index) => ({
@@ -387,96 +372,6 @@ describe("analysis input", () => {
     expect(JSON.stringify(bundle.modelInput)).not.toMatch(
       /attention-sentinel|sales-sentinel|history-sentinel|traffic-sentinel|mix-sentinel/,
     );
-  });
-
-  it("aggregates the real per-shop sales history and exposes realtime and seven-day shares", () => {
-    const collected = fourSourceFixture();
-    collected.sales.data.sales.totals.salesYen = 100000;
-    collected.sales.data.sales.shops = [
-      { shopName: "3911", salesYen: 70000, orderCount: 14 },
-      { shopName: "0406", salesYen: 30000, orderCount: 6 },
-    ];
-    collected.sales.data.history = {
-      totals: { salesYen: 300000, orderCount: 60, conversionRate: 3.2 },
-      range: { dates: ["2026-07-30", "2026-07-31"] },
-      shops: [
-        {
-          shopName: "3911",
-          totals: { salesYen: 180000, orderCount: 36 },
-          daily: [
-            { date: "2026-07-30", salesYen: 80000, orderCount: 16 },
-            { date: "2026-07-31", salesYen: 100000, orderCount: 20 },
-          ],
-        },
-        {
-          shopName: "0406",
-          totals: { salesYen: 120000, orderCount: 24 },
-          daily: [
-            { date: "2026-07-30", salesYen: 50000, orderCount: 10 },
-            { date: "2026-07-31", salesYen: 70000, orderCount: 14 },
-          ],
-        },
-      ],
-    };
-
-    const bundle = buildAnalysisInput(collected, {
-      previousSnapshot: null,
-      nowTs: Date.parse("2026-08-01T10:00:00+09:00"),
-    });
-
-    expect(bundle.modelInput.modules.sales.sevenDay.dailyTrend).toEqual([
-      { date: "2026-07-30", salesYen: 130000, orderCount: 26 },
-      { date: "2026-07-31", salesYen: 170000, orderCount: 34 },
-    ]);
-    expect(bundle.modelInput.modules.sales.shops).toEqual([
-      {
-        shopName: "3911",
-        salesYen: 70000,
-        orderCount: 14,
-        realtimeSharePercent: 70,
-        sevenDaySalesYen: 180000,
-        sevenDayOrderCount: 36,
-        sevenDaySharePercent: 60,
-      },
-      {
-        shopName: "0406",
-        salesYen: 30000,
-        orderCount: 6,
-        realtimeSharePercent: 30,
-        sevenDaySalesYen: 120000,
-        sevenDayOrderCount: 24,
-        sevenDaySharePercent: 40,
-      },
-    ]);
-  });
-
-  it("takes top ten from each ranking and interleaves unique products before the cap", () => {
-    const collected = fourSourceFixture();
-    const ranked = (prefix) =>
-      Array.from({ length: 10 }, (_, index) => ({
-        itemManagementNumber: `${prefix}-${index + 1}`,
-        title: `${prefix} item ${index + 1}`,
-        rank: index + 1,
-      }));
-    collected.sales.data.ranking = {
-      rankings: {
-        sales: ranked("sales"),
-        orderCount: ranked("orders"),
-        units: ranked("units"),
-      },
-    };
-
-    const bundle = buildAnalysisInput(collected, {
-      previousSnapshot: null,
-      nowTs: Date.parse("2026-08-01T10:00:00+09:00"),
-    });
-    const keys = bundle.modelInput.rankedProducts.map((product) => product.itemManagementNumber);
-
-    expect(keys).toHaveLength(20);
-    expect(keys.slice(0, 6)).toEqual(["sales-1", "orders-1", "units-1", "sales-2", "orders-2", "units-2"]);
-    expect(keys.some((key) => key.startsWith("sales-"))).toBe(true);
-    expect(keys.some((key) => key.startsWith("orders-"))).toBe(true);
-    expect(keys.some((key) => key.startsWith("units-"))).toBe(true);
   });
 
   it("limits sanitized review excerpts to 300 Unicode characters", () => {
@@ -521,5 +416,144 @@ describe("severity", () => {
     });
 
     expect(buildAnalysisInput(collected, { previousSnapshot: null, nowTs: Date.now() }).severity).toBe("unknown");
+  });
+});
+
+describe("modelInput shape", () => {
+  it("exposes exactly the four fact blocks and no restructured modules", () => {
+    const analysis = buildAnalysisInput(fourSourceFixture(), { previousSnapshot: null, nowTs: Date.now() });
+
+    expect(Object.keys(analysis.modelInput).sort()).toEqual([
+      "attentionShops",
+      "capturedAtJST",
+      "caveats",
+      "comparisonWindow",
+      "dataQuality",
+      "metrics",
+      "reviewSamples",
+      "severity",
+      "sourceCoverage",
+      "sourceFreshness",
+    ]);
+  });
+
+  it("no longer produces display strings", () => {
+    const analysis = buildAnalysisInput(fourSourceFixture(), { previousSnapshot: null, nowTs: Date.now() });
+    expect(analysis.metricDisplay).toBeUndefined();
+  });
+
+  it("omits human labels from the metric entries", () => {
+    const analysis = buildAnalysisInput(fourSourceFixture(), { previousSnapshot: null, nowTs: Date.now() });
+    expect(Object.keys(analysis.modelInput.metrics[0]).sort()).toEqual([
+      "delta",
+      "deltaPercent",
+      "key",
+      "note",
+      "previousValue",
+      "source",
+      "unit",
+      "value",
+    ]);
+  });
+
+  it("stays far below the sixteen kilobyte budget on a full four-source payload", () => {
+    const analysis = buildAnalysisInput(fourSourceFixture(), { previousSnapshot: null, nowTs: Date.now() });
+    expect(Buffer.byteLength(JSON.stringify(analysis.modelInput), "utf8")).toBeLessThan(16000);
+  });
+});
+
+describe("attentionShops", () => {
+  it("is empty when every shop is normal", () => {
+    const collected = fourSourceFixture();
+    collected.attention.data.shops = [{ shopName: "3911", status: "normal", unrepliedReviewCount: 30 }];
+    collected.performance.data.shops = [];
+
+    expect(buildAnalysisInput(collected, { previousSnapshot: null, nowTs: Date.now() }).modelInput.attentionShops).toEqual(
+      [],
+    );
+  });
+
+  it("merges the attention and traffic views of one shop", () => {
+    const collected = fourSourceFixture();
+    collected.attention.data.shops = [
+      {
+        shopName: "3911",
+        status: "critical",
+        pendingOrderCount: 4,
+        unansweredInquiryCount: 0,
+        overdueInquiryCount: 0,
+        unrepliedReviewCount: 30,
+      },
+    ];
+    collected.performance.data.shops = [
+      { shopName: "3911", traffic: { status: "attention", visitDeltaPercent: -18, sampleCount: 5 } },
+    ];
+
+    const [shop] = buildAnalysisInput(collected, { previousSnapshot: null, nowTs: Date.now() }).modelInput
+      .attentionShops;
+
+    expect(shop.shopName).toBe("3911");
+    expect(shop.issues.sort()).toEqual(["orders", "reviews", "traffic"]);
+    expect(shop.pendingOrderCount).toBe(4);
+    expect(shop.visitDeltaPercent).toBe(-18);
+    expect(shop.salesYen).toBe(70000);
+  });
+
+  it("keeps critical shops ahead of attention shops and caps the list at five", () => {
+    const collected = fourSourceFixture();
+    collected.attention.data.shops = [
+      { shopName: "a", status: "attention", pendingOrderCount: 1 },
+      { shopName: "b", status: "attention", pendingOrderCount: 1 },
+      { shopName: "c", status: "attention", pendingOrderCount: 1 },
+      { shopName: "d", status: "attention", pendingOrderCount: 1 },
+      { shopName: "e", status: "attention", pendingOrderCount: 1 },
+      { shopName: "z", status: "critical", pendingOrderCount: 1 },
+    ];
+    collected.performance.data.shops = [];
+
+    const shops = buildAnalysisInput(collected, { previousSnapshot: null, nowTs: Date.now() }).modelInput
+      .attentionShops;
+
+    expect(shops).toHaveLength(5);
+    expect(shops[0].shopName).toBe("z");
+  });
+
+  it("hides the traffic delta when the baseline sample is too small", () => {
+    const collected = fourSourceFixture();
+    collected.attention.data.shops = [];
+    collected.performance.data.shops = [
+      { shopName: "3911", traffic: { status: "critical", visitDeltaPercent: -40, sampleCount: 2 } },
+    ];
+
+    const [shop] = buildAnalysisInput(collected, { previousSnapshot: null, nowTs: Date.now() }).modelInput
+      .attentionShops;
+
+    expect(shop.visitDeltaPercent).toBeNull();
+  });
+});
+
+describe("size budget", () => {
+  it("drops comparison fields before shops and reviews", () => {
+    const collected = fourSourceFixture();
+    collected.attention.data.recentReviews = Array.from({ length: 10 }, (_, index) => ({
+      shopName: "3911",
+      rating: 1,
+      postedAtJST: "2026-08-01 09:00:00 JST",
+      itemManagementNumber: "item-" + index,
+      excerpt: "あ".repeat(300),
+    }));
+    collected.attention.data.shops = Array.from({ length: 5 }, (_, index) => ({
+      shopName: "shop-" + index,
+      status: "critical",
+      pendingOrderCount: 1,
+    }));
+
+    const analysis = buildAnalysisInput(collected, {
+      previousSnapshot: { capturedAtJST: "2026-08-01 09:00:00 JST", metrics: { "sales.orders": 5 } },
+      nowTs: Date.parse("2026-08-01T10:00:00+09:00"),
+    });
+
+    expect(Buffer.byteLength(JSON.stringify(analysis.modelInput), "utf8")).toBeLessThanOrEqual(16000);
+    expect(analysis.modelInput.reviewSamples.length).toBeGreaterThan(0);
   });
 });
