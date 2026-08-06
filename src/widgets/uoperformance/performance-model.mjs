@@ -60,16 +60,17 @@ export function weekdayJp(dateStr) {
 }
 
 /** Catmull-Rom → cubic bezier, with an explicit value window so the median line shares the scale. */
-export function spark(values, width, height, min, max) {
+export function spark(values, width, height, min, max, horizontalPadding = 0) {
   const count = values.length;
   if (!count) {
     return { line: "", area: "" };
   }
 
   const usable = height - SPARK_PADDING * 2;
+  const usableWidth = Math.max(0, width - horizontalPadding * 2);
   const span = max - min || 1;
   const points = values.map((value, index) => ({
-    x: count === 1 ? width / 2 : index * (width / (count - 1)),
+    x: count === 1 ? width / 2 : horizontalPadding + index * (usableWidth / (count - 1)),
     y: SPARK_PADDING + (1 - (value - min) / span) * usable,
   }));
 

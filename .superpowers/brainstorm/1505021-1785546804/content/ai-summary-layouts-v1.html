@@ -1,0 +1,121 @@
+<style>
+  .uo-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; margin-top:22px; }
+  .uo-option { border:1px solid var(--border); border-radius:18px; overflow:hidden; cursor:pointer; background:var(--surface); transition:.18s ease; }
+  .uo-option:hover { transform:translateY(-2px); border-color:var(--accent); box-shadow:0 14px 40px rgba(0,0,0,.12); }
+  .uo-option.selected { outline:3px solid color-mix(in srgb,var(--accent) 35%,transparent); border-color:var(--accent); }
+  .uo-shot { padding:13px; min-height:430px; background:linear-gradient(145deg,#403427,#231e18); color:#f8ead1; }
+  .uo-tabs { display:flex; gap:6px; margin-bottom:10px; }
+  .uo-tab { flex:1; border-radius:5px; padding:7px 4px; text-align:center; font-size:8px; background:rgba(255,255,255,.05); color:#b9a47b; }
+  .uo-tab.active { background:rgba(239,196,105,.14); color:#f2cf78; }
+  .ai-card { border:1px solid rgba(236,190,97,.24); background:rgba(255,255,255,.065); border-radius:12px; padding:13px; box-shadow:0 10px 30px rgba(0,0,0,.18); }
+  .ai-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
+  .ai-title { display:flex; gap:7px; align-items:center; font-size:10px; font-weight:800; color:#f7d376; }
+  .ai-spark { width:23px; height:23px; border-radius:7px; display:grid; place-items:center; background:rgba(246,196,91,.13); border:1px solid rgba(246,196,91,.25); }
+  .ai-meta { font-size:6px; color:#ab9878; margin-top:2px; }
+  .ai-actions { display:flex; gap:4px; }
+  .ai-btn { border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.04); color:#dbc79f; border-radius:6px; padding:4px 6px; font-size:6px; }
+  .ai-btn.active { background:#e7bd62; color:#372b19; font-weight:800; }
+  .status { display:inline-flex; align-items:center; gap:4px; border-radius:99px; padding:3px 6px; font-size:6px; font-weight:800; background:rgba(242,164,55,.13); color:#f6b95c; border:1px solid rgba(242,164,55,.28); }
+  .dot { width:4px; height:4px; border-radius:50%; background:#f1a840; }
+  .lead { font-size:10px; line-height:1.65; font-weight:750; color:#fff5df; margin:8px 0 10px; }
+  .muted { color:#bca987; font-size:7px; line-height:1.55; }
+  .three { display:grid; grid-template-columns:1.2fr 1fr 1fr; gap:6px; }
+  .pane { border:1px solid rgba(255,255,255,.09); border-radius:8px; background:rgba(0,0,0,.12); padding:8px; }
+  .pane h5 { margin:0 0 5px; font-size:7px; color:#d7bd87; }
+  .pane p,.pane li { margin:0; font-size:7px; line-height:1.5; color:#e8dcc3; }
+  .pane ul { margin:0; padding-left:12px; }
+  .evidence { display:flex; gap:5px; flex-wrap:wrap; margin-top:8px; }
+  .chip { border-radius:6px; background:rgba(255,255,255,.06); padding:4px 6px; font-size:6px; color:#cfbd9d; }
+  .chip.bad { color:#ff9e93; background:rgba(211,73,67,.12); }
+  .chip.good { color:#79dfae; background:rgba(62,173,116,.12); }
+  .module { margin-top:9px; border:1px solid rgba(255,255,255,.07); border-radius:9px; padding:9px; background:rgba(255,255,255,.025); }
+  .module-line { height:5px; border-radius:4px; background:rgba(255,255,255,.08); margin:5px 0; }
+  .module-line.short { width:58%; }
+  .narrative { border-left:2px solid #e6bd64; padding-left:9px; font-size:9px; line-height:1.75; color:#f2e5ca; }
+  .action-row { display:flex; align-items:flex-start; gap:7px; padding:7px 0; border-top:1px solid rgba(255,255,255,.08); }
+  .action-no { width:16px; height:16px; border-radius:5px; display:grid; place-items:center; background:rgba(233,188,96,.14); color:#f1c96f; font-size:7px; font-weight:800; }
+  .traffic { display:grid; grid-template-columns:repeat(4,1fr); gap:5px; margin:9px 0; }
+  .traffic-item { padding:7px 5px; border-radius:7px; border:1px solid rgba(255,255,255,.08); background:rgba(0,0,0,.13); }
+  .traffic-item b { display:block; font-size:9px; margin-top:3px; color:#fff0d0; }
+  .traffic-item small { font-size:6px; color:#aa9877; }
+  .bar { height:4px; margin-top:5px; border-radius:4px; background:rgba(255,255,255,.08); overflow:hidden; }
+  .bar i { display:block; height:100%; background:#d05972; }
+  .uo-caption { padding:14px 15px 16px; }
+  .uo-caption h3 { margin:0 0 5px; font-size:16px; }
+  .uo-caption p { margin:0; font-size:13px; line-height:1.5; color:var(--muted); }
+  .recommend { display:inline-block; margin-left:7px; border-radius:99px; padding:2px 7px; font-size:10px; color:#16794e; background:#ddf6e9; vertical-align:middle; }
+  @media (max-width:1000px) { .uo-grid { grid-template-columns:1fr; } .uo-shot { min-height:auto; } }
+</style>
+
+<h2>AI 経営サマリー：顶部卡片布局</h2>
+<p class="subtitle">默认显示日语，右上角可切换中文。请选择最符合“管理层一眼看懂、需要时再深入”的方案。</p>
+
+<div class="uo-grid">
+  <div class="uo-option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="uo-shot">
+      <div class="uo-tabs"><div class="uo-tab active">UO ホーム</div><div class="uo-tab">ブックマーク</div><div class="uo-tab">インフォメーション</div></div>
+      <div class="ai-card">
+        <div class="ai-head">
+          <div class="ai-title"><span class="ai-spark">✦</span><span>AI 経営サマリー<div class="ai-meta">10:00 JST · 4/4 データソース</div></span></div>
+          <div class="ai-actions"><span class="ai-btn active">日本語</span><span class="ai-btn">中文</span><span class="ai-btn">↻</span></div>
+        </div>
+        <span class="status"><i class="dot"></i>要対応</span>
+        <p class="lead">売上は平常ペースを下回り、アクセスも同曜日中央値比で低調です。一方、出荷処理は安定しているため、まず集客回復と未対応64件の解消を優先してください。</p>
+        <div class="three">
+          <div class="pane"><h5>総合判断</h5><p>営業面は注意、物流面は正常。全社として「改善行動が必要」です。</p></div>
+          <div class="pane"><h5>主要な根拠</h5><ul><li>訪問数 −31.8%</li><li>売上進捗 24%</li><li>未対応 64件</li></ul></div>
+          <div class="pane"><h5>優先アクション</h5><ul><li>集客施策を点検</li><li>低評価32件を分類</li><li>未回答を本日処理</li></ul></div>
+        </div>
+        <div class="evidence"><span class="chip bad">アクセス低下</span><span class="chip bad">対応滞留</span><span class="chip good">出荷安定</span><span class="chip">詳細を表示 ▾</span></div>
+      </div>
+      <div class="module"><div class="muted">出荷出力-リアルタイム</div><div class="module-line"></div><div class="module-line short"></div></div>
+      <div class="module"><div class="muted">運営対応</div><div class="module-line"></div></div>
+    </div>
+    <div class="uo-caption"><h3>A. 分层驾驶舱 <span class="recommend">推荐</span></h3><p>默认呈现一句结论，并同时露出依据和行动；详细证据可继续展开，信息密度与现有模块匹配。</p></div>
+  </div>
+
+  <div class="uo-option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="uo-shot">
+      <div class="uo-tabs"><div class="uo-tab active">UO ホーム</div><div class="uo-tab">ブックマーク</div><div class="uo-tab">インフォメーション</div></div>
+      <div class="ai-card">
+        <div class="ai-head">
+          <div class="ai-title"><span class="ai-spark">✦</span><span>AI 経営レポート<div class="ai-meta">10:00 JST · 1時間ごとに更新</div></span></div>
+          <div class="ai-actions"><span class="ai-btn active">日本語</span><span class="ai-btn">中文</span></div>
+        </div>
+        <span class="status"><i class="dot"></i>要対応</span>
+        <p class="narrative">本日の全社状況は注意が必要です。リアルタイム売上は178,869円で、直近7日平均に対する進捗は24%。訪問数は同曜日中央値を31.8%下回っています。一方、出荷出力は749件で処理フローは安定しています。運営対応は64件あり、特に低評価レビューと未回答問い合わせを優先的に確認してください。</p>
+        <div class="action-row"><span class="action-no">1</span><span class="muted"><b style="color:#f1d18b">流入経路を確認</b><br>低下幅の大きい店舗から広告・検索流入を点検</span></div>
+        <div class="action-row"><span class="action-no">2</span><span class="muted"><b style="color:#f1d18b">低評価を分類</b><br>脱敏済みレビューから共通原因を抽出</span></div>
+        <div class="action-row"><span class="action-no">3</span><span class="muted"><b style="color:#f1d18b">未対応を削減</b><br>本日中に高優先度案件を処理</span></div>
+      </div>
+      <div class="module"><div class="muted">出荷出力-リアルタイム</div><div class="module-line"></div><div class="module-line short"></div></div>
+    </div>
+    <div class="uo-caption"><h3>B. 完整经营简报</h3><p>一打开就看到完整段落和三项行动，阅读连贯，但会明显增加页面顶部高度。</p></div>
+  </div>
+
+  <div class="uo-option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="uo-shot">
+      <div class="uo-tabs"><div class="uo-tab active">UO ホーム</div><div class="uo-tab">ブックマーク</div><div class="uo-tab">インフォメーション</div></div>
+      <div class="ai-card">
+        <div class="ai-head">
+          <div class="ai-title"><span class="ai-spark">✦</span><span>AI 経営シグナル<div class="ai-meta">10:00 JST · 前回比を分析</div></span></div>
+          <div class="ai-actions"><span class="ai-btn active">日本語</span><span class="ai-btn">中文</span><span class="ai-btn">詳細</span></div>
+        </div>
+        <span class="status"><i class="dot"></i>要対応</span>
+        <p class="lead">営業指標は弱含み、物流は安定。集客回復と未対応案件の解消を優先。</p>
+        <div class="traffic">
+          <div class="traffic-item"><small>売上</small><b>¥178,869</b><div class="bar"><i style="width:24%"></i></div></div>
+          <div class="traffic-item"><small>アクセス</small><b>−31.8%</b><div class="bar"><i style="width:68%"></i></div></div>
+          <div class="traffic-item"><small>未対応</small><b>64件</b><div class="bar"><i style="width:58%"></i></div></div>
+          <div class="traffic-item"><small>出荷出力</small><b>749件</b><div class="bar"><i style="width:82%;background:#45b983"></i></div></div>
+        </div>
+        <div class="muted">詳細は「詳細」ボタンから展開します。初期状態では数値シグナル中心です。</div>
+      </div>
+      <div class="module"><div class="muted">出荷出力-リアルタイム</div><div class="module-line"></div><div class="module-line short"></div></div>
+      <div class="module"><div class="muted">運営対応</div><div class="module-line"></div></div>
+    </div>
+    <div class="uo-caption"><h3>C. 极简信号条</h3><p>顶部最紧凑，适合快速扫视；但 AI 的解释和解决建议默认被隐藏，容易退化成另一组 KPI。</p></div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:18px">点击卡片即可选择；如果希望混合两种方案，也可以在终端直接说明。</p>

@@ -309,14 +309,18 @@ function TrafficChart({ days, series, expected, t }) {
   const lo = Math.min(...vals) * 0.9;
   const hi = Math.max(...vals, showMedian ? expected : 0) * 1.04;
   // At most 7 points — cheap enough to recompute; memoizing on a freshly built array never hits anyway.
-  const path = spark(vals, CHART_WIDTH, CHART_HEIGHT, lo, hi);
+  // Each date and hover target owns one equal-width day band. Plot at the band centres too,
+  // otherwise the curve uses edge coordinates while its labels use centre coordinates.
+  const horizontalPadding = days.length ? CHART_WIDTH / (days.length * 2) : 0;
+  const path = spark(vals, CHART_WIDTH, CHART_HEIGHT, lo, hi, horizontalPadding);
   const yAt = (v) => SPARK_PADDING + (1 - (v - lo) / (hi - lo || 1)) * (CHART_HEIGHT - SPARK_PADDING * 2);
-  const xPct = (i) => (days.length === 1 ? 50 : (i / (days.length - 1)) * 100);
+  const xPct = (i) => ((i + 0.5) / days.length) * 100;
   // expectedVisitCount is one figure for the latest business day, not a per-day series.
   // Spanning the whole chart invited comparing it against the other six days, each of which
   // falls on a different weekday and so has a different median of its own — so it covers
   // only the final segment, where the comparison actually holds.
   const medianLeft = days.length > 1 ? xPct(days.length - 2) : 0;
+  const medianRight = days.length > 1 ? 100 - xPct(days.length - 1) : 0;
   const tipTx = hover === 0 ? "0%" : hover === days.length - 1 ? "-100%" : "-50%";
 
   return (
@@ -325,9 +329,10 @@ function TrafficChart({ days, series, expected, t }) {
         {showMedian ? (
           <div
             data-testid="median-baseline"
-            className="pointer-events-none absolute right-0 z-[3] border-t-[1.5px] border-dashed"
+            className="pointer-events-none absolute z-[3] border-t-[1.5px] border-dashed"
             style={{
               left: `${medianLeft}%`,
+              right: `${medianRight}%`,
               bottom: `${CHART_HEIGHT - yAt(expected)}px`,
               borderColor: "rgba(198,54,43,.7)",
             }}

@@ -1,0 +1,87 @@
+<style>
+  .arch { display:flex; flex-direction:column; gap:18px; margin-top:22px; }
+  .lane { display:grid; grid-template-columns:170px 1fr; gap:16px; align-items:stretch; }
+  .lane-label { border-radius:14px; border:1px solid var(--border); background:var(--surface); padding:14px; }
+  .lane-label b { display:block; font-size:13px; margin-bottom:5px; }
+  .lane-label span { color:var(--muted); font-size:11px; line-height:1.45; }
+  .lane-body { border-radius:14px; border:1px solid var(--border); background:var(--surface); padding:14px; }
+  .sources { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
+  .source { border-radius:11px; border:1px solid var(--border); padding:12px; min-height:92px; background:color-mix(in srgb,var(--surface) 85%,var(--accent) 3%); }
+  .source .icon { font-size:21px; }
+  .source b { display:block; margin:6px 0 3px; font-size:12px; }
+  .source span { color:var(--muted); font-size:10px; line-height:1.4; }
+  .flow { display:grid; grid-template-columns:1fr 28px 1fr 28px 1fr 28px 1fr; align-items:stretch; gap:4px; }
+  .box { border:1px solid var(--border); border-radius:12px; padding:13px; background:color-mix(in srgb,var(--surface) 92%,var(--accent) 3%); }
+  .box strong { display:block; font-size:12px; margin-bottom:5px; }
+  .box p { margin:0; color:var(--muted); font-size:10px; line-height:1.45; }
+  .arrow { display:grid; place-items:center; color:var(--accent); font-size:22px; font-weight:800; }
+  .dual { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .callout { border-radius:11px; padding:12px; border:1px solid var(--border); }
+  .callout.good { background:rgba(28,158,105,.08); border-color:rgba(28,158,105,.3); }
+  .callout.warn { background:rgba(225,153,48,.08); border-color:rgba(225,153,48,.3); }
+  .callout b { display:block; font-size:12px; margin-bottom:5px; }
+  .callout ul { margin:0; padding-left:17px; color:var(--muted); font-size:10px; line-height:1.6; }
+  .schema { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .schema div { border-radius:9px; padding:10px; background:var(--bg); border:1px dashed var(--border); }
+  .schema b { display:block; font-size:11px; margin-bottom:4px; }
+  .schema span { color:var(--muted); font-size:9px; line-height:1.4; }
+  .approve { margin-top:20px; }
+  @media (max-width:900px) {
+    .lane { grid-template-columns:1fr; }
+    .sources,.schema { grid-template-columns:1fr 1fr; }
+    .flow { grid-template-columns:1fr; }
+    .arrow { transform:rotate(90deg); min-height:24px; }
+  }
+</style>
+
+<h2>设计第 1 部分：架构与数据流</h2>
+<p class="subtitle">AI 汇总作为 Homepage 内的独立全宽组件；密钥、原始数据和模型调用全部停留在服务端。</p>
+
+<div class="arch">
+  <div class="lane">
+    <div class="lane-label"><b>① 数据来源</b><span>复用当前四个经营模块的数据接口，不让浏览器重新拼装数据。</span></div>
+    <div class="lane-body sources">
+      <div class="source"><span class="icon">📦</span><b>出荷出力</b><span>今日输出、配送、店铺分布、数据新鲜度</span></div>
+      <div class="source"><span class="icon">🧾</span><b>运营对应</b><span>待处理订单、咨询、低分评价和来源状态</span></div>
+      <div class="source"><span class="icon">💴</span><b>乐天销售</b><span>实时销售、7日趋势、店铺与商品 Top 信号</span></div>
+      <div class="source"><span class="icon">📈</span><b>经营表现</b><span>访问、UU、同星期中位数、新客/复购结构</span></div>
+    </div>
+  </div>
+
+  <div class="lane">
+    <div class="lane-label"><b>② 服务端分析</b><span>先做可靠的数据处理，再交给 GPT 负责解释和行动建议。</span></div>
+    <div class="lane-body flow">
+      <div class="box"><strong>并发采集</strong><p>四组接口独立超时；一个来源失败不会拖垮全部。</p></div>
+      <div class="arrow">→</div>
+      <div class="box"><strong>归一化与脱敏</strong><p>删除身份、订单号、联系方式和链接；评价只保留脱敏摘要。</p></div>
+      <div class="arrow">→</div>
+      <div class="box"><strong>确定性指标层</strong><p>计算环比、基准差、严重度和证据键，防止模型发明数字。</p></div>
+      <div class="arrow">→</div>
+      <div class="box"><strong>Responses API</strong><p>自定义 URL / Key / model，reasoning.effort = xhigh，一次返回日中双语。</p></div>
+    </div>
+  </div>
+
+  <div class="lane">
+    <div class="lane-label"><b>③ 校验与存储</b><span>模型输出不是直接显示；必须通过结构和证据校验。</span></div>
+    <div class="lane-body dual">
+      <div class="callout good"><b>结构化输出校验</b><ul><li>状态、结论、依据、行动均有固定字段</li><li>依据引用 metricKey，实际数字由程序渲染</li><li>日文和中文在同一份结果内一一对应</li></ul></div>
+      <div class="callout warn"><b>持久化快照</b><ul><li>原子写入 config/uo-ai-summary.json</li><li>保留最新结果与最近 24 个小时级紧凑快照</li><li>不持久化评价原文，仅保存脱敏后的分析输入</li></ul></div>
+    </div>
+  </div>
+
+  <div class="lane">
+    <div class="lane-label"><b>④ 触发与展示</b><span>自动调度与手动重算共用同一条受控分析链路。</span></div>
+    <div class="lane-body schema">
+      <div><b>每小时自动生成</b><span>服务启动时恢复缓存；缺失或过期则补算，之后按小时执行。</span></div>
+      <div><b>手动重新分析</b><span>POST 触发，10 分钟冷却；并发请求合并，避免重复计费。</span></div>
+      <div><b>顶部全宽卡片</b><span>默认日文；中文原位切换。浏览器只获取已校验的摘要。</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="options approve">
+  <div class="option" data-choice="architecture-approved" onclick="toggleSelect(this)">
+    <div class="letter">✓</div>
+    <div class="content"><h3>确认此架构</h3><p>下一步继续确认摘要内容、异常与降级规则。</p></div>
+  </div>
+</div>

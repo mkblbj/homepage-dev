@@ -169,9 +169,9 @@ describe("widgets/uoperformance/component", () => {
     const baseline = container.querySelector('[data-testid="median-baseline"]');
 
     expect(baseline).toBeTruthy();
-    expect(baseline).toHaveClass("right-0");
-    // two points in the fixture → the line starts at the earlier one
-    expect(parseFloat(baseline.style.left)).toBeCloseTo(0, 4);
+    // two day bands place their points at 25% and 75%; the median line joins those points
+    expect(parseFloat(baseline.style.left)).toBeCloseTo(25, 4);
+    expect(parseFloat(baseline.style.right)).toBeCloseTo(25, 4);
   });
 
   it("spans the last inter-point gap when a full week is present", () => {
@@ -183,10 +183,37 @@ describe("widgets/uoperformance/component", () => {
     mockData(snapshot({ traffic: { ...snapshot().traffic, daily: week } }));
     const { container } = render();
 
-    // 7 points → the second-to-last sits at 5/6 of the width, so the line covers the final day only
-    const left = parseFloat(container.querySelector('[data-testid="median-baseline"]').style.left);
+    // Seven day-band centres sit at (i + 0.5) / 7, so the baseline joins the final two points.
+    const baseline = container.querySelector('[data-testid="median-baseline"]');
+    const left = parseFloat(baseline.style.left);
+    const right = parseFloat(baseline.style.right);
 
-    expect(left).toBeCloseTo((5 / 6) * 100, 4);
+    expect(left).toBeCloseTo((5.5 / 7) * 100, 4);
+    expect(right).toBeCloseTo((0.5 / 7) * 100, 4);
+  });
+
+  it("centres chart points and hover markers in the same day bands as the date labels", () => {
+    const week = ["07-26", "07-27", "07-28", "07-29", "07-30", "07-31", "08-01"].map((md, i) => ({
+      dateJST: `2026-${md}`,
+      visitCount: 15000 + i * 100,
+      uniqueVisitorCount: 14000 + i * 100,
+    }));
+    mockData(snapshot({ traffic: { ...snapshot().traffic, daily: week } }));
+    const { container } = render();
+
+    // Seven equal-width day bands in a 600-unit chart have centres at 42.86 and 557.14.
+    // The plotted points and hover marker must use those same centres, otherwise each
+    // date appears shifted by half a day from its value.
+    const line = container.querySelector('path[stroke="url(#uopf-stroke)"]');
+    const coordinates = [...line.getAttribute("d").matchAll(/([\d.]+) ([\d.]+)/g)];
+
+    expect(Number(coordinates[0][1])).toBeCloseTo(600 / 14, 2);
+    expect(Number(coordinates.at(-1)[1])).toBeCloseTo(600 - 600 / 14, 2);
+
+    const hoverBands = container.querySelectorAll(".cursor-crosshair");
+    fireEvent.mouseEnter(hoverBands[hoverBands.length - 1]);
+
+    expect(screen.getByText("8/1（土）").parentElement.style.left).toBe(`${(6.5 / 7) * 100}%`);
   });
 
   it("names the weekday the median belongs to", () => {
