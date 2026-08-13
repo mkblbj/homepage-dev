@@ -72,26 +72,24 @@ export default function UoWorldClock({ options }) {
   return (
     <Container options={options} additionalClassNames="information-widget-uoworldclock">
       <Raw>
-        <div className={`uoworldclock-line flex flex-row items-center gap-3 border-l-2 pl-3 ${styles.line}`}>
+        <div className={`uoworldclock-line flex flex-row items-center gap-2.5 border-l-2 pl-3 ${styles.line}`}>
           {label && <span className="text-sm">{label}</span>}
-          <div className="flex flex-col">
-            <div className={`uoworldclock-time leading-tight tabular-nums ${styles.time}`}>
-              {timeParts.map((part, index) => (
-                <span
-                  // parts 由 Intl 生成，顺序稳定且无独立 id，用 index 作 key 是安全的
-                  key={index}
-                  className={
-                    part.primary ? "uoworldclock-primary text-2xl font-medium" : "uoworldclock-secondary text-sm"
-                  }
-                >
-                  {part.value}
-                </span>
-              ))}
-            </div>
-            <div className={`text-xs ${styles.muted}`}>
-              {dateText}
-              {stateText ? ` · ${stateText}` : ""}
-            </div>
+          <div className={`uoworldclock-time leading-tight tabular-nums ${styles.time}`}>
+            {timeParts.map((part, index) => (
+              <span
+                // parts 由 Intl 生成，顺序稳定且无独立 id，用 index 作 key 是安全的
+                key={index}
+                className={
+                  part.primary ? "uoworldclock-primary text-2xl font-medium" : "uoworldclock-secondary text-sm"
+                }
+              >
+                {part.value}
+              </span>
+            ))}
+          </div>
+          <div className={`text-xs ${styles.muted}`}>
+            {dateText}
+            {stateText ? ` · ${stateText}` : ""}
           </div>
         </div>
       </Raw>
