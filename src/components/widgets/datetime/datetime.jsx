@@ -16,7 +16,7 @@ const textSizes = {
 };
 
 export default function DateTime({ options }) {
-  const { text_size: textSize, locale, format, label } = options;
+  const { text_size: textSize, locale, format } = options;
   const { i18n } = useTranslation();
   const [date, setDate] = useState("");
   const dateLocale = locale ?? i18n.language;
@@ -33,12 +33,7 @@ export default function DateTime({ options }) {
   return (
     <Container options={options} additionalClassNames="information-widget-datetime">
       <Raw>
-        <div className="flex flex-row items-center grow justify-end gap-1.5">
-          {label && (
-            <span className={`text-theme-800 dark:text-theme-200 opacity-70 ${textSizes[textSize || "lg"]}`}>
-              {label}
-            </span>
-          )}
+        <div className="flex flex-row items-center grow justify-end">
           <span className={`text-theme-800 dark:text-theme-200 tabular-nums ${textSizes[textSize || "lg"]}`}>
             {date}
           </span>
