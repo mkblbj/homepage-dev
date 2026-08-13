@@ -31,4 +31,39 @@ describe("components/widgets/datetime", () => {
       vi.useRealTimers();
     }
   });
+
+  it("renders the label next to the time when the label option is provided", () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2020-01-01T00:00:00.000Z"));
+
+      const format = { timeZone: "UTC", hour: "2-digit", minute: "2-digit", second: "2-digit" };
+      const expected = new Intl.DateTimeFormat("en-US", format).format(new Date());
+
+      renderWithProviders(<DateTime options={{ locale: "en-US", format, label: "🇬🇧 英国" }} />, {
+        settings: { target: "_self" },
+      });
+
+      expect(screen.getByText("🇬🇧 英国")).toBeInTheDocument();
+      expect(screen.getByText(expected)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("renders no extra element when the label option is absent", () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2020-01-01T00:00:00.000Z"));
+
+      const format = { timeZone: "UTC", hour: "2-digit", minute: "2-digit", second: "2-digit" };
+      const { container } = renderWithProviders(<DateTime options={{ locale: "en-US", format }} />, {
+        settings: { target: "_self" },
+      });
+
+      expect(container.querySelectorAll(".information-widget-datetime span")).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
