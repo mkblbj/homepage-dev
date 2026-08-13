@@ -16,10 +16,12 @@ const stateStyles = {
     time: "text-theme-800 dark:text-theme-200",
     muted: "text-theme-600 dark:text-theme-400",
   },
+  // 夜间档靠冷色调与竖线颜色表达「那边没人」，而不是靠压暗——
+  // 压暗会让日期行跌破 WCAG AA 对小字要求的 4.5:1。
   night: {
-    line: "border-slate-500/70",
-    time: "text-slate-500 dark:text-slate-400",
-    muted: "text-slate-500 dark:text-slate-500",
+    line: "border-slate-400/80",
+    time: "text-slate-600 dark:text-slate-300",
+    muted: "text-slate-500 dark:text-slate-400",
   },
 };
 
