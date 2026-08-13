@@ -48,8 +48,8 @@ describe("config/custom.js sale reminder", () => {
   beforeEach(() => {
     document.body.innerHTML = `
       <div id="information-widgets-right">
-        <div class="information-widget-datetime">2026/7/6月曜日 午後3:00:00</div>
-        <div class="information-widget-datetime">Sunday, 6 July 2026 at 7:00:00 am</div>
+        <div class="information-widget-uoworldclock">午前11:15:42</div>
+        <div class="information-widget-uoworldclock">3:15:42 am</div>
       </div>
     `;
   });
@@ -81,7 +81,7 @@ describe("config/custom.js sale reminder", () => {
     expect(reminder).toHaveTextContent("本日は大型セール日");
     expect(reminder).toHaveTextContent("注文大幅増加見込み");
     expect(reminder).toHaveTextContent("楽天公式：お買い物マラソン＆ジャンルSALE開催中 · 7/11 01:59まで");
-    expect(reminder?.nextElementSibling).toHaveClass("information-widget-datetime");
+    expect(reminder?.nextElementSibling).toHaveClass("information-widget-uoworldclock");
     // 提醒必须插在第一个（日本）时钟之前，否则页眉会变成「时钟 / 提醒 / 时钟」的错乱布局
     const host = document.getElementById("information-widgets-right");
     expect(host?.firstElementChild).toBe(reminder);
