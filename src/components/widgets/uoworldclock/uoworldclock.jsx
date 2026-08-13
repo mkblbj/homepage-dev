@@ -4,6 +4,7 @@ import Container from "../widget/container";
 import Raw from "../widget/raw";
 
 import { resolveClockState } from "./clock-state";
+import Flag, { hasFlag } from "./flags";
 
 const stateStyles = {
   working: {
@@ -40,8 +41,21 @@ function splitTimeParts(parts) {
   }));
 }
 
+// 配了可识别的 flag 就渲染内联 SVG，否则退回文字 label——
+// 未知的 flag code 同样退回文字，不至于让标识整个消失。
+function FlagOrLabel({ flag, label }) {
+  if (hasFlag(flag)) {
+    return (
+      <span className="uoworldclock-flag flex items-center">
+        <Flag code={flag} />
+      </span>
+    );
+  }
+  return label ? <span className="text-sm">{label}</span> : null;
+}
+
 export default function UoWorldClock({ options }) {
-  const { label, locale, timeZone, workHours, dayHours, workdays, dateFormat, stateLabels } = options;
+  const { label, flag, locale, timeZone, workHours, dayHours, workdays, dateFormat, stateLabels } = options;
   const [now, setNow] = useState(null);
 
   useEffect(() => {
@@ -75,7 +89,7 @@ export default function UoWorldClock({ options }) {
     <Container options={options} additionalClassNames="information-widget-uoworldclock">
       <Raw>
         <div className={`uoworldclock-line flex flex-row items-center gap-2.5 border-l-2 pl-3 ${styles.line}`}>
-          {label && <span className="text-sm">{label}</span>}
+          <FlagOrLabel flag={flag} label={label} />
           <div className={`uoworldclock-time leading-tight tabular-nums ${styles.time}`}>
             {timeParts.map((part, index) => (
               <span

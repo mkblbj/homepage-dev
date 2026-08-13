@@ -136,6 +136,64 @@ describe("components/widgets/uoworldclock", () => {
     }
   });
 
+  it("renders an inline SVG flag instead of text when flag is configured", () => {
+    vi.useFakeTimers();
+    try {
+      // Windows 的 Segoe UI Emoji 不含国旗字形，会把 🇯🇵 降级成 JP 两个字母，
+      // 因此改用内联 SVG 保证跨平台一致
+      const { container } = renderAt("2026-08-13T11:15:42+09:00", { ...JP_OPTIONS, flag: "jp" });
+      expect(container.querySelector(".uoworldclock-flag svg")).not.toBeNull();
+      expect(screen.queryByText("🇯🇵")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("falls back to the text label when no flag is configured", () => {
+    vi.useFakeTimers();
+    try {
+      const { container } = renderAt("2026-08-13T11:15:42+09:00", JP_OPTIONS);
+      expect(screen.getByText("🇯🇵")).toBeInTheDocument();
+      expect(container.querySelector(".uoworldclock-flag svg")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("gives every flag instance its own clipPath ids", () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-08-13T11:15:42+09:00"));
+      // 英国旗需要 clipPath；两个实例同页渲染时 id 若相同，后一面旗会被前一面的裁剪路径污染
+      const { container } = renderWithProviders(
+        <>
+          <UoWorldClock options={{ ...UK_OPTIONS, flag: "gb" }} />
+          <UoWorldClock options={{ ...UK_OPTIONS, flag: "gb" }} />
+        </>,
+        { settings: { target: "_self" } },
+      );
+
+      const ids = [...container.querySelectorAll("clipPath")].map((el) => el.id);
+      expect(ids.length).toBeGreaterThanOrEqual(4);
+      expect(new Set(ids).size).toBe(ids.length);
+      // url(#id) 里的冒号会被当作伪类解析，useId 的原始值必须清洗过
+      expect(ids.every((id) => !id.includes(":"))).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("ignores an unknown flag code and keeps the text label", () => {
+    vi.useFakeTimers();
+    try {
+      const { container } = renderAt("2026-08-13T11:15:42+09:00", { ...JP_OPTIONS, flag: "zz" });
+      expect(container.querySelector(".uoworldclock-flag svg")).toBeNull();
+      expect(screen.getByText("🇯🇵")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("ticks every second", () => {
     vi.useFakeTimers();
     try {
