@@ -49,6 +49,7 @@ describe("config/custom.js sale reminder", () => {
     document.body.innerHTML = `
       <div id="information-widgets-right">
         <div class="information-widget-datetime">2026/7/6月曜日 午後3:00:00</div>
+        <div class="information-widget-datetime">Sunday, 6 July 2026 at 7:00:00 am</div>
       </div>
     `;
   });
@@ -81,6 +82,10 @@ describe("config/custom.js sale reminder", () => {
     expect(reminder).toHaveTextContent("注文大幅増加見込み");
     expect(reminder).toHaveTextContent("楽天公式：お買い物マラソン＆ジャンルSALE開催中 · 7/11 01:59まで");
     expect(reminder?.nextElementSibling).toHaveClass("information-widget-datetime");
+    // 提醒必须插在第一个（日本）时钟之前，否则页眉会变成「时钟 / 提醒 / 时钟」的错乱布局
+    const host = document.getElementById("information-widgets-right");
+    expect(host?.firstElementChild).toBe(reminder);
+    expect(host?.children).toHaveLength(3);
   });
 
   it("retries temporary conflict responses before returning campaign data", async () => {
