@@ -49,6 +49,19 @@ describe("widgets/uoperformance/locales", () => {
     }
   });
 
+  it("defines every trend label and both positive and negative thresholds", () => {
+    const trendKeys = ["decrease", "increase", "sharp_decrease", "stable", "surge", "unknown"];
+
+    for (const locale of LOCALES) {
+      const namespace = loadNamespace(locale);
+
+      expect(Object.keys(namespace.trend).sort(), `${locale}.trend keys mismatch`).toEqual(trendKeys);
+      for (const threshold of ["+20", "+35", "−20", "−35"]) {
+        expect(namespace.thresholds, `${locale}.thresholds lost ${threshold}`).toContain(threshold);
+      }
+    }
+  });
+
   it("keeps every interpolation placeholder in every locale", () => {
     const cases = [
       ["subtitle", "{{count}}"],

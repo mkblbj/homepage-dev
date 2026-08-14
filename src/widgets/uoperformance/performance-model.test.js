@@ -20,6 +20,7 @@ const snapshot = {
   shopCount: 7,
   traffic: {
     status: "normal",
+    trendStatus: "stable",
     dataDateJST: "2026-07-30",
     visitCount: 15897,
     uniqueVisitorCount: 14737,
@@ -68,6 +69,7 @@ const snapshot = {
       status: "attention",
       traffic: {
         status: "attention",
+        trendStatus: "decrease",
         dataDateJST: "2026-07-30",
         visitCount: 5122,
         uniqueVisitorCount: 4652,
@@ -98,6 +100,7 @@ describe("widgets/uoperformance/performance-model", () => {
     const model = buildPerformanceModel(snapshot);
 
     expect(model.trafficStatus).toBe("normal");
+    expect(model.trendStatus).toBe("stable");
     expect(model.dataDateJST).toBe("2026-07-30");
     expect(model.visit).toBe(15897);
     expect(model.uu).toBe(14737);
@@ -170,6 +173,7 @@ describe("widgets/uoperformance/performance-model", () => {
     expect(model.shops[0]).toMatchObject({
       name: "3911",
       status: "attention",
+      trendStatus: "decrease",
       sampleCount: 4,
       visit: 5122,
       expected: 6784.5,
@@ -177,6 +181,20 @@ describe("widgets/uoperformance/performance-model", () => {
       newSalesShare: 83.5,
       newOrderShare: 85.8,
     });
+  });
+
+  it("normalizes missing or unsupported trend statuses to unknown", () => {
+    const model = buildPerformanceModel({
+      ...snapshot,
+      traffic: { ...snapshot.traffic, trendStatus: "unexpected" },
+      shops: snapshot.shops.map((shop) => ({
+        ...shop,
+        traffic: { ...shop.traffic, trendStatus: undefined },
+      })),
+    });
+
+    expect(model.trendStatus).toBe("unknown");
+    expect(model.shops[0].trendStatus).toBe("unknown");
   });
 
   it("merges shop logos by name and tolerates a missing snapshot", () => {

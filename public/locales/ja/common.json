@@ -1348,12 +1348,20 @@
         "partial": "部分データ",
         "total": "合計",
         "shop": "店舗",
-        "statusCol": "状態",
+        "statusCol": "傾向",
         "traffic": {
             "critical": "訪問 大幅低下",
             "attention": "訪問 低下",
             "normal": "訪問 正常",
             "unknown": "サンプル不足"
+        },
+        "trend": {
+            "surge": "訪問 急増",
+            "increase": "訪問 増加",
+            "stable": "訪問 安定",
+            "decrease": "訪問 低下",
+            "sharp_decrease": "訪問 大幅低下",
+            "unknown": "傾向不明"
         },
         "sourceTraffic": "訪問（アクセス）",
         "sourceMix": "新規/リピート",
@@ -1395,7 +1403,7 @@
         "ordersUnit": "件",
         "byShop": "店舗別 経営表現",
         "covered": "{{covered}}/{{total}} 店舗",
-        "thresholds": "閾値：注意 −20% / 重大 −35%",
+        "thresholds": "傾向閾値：急増 +35% / 増加 +20% / 低下 −20% / 大幅低下 −35%",
         "noData": "データがありません"
     },
     "uoprinters": {

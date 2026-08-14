@@ -8,7 +8,7 @@
  *   - dataDateJST (RMS business day) and generatedAtJST (fetch time) are DIFFERENT; both are shown.
  *   - sampleCount < 3 → no median comparison. NOT zero traffic, NOT an outage.
  *   - null values are UNKNOWN → "—", never 0 (a null share is not 0%).
- *   - company status follows traffic.status only; customerMix is context and never sets it.
+ *   - company alert severity follows traffic.status; visible direction follows traffic.trendStatus.
  *   - company visits/UU are NOT de-duplicated across shops.
  *   - expectedVisitCount is a VISIT median: the dashed baseline hides while UU is selected.
  *   - today's sales come from /api/sales, historical sales/CVR from /api/history/sales.
@@ -72,8 +72,27 @@ const TONE = {
   },
 };
 
-const toneOf = (status) => TONE[status] || TONE.unknown;
-const trafficLabelOf = (t, status) => t(`${NS}.traffic.${TONE[status] ? status : "unknown"}`);
+const TREND_TONE = {
+  surge: {
+    pill: "border-violet-400/40 bg-violet-500/10 text-violet-600 dark:text-violet-300",
+    text: "text-violet-700 dark:text-violet-400",
+    dot: "bg-violet-500",
+    color: "#7C3AED",
+  },
+  increase: {
+    pill: "border-blue-400/40 bg-blue-500/10 text-blue-600 dark:text-blue-300",
+    text: "text-blue-700 dark:text-blue-400",
+    dot: "bg-blue-500",
+    color: BLUE,
+  },
+  stable: TONE.normal,
+  decrease: TONE.attention,
+  sharp_decrease: TONE.critical,
+  unknown: TONE.unknown,
+};
+
+const trendToneOf = (status) => TREND_TONE[status] || TREND_TONE.unknown;
+const trendLabelOf = (t, status) => t(`${NS}.trend.${TREND_TONE[status] ? status : "unknown"}`);
 
 function fmt(t, value) {
   return t("common.number", { value: Number(value) || 0 });
@@ -448,7 +467,7 @@ export default function Component({ service }) {
     );
   }
 
-  const tone = toneOf(model.trafficStatus);
+  const tone = trendToneOf(model.trendStatus);
   const cardCls = "rounded-2xl border border-theme-300/40 bg-theme-200/30 dark:border-theme-600/40 dark:bg-white/10";
   const sampleShort = model.sampleCount < 3;
   const isSales = metric === "sales";
@@ -518,7 +537,7 @@ export default function Component({ service }) {
               className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${tone.pill}`}
             >
               <span className={`h-1.5 w-1.5 rounded-full ${tone.dot}`} />
-              {trafficLabelOf(t, model.trafficStatus)}
+              {trendLabelOf(t, model.trendStatus)}
             </span>
             <RefreshButton onRefresh={handleRefresh} t={t} />
           </div>
@@ -743,8 +762,8 @@ export default function Component({ service }) {
           </div>
           {model.shops.map((sh) => {
             const unknownSample = sh.sampleCount < 3 || isNil(sh.delta);
-            const st = toneOf(unknownSample ? "unknown" : sh.status);
-            const label = unknownSample ? t(`${NS}.sampleShortShort`) : trafficLabelOf(t, sh.status);
+            const st = trendToneOf(unknownSample ? "unknown" : sh.trendStatus);
+            const label = unknownSample ? t(`${NS}.sampleShortShort`) : trendLabelOf(t, sh.trendStatus);
             const share = isSales ? sh.newSalesShare : sh.newOrderShare;
 
             return (

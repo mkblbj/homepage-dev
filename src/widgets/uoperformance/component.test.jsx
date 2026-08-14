@@ -50,6 +50,7 @@ function snapshot(overrides = {}) {
     shopCount: 2,
     traffic: {
       status: "normal",
+      trendStatus: "stable",
       dataDateJST: "2026-07-30",
       visitCount: 15897,
       uniqueVisitorCount: 14737,
@@ -82,6 +83,7 @@ function snapshot(overrides = {}) {
         status: "attention",
         traffic: {
           status: "attention",
+          trendStatus: "decrease",
           dataDateJST: "2026-07-30",
           visitCount: 5122,
           uniqueVisitorCount: 4652,
@@ -147,6 +149,50 @@ describe("widgets/uoperformance/component", () => {
     // The visit count and the delta each appear twice: hero + company totals row.
     expect(screen.getAllByText("15897")).toHaveLength(2);
     expect(screen.getAllByText("-18.1%")).toHaveLength(2);
+  });
+
+  it("renders the backend trend for the company and each shop", () => {
+    const base = snapshot();
+    mockData(
+      snapshot({
+        traffic: { ...base.traffic, status: "normal", trendStatus: "surge" },
+        shops: [
+          {
+            ...base.shops[0],
+            status: "normal",
+            traffic: { ...base.shops[0].traffic, status: "normal", trendStatus: "increase" },
+          },
+        ],
+      }),
+    );
+    render();
+
+    expect(screen.getByText("uoperformance.trend.surge")).toBeInTheDocument();
+    expect(screen.getByText("uoperformance.trend.increase")).toBeInTheDocument();
+    expect(screen.queryByText("uoperformance.traffic.normal")).not.toBeInTheDocument();
+  });
+
+  it("keeps sample insufficiency ahead of a shop trend", () => {
+    const base = snapshot();
+    mockData(
+      snapshot({
+        shops: [
+          {
+            ...base.shops[0],
+            traffic: {
+              ...base.shops[0].traffic,
+              trendStatus: "surge",
+              sampleCount: 2,
+              visitDeltaPercent: null,
+            },
+          },
+        ],
+      }),
+    );
+    render();
+
+    expect(screen.getByText("uoperformance.sampleShortShort")).toBeInTheDocument();
+    expect(screen.queryByText("uoperformance.trend.surge")).not.toBeInTheDocument();
   });
 
   it("hides the median legend while the UU series is selected", () => {
@@ -311,22 +357,24 @@ describe("widgets/uoperformance/component", () => {
     expect(bar).toBeTruthy();
   });
 
-  it("uses theme-aware high-contrast colors for delta labels", () => {
+  it("uses theme-aware high-contrast colors for every traffic trend", () => {
     const base = snapshot();
     const shop = base.shops[0];
-    const withStatus = (shopName, status, visitDeltaPercent) => ({
+    const withTrend = (shopName, trendStatus, visitDeltaPercent) => ({
       ...shop,
       shopName,
-      status,
-      traffic: { ...shop.traffic, status, visitDeltaPercent },
+      status: "normal",
+      traffic: { ...shop.traffic, status: "normal", trendStatus, visitDeltaPercent },
     });
 
     mockData(
       snapshot({
         shops: [
-          withStatus("critical-shop", "critical", -41.9),
-          withStatus("attention-shop", "attention", -24.5),
-          withStatus("normal-shop", "normal", -18.4),
+          withTrend("sharp-decrease-shop", "sharp_decrease", -41.9),
+          withTrend("decrease-shop", "decrease", -24.5),
+          withTrend("stable-shop", "stable", -18.4),
+          withTrend("increase-shop", "increase", 24.5),
+          withTrend("surge-shop", "surge", 41.9),
         ],
       }),
     );
@@ -338,6 +386,8 @@ describe("widgets/uoperformance/component", () => {
       ["-41.9%", "text-rose-700", "dark:text-rose-400"],
       ["-24.5%", "text-amber-700", "dark:text-amber-400"],
       ["-18.4%", "text-emerald-700", "dark:text-emerald-400"],
+      ["+24.5%", "text-blue-700", "dark:text-blue-400"],
+      ["+41.9%", "text-violet-700", "dark:text-violet-400"],
     ];
 
     cases.forEach(([value, lightClass, darkClass]) => {

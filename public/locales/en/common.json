@@ -1348,12 +1348,20 @@
         "partial": "Partial data",
         "total": "Total",
         "shop": "Shop",
-        "statusCol": "Status",
+        "statusCol": "Trend",
         "traffic": {
             "critical": "Traffic down sharply",
             "attention": "Traffic down",
             "normal": "Traffic normal",
             "unknown": "Not enough samples"
+        },
+        "trend": {
+            "surge": "Traffic surging",
+            "increase": "Traffic increasing",
+            "stable": "Traffic stable",
+            "decrease": "Traffic decreasing",
+            "sharp_decrease": "Traffic down sharply",
+            "unknown": "Trend unknown"
         },
         "sourceTraffic": "Traffic (access)",
         "sourceMix": "New / repeat",
@@ -1395,7 +1403,7 @@
         "ordersUnit": " orders",
         "byShop": "By shop",
         "covered": "{{covered}}/{{total}} shops",
-        "thresholds": "Thresholds: attention −20% / critical −35%",
+        "thresholds": "Trend thresholds: surge +35% / increase +20% / decrease −20% / sharp decrease −35%",
         "noData": "No data"
     },
     "uoprinters": {

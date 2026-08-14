@@ -1361,12 +1361,20 @@
         "partial": "部分数据",
         "total": "合计",
         "shop": "店铺",
-        "statusCol": "状态",
+        "statusCol": "趋势",
         "traffic": {
             "critical": "访问大幅下降",
             "attention": "访问下降",
             "normal": "访问正常",
             "unknown": "样本不足"
+        },
+        "trend": {
+            "surge": "访问激增",
+            "increase": "访问增加",
+            "stable": "访问稳定",
+            "decrease": "访问下降",
+            "sharp_decrease": "访问大幅下降",
+            "unknown": "趋势未知"
         },
         "sourceTraffic": "访问（access）",
         "sourceMix": "新客/复购",
@@ -1408,7 +1416,7 @@
         "ordersUnit": " 件",
         "byShop": "各店铺经营表现",
         "covered": "{{covered}}/{{total}} 家店铺",
-        "thresholds": "阈值：注意 −20% / 严重 −35%",
+        "thresholds": "趋势阈值：激增 +35% / 增加 +20% / 下降 −20% / 大幅下降 −35%",
         "noData": "暂无数据"
     },
     "uoprinters": {

@@ -12,6 +12,7 @@ export const SPARK_PADDING = 7;
 const WEEKDAY_JP = ["日", "月", "火", "水", "木", "金", "土"];
 const BUCKET_KEYS = ["repeat1", "repeat2", "repeat3", "repeatOver4"];
 const BUCKET_COLORS = ["#5B9BF8", "#7FB2FA", "#A6C9FB", "#C6DBFD"];
+const TREND_STATUSES = new Set(["surge", "increase", "stable", "decrease", "sharp_decrease", "unknown"]);
 
 export function isNil(value) {
   return value === null || value === undefined;
@@ -19,6 +20,10 @@ export function isNil(value) {
 
 function toNullableNumber(value) {
   return isNil(value) ? null : Number(value);
+}
+
+function normalizeTrendStatus(value) {
+  return TREND_STATUSES.has(value) ? value : "unknown";
 }
 
 export function pctLabel(value) {
@@ -133,6 +138,7 @@ export function buildPerformanceModel(data, logos) {
     partial: data.partial === true,
     shopCount: Number(data.shopCount || (data.shops || []).length),
     trafficStatus: traffic.status || "unknown",
+    trendStatus: normalizeTrendStatus(traffic.trendStatus),
     // The RMS business day is NOT the snapshot fetch time — both are surfaced separately.
     dataDateJST: traffic.dataDateJST || null,
     visit: toNullableNumber(traffic.visitCount),
@@ -157,6 +163,7 @@ export function buildPerformanceModel(data, logos) {
         name: shop.shopName,
         logoUrl: logoByName.get(shop.shopName) || null,
         status: shopTraffic.status || shop.status || "unknown",
+        trendStatus: normalizeTrendStatus(shopTraffic.trendStatus),
         sampleCount: Number(shopTraffic.sampleCount || 0),
         visit: toNullableNumber(shopTraffic.visitCount),
         uu: toNullableNumber(shopTraffic.uniqueVisitorCount),
