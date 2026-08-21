@@ -150,4 +150,49 @@ describe("pages/api/uoroster/calendar", () => {
 
     expect(res.statusCode).toBe(502);
   });
+
+  it("attributes a connection failure to the network, not to a fake HR 500", async () => {
+    // This is the shape httpProxy synthesizes when the request itself fails
+    // (DNS/ECONNREFUSED/TLS) — status 500, but `data` is a plain object it
+    // built locally, never a Buffer from an actual HR response.
+    httpProxy.mockResolvedValue([
+      500,
+      "application/json",
+      { error: { message: "connect ECONNREFUSED 10.0.0.5:443" } },
+      null,
+    ]);
+
+    const res = createMockRes();
+    await handler({ method: "GET", query: { department: "Production" } }, res);
+
+    expect(res.statusCode).toBe(502);
+    expect(res.body).not.toContain("SECRET");
+    expect(res.body).not.toContain("hr.example.com");
+    expect(logger.error).toHaveBeenCalledTimes(1);
+
+    const [message, loggedDepartment, loggedContentType, loggedDetail] = logger.error.mock.calls[0];
+    expect(message).toContain("never reached HR");
+    expect(message).not.toContain("returned %d");
+    expect(loggedDepartment).toBe("Production");
+    expect(loggedContentType).toBe("application/json");
+    expect(loggedDetail).toContain("ECONNREFUSED");
+  });
+
+  it("attributes a non-JSON 200 payload (e.g. a Frappe login page) instead of a generic missing-field message", async () => {
+    httpProxy.mockResolvedValue([200, "text/html", Buffer.from("<html><body>Please log in</body></html>")]);
+
+    const res = createMockRes();
+    await handler({ method: "GET", query: { department: "Production" } }, res);
+
+    expect(res.statusCode).toBe(502);
+    expect(logger.error).toHaveBeenCalledTimes(1);
+
+    const [message, loggedDepartment, loggedContentType, loggedDetail] = logger.error.mock.calls[0];
+    expect(message).toContain("was not valid JSON");
+    expect(message).not.toContain("carried no message field");
+    expect(loggedDepartment).toBe("Production");
+    expect(loggedContentType).toBe("text/html");
+    expect(typeof loggedDetail).toBe("string");
+    expect(loggedDetail.length).toBeGreaterThan(0);
+  });
 });

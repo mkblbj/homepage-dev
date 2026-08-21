@@ -30,6 +30,21 @@ function sendHtml(res, status, html) {
   return res.send(html);
 }
 
+// httpProxy 在连接失败时（DNS 解析失败 / ECONNREFUSED / TLS 错误等）不会 reject，
+// 而是把失败伪装成一次「响应」：status 500、contentType 固定是 application/json，
+// data 则是它自己拼出的 { error } 对象。这个 data 不是 Buffer——而 HR 真的回 500
+// 时 data 一定是 Buffer（原始响应体）。这是结构上可靠、而不是猜的区分点。
+function isConnectionFailure(status, contentType, data) {
+  return (
+    status === 500 &&
+    contentType === "application/json" &&
+    Boolean(data) &&
+    typeof data === "object" &&
+    !Buffer.isBuffer(data) &&
+    Boolean(data.error)
+  );
+}
+
 export default async function handler(req, res) {
   if (req.method !== "GET") {
     res.setHeader("Allow", ["GET"]);
@@ -41,6 +56,11 @@ export default async function handler(req, res) {
     return sendHtml(res, 400, errorPage("部门参数无效", "department 仅接受 Production 或 Office。"));
   }
 
+  // 前端按钮的显隐由 cleanServiceGroups 派生的 widget.rosterCalendar 决定，
+  // 它会合并 services.yaml / Docker 标签 / Kubernetes 注解三个配置来源；
+  // 但这里的 servicesFromConfig() 只读 services.yaml——如果改用 Docker 标签
+  // 配置本 widget，会出现按钮渲染出来、这里却永远读不到 config，点击必 503
+  // 的情况。当前部署用的是 yaml，暂不处理，仅记录此限制。
   const config = findRosterCalendarConfig(await servicesFromConfig());
   if (!config) {
     return sendHtml(
@@ -76,10 +96,26 @@ export default async function handler(req, res) {
     );
   }
 
-  const [status, , data] = proxyResult;
+  const [status, contentType, data] = proxyResult;
 
   if (status !== 200) {
-    logger.error("HR roster calendar returned %d for department %s", status, department);
+    if (isConnectionFailure(status, contentType, data)) {
+      // 连接从未建立，HR 根本没机会响应——不要写成「HR 返回 500」，否则运维会去
+      // HR 侧翻一个不存在的 500。真正线索是 httpProxy 捕获到的底层网络异常。
+      logger.error(
+        "HR roster calendar request for department %s never reached HR — connection failed before any response (content-type %s): %s",
+        department,
+        contentType,
+        data.error?.message ?? "unknown error",
+      );
+    } else {
+      logger.error(
+        "HR roster calendar returned %d (content-type %s) for department %s",
+        status,
+        contentType,
+        department,
+      );
+    }
     return sendHtml(
       res,
       502,
@@ -88,14 +124,31 @@ export default async function handler(req, res) {
   }
 
   let html = null;
+  let parseError = null;
   try {
     html = JSON.parse(data.toString()).message;
   } catch (e) {
     html = null;
+    parseError = e;
   }
 
   if (typeof html !== "string" || html.length === 0) {
-    logger.error("HR roster calendar response carried no message field for department %s", department);
+    if (parseError) {
+      // Frappe 会话/凭据异常时的典型表现：200 + HTML 登录页，不是 JSON。这条日志
+      // 是唯一线索，必须说清「不是 JSON」，而不是笼统的「缺 message 字段」。
+      logger.error(
+        "HR roster calendar response for department %s was not valid JSON (expected application/json, got %s): %s",
+        department,
+        contentType,
+        parseError?.message ?? "unknown parse error",
+      );
+    } else {
+      logger.error(
+        "HR roster calendar response carried no message field for department %s (content-type %s)",
+        department,
+        contentType,
+      );
+    }
     return sendHtml(res, 502, errorPage("排班月历内容异常", "HR 接口未返回月历内容。"));
   }
 
