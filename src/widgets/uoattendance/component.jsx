@@ -425,6 +425,39 @@ function DeptTimeline({ dept, label, working, scheduled, fteText, rows, domain, 
   );
 }
 
+// ---- roster calendar: month-view entry points, one per department ----
+// Border/icon colour reuses DEPT_STYLES so the buttons read as the same two
+// departments drawn in the timelines below.
+function RosterCalendarLink({ department, label, title }) {
+  const { solid } = deptStyle(department);
+
+  return (
+    <a
+      href={`/api/uoroster/calendar?department=${department}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={title}
+      aria-label={title}
+      className="inline-flex items-center gap-1 rounded-lg border px-1.5 py-1 text-[10.5px] font-bold transition-colors hover:bg-theme-200/40 dark:hover:bg-theme-700/40"
+      style={{ borderColor: `${solid}66`, color: solid }}
+    >
+      <svg
+        className="h-3 w-3"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <rect x="3" y="5" width="18" height="16" rx="2" />
+        <path d="M3 10h18M8 3v4M16 3v4" />
+      </svg>
+      {label}
+    </a>
+  );
+}
+
 // ---- summary: big count + segment bar + legend ----
 function SummaryBar({ workingTotal, scheduledTotal, segments }) {
   const denom = scheduledTotal > 0 ? scheduledTotal : segments.reduce((sum, seg) => sum + seg.n, 0) || 1;
@@ -860,6 +893,12 @@ export default function Component({ service }) {
           />
 
           <span className="ml-auto flex shrink-0 items-center gap-2">
+            {widget.rosterCalendar ? (
+              <>
+                <RosterCalendarLink department="Production" label="生産" title="生産シフトカレンダー（今月）" />
+                <RosterCalendarLink department="Office" label="オフィス" title="オフィスシフトカレンダー（今月）" />
+              </>
+            ) : null}
             <span className="text-[12px] font-medium tabular-nums text-theme-700 dark:text-theme-200">
               現在 {fmtClock(nowH)}
             </span>

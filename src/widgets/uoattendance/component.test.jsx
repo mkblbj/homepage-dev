@@ -131,6 +131,10 @@ const service = {
   widget: { type: "uoattendance", scheduleUrl: "http://example/schedule", refreshInterval: 3600000 },
 };
 
+const serviceWithCalendar = {
+  widget: { ...service.widget, rosterCalendar: true },
+};
+
 async function flushPromises() {
   await Promise.resolve();
   await Promise.resolve();
@@ -341,5 +345,38 @@ describe("widgets/uoattendance/component", () => {
     renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
 
     expect(screen.getAllByText(/widget\.api_error/i).length).toBeGreaterThan(0);
+  });
+
+  it("renders both roster calendar links when the calendar is configured", () => {
+    mockApi({
+      actual: { message: { employees: actualEmployees } },
+      today: { message: { today: todaySnapshot } },
+      tomorrow: { message: { tomorrow: tomorrowSnapshot } },
+    });
+
+    renderWithProviders(<Component service={serviceWithCalendar} />, { settings: { hideErrors: false } });
+
+    // "生産" / "オフィス" also label the department cards and the summary legend,
+    // so match on the accessible name instead of the visible short label.
+    const production = screen.getByRole("link", { name: "生産シフトカレンダー（今月）" });
+    const office = screen.getByRole("link", { name: "オフィスシフトカレンダー（今月）" });
+
+    expect(production).toHaveAttribute("href", "/api/uoroster/calendar?department=Production");
+    expect(office).toHaveAttribute("href", "/api/uoroster/calendar?department=Office");
+    expect(production).toHaveAttribute("target", "_blank");
+    expect(production).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("hides the roster calendar links when the calendar is not configured", () => {
+    mockApi({
+      actual: { message: { employees: actualEmployees } },
+      today: { message: { today: todaySnapshot } },
+      tomorrow: { message: { tomorrow: tomorrowSnapshot } },
+    });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+
+    expect(screen.queryByRole("link", { name: "生産シフトカレンダー（今月）" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "オフィスシフトカレンダー（今月）" })).not.toBeInTheDocument();
   });
 });
