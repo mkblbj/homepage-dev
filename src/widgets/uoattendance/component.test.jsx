@@ -249,6 +249,35 @@ describe("widgets/uoattendance/component", () => {
     expect(bar.style.background).not.toBe("rgba(232, 168, 104, 0.6)");
   });
 
+  it("colors the department working/scheduled count for both light and dark themes", () => {
+    // WCAG AA fix: on the light background, the department "solid" color alone
+    // (e.g. #E8A868 on #F8FAFC) falls short of 4.5:1. Light theme must use the
+    // darker "ink" shade instead; dark theme keeps the original "solid" color,
+    // which already passes against the dark background.
+    mockApi({
+      actual: { message: { employees: actualEmployees } },
+      today: { message: { today: todaySnapshot } },
+      tomorrow: { message: { tomorrow: tomorrowSnapshot } },
+    });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+
+    const officeCard = screen.getByText("温 剛").closest(".rounded-xl");
+    const productionCard = screen.getByText("周 阔").closest(".rounded-xl");
+    const officeCount = within(officeCard).getByText(/^\d+\/\d+$/);
+    const productionCount = within(productionCard).getByText(/^\d+\/\d+$/);
+
+    expect(officeCount.style.getPropertyValue("--dept-ink")).toBe("#1A6591");
+    expect(officeCount.style.getPropertyValue("--dept-solid")).toBe("#5EB3E4");
+    expect(officeCount).toHaveClass("text-[color:var(--dept-ink)]");
+    expect(officeCount).toHaveClass("dark:text-[color:var(--dept-solid)]");
+
+    expect(productionCount.style.getPropertyValue("--dept-ink")).toBe("#8F5A0B");
+    expect(productionCount.style.getPropertyValue("--dept-solid")).toBe("#E8A868");
+    expect(productionCount).toHaveClass("text-[color:var(--dept-ink)]");
+    expect(productionCount).toHaveClass("dark:text-[color:var(--dept-solid)]");
+  });
+
   it("keeps the unscheduled badge on the employee name line", () => {
     mockApi({
       actual: { message: { employees: actualEmployees } },
@@ -365,6 +394,39 @@ describe("widgets/uoattendance/component", () => {
     expect(office).toHaveAttribute("href", "/api/uoroster/calendar?department=Office");
     expect(production).toHaveAttribute("target", "_blank");
     expect(production).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("colors roster calendar link text for both themes without touching the border", () => {
+    // Same WCAG AA fix as the department count: light theme reads the "ink"
+    // shade, dark theme keeps "solid". The border stays keyed to "solid" only
+    // (it's decorative, not subject to the text-contrast requirement), and the
+    // svg icon should keep inheriting via currentColor so it follows along.
+    mockApi({
+      actual: { message: { employees: actualEmployees } },
+      today: { message: { today: todaySnapshot } },
+      tomorrow: { message: { tomorrow: tomorrowSnapshot } },
+    });
+
+    renderWithProviders(<Component service={serviceWithCalendar} />, { settings: { hideErrors: false } });
+
+    const production = screen.getByRole("link", { name: "生産シフトカレンダー（今月）" });
+    const office = screen.getByRole("link", { name: "オフィスシフトカレンダー（今月）" });
+
+    expect(production.style.getPropertyValue("--dept-ink")).toBe("#8F5A0B");
+    expect(production.style.getPropertyValue("--dept-solid")).toBe("#E8A868");
+    expect(production).toHaveClass("text-[color:var(--dept-ink)]");
+    expect(production).toHaveClass("dark:text-[color:var(--dept-solid)]");
+    // border color is unaffected by the contrast fix: still `${solid}66`
+    expect(production.style.borderColor).toBe("rgba(232, 168, 104, 0.4)");
+
+    expect(office.style.getPropertyValue("--dept-ink")).toBe("#1A6591");
+    expect(office.style.getPropertyValue("--dept-solid")).toBe("#5EB3E4");
+    expect(office).toHaveClass("text-[color:var(--dept-ink)]");
+    expect(office).toHaveClass("dark:text-[color:var(--dept-solid)]");
+    expect(office.style.borderColor).toBe("rgba(94, 179, 228, 0.4)");
+
+    // the icon must keep following the link's text color automatically
+    expect(production.querySelector("svg")).toHaveAttribute("stroke", "currentColor");
   });
 
   it("hides the roster calendar links when the calendar is not configured", () => {
