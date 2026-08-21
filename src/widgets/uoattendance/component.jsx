@@ -892,7 +892,7 @@ export default function Component({ service }) {
             segments={view.segments}
           />
 
-          <span className="ml-auto flex shrink-0 items-center gap-2">
+          <span className="ml-auto flex flex-wrap items-center justify-end gap-2">
             {widget.rosterCalendar ? (
               <>
                 <RosterCalendarLink department="Production" label="生産" title="生産シフトカレンダー（今月）" />
