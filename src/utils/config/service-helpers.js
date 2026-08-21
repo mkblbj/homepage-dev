@@ -450,6 +450,10 @@ export function cleanServiceGroups(groups) {
           // uoattendance, uorakutensales
           scheduleUrl,
 
+          // uoattendance — server-only, deliberately never copied onto `widget`
+          rosterCalendarUrl,
+          rosterCalendarToken,
+
           // rakutenranking
           defaultGenre,
           genres,
@@ -643,6 +647,9 @@ export function cleanServiceGroups(groups) {
         if (type === "uoattendance") {
           if (scheduleUrl) widget.scheduleUrl = scheduleUrl;
           if (refreshInterval) widget.refreshInterval = refreshInterval;
+          // Destructured above but never assigned: the browser only learns
+          // whether the calendar is configured, never the URL or token.
+          if (rosterCalendarUrl && rosterCalendarToken) widget.rosterCalendar = true;
         }
         if (type === "uorakutensales") {
           if (refreshInterval) widget.refreshInterval = refreshInterval;
