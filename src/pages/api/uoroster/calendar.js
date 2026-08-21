@@ -33,7 +33,7 @@ function sendHtml(res, status, html) {
 export default async function handler(req, res) {
   if (req.method !== "GET") {
     res.setHeader("Allow", ["GET"]);
-    return res.status(405).end(`Method ${req.method} Not Allowed`);
+    return sendHtml(res, 405, errorPage("请求方法不支持", `该接口仅支持 GET 请求，收到的是 ${req.method}。`));
   }
 
   const department = normalizeDepartment(req.query?.department);
@@ -53,12 +53,30 @@ export default async function handler(req, res) {
     );
   }
 
-  const [status, , data] = await httpProxy(buildCalendarUrl(config.baseUrl, department), {
-    headers: {
-      Authorization: `token ${config.token}`,
-      Accept: "application/json",
-    },
-  });
+  // httpProxy 内部的 new URL(url) 不在它自己的 try/catch 保护范围内：上游网络失败会被它
+  // 降级成 [500, ...] 返回值，但 rosterCalendarUrl 本身格式非法（例如漏写协议头）会同步抛出
+  // TypeError，变成这里的 rejected promise。必须兜住，否则会绕过统一的中文错误页设计。
+  let proxyResult;
+  try {
+    proxyResult = await httpProxy(buildCalendarUrl(config.baseUrl, department), {
+      headers: {
+        Authorization: `token ${config.token}`,
+        Accept: "application/json",
+      },
+    });
+  } catch (e) {
+    logger.error("HR roster calendar request threw for department %s: %s", department, e?.message ?? e);
+    return sendHtml(
+      res,
+      502,
+      errorPage(
+        "无法获取排班月历",
+        "请求 HR 接口时发生异常，请确认 rosterCalendarUrl 是否为包含协议头（如 https://）的完整地址。",
+      ),
+    );
+  }
+
+  const [status, , data] = proxyResult;
 
   if (status !== 200) {
     logger.error("HR roster calendar returned %d for department %s", status, department);

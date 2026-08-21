@@ -92,6 +92,8 @@ describe("pages/api/uoroster/calendar", () => {
 
     expect(res.statusCode).toBe(405);
     expect(res.headers.Allow).toEqual(["GET"]);
+    expect(res.headers["Content-Type"]).toBe("text/html; charset=utf-8");
+    expect(res.headers["X-Content-Type-Options"]).toBe("nosniff");
     expect(httpProxy).not.toHaveBeenCalled();
   });
 
@@ -114,6 +116,20 @@ describe("pages/api/uoroster/calendar", () => {
 
     expect(res.statusCode).toBe(502);
     expect(res.body).not.toContain("SECRET");
+    expect(logger.error).toHaveBeenCalled();
+  });
+
+  it("maps a thrown httpProxy error (e.g. an invalid rosterCalendarUrl) to 502 without leaking the token", async () => {
+    httpProxy.mockRejectedValue(new TypeError("Invalid URL"));
+
+    const res = createMockRes();
+    await handler({ method: "GET", query: { department: "Production" } }, res);
+
+    expect(res.statusCode).toBe(502);
+    expect(res.headers["Content-Type"]).toBe("text/html; charset=utf-8");
+    expect(res.headers["X-Content-Type-Options"]).toBe("nosniff");
+    expect(res.body).not.toContain("SECRET");
+    expect(res.body).not.toContain("hr.example.com");
     expect(logger.error).toHaveBeenCalled();
   });
 
