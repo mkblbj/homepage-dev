@@ -131,6 +131,10 @@ const service = {
   widget: { type: "uoattendance", scheduleUrl: "http://example/schedule", refreshInterval: 3600000 },
 };
 
+const serviceWithCalendar = {
+  widget: { ...service.widget, rosterCalendar: true },
+};
+
 async function flushPromises() {
   await Promise.resolve();
   await Promise.resolve();
@@ -245,6 +249,37 @@ describe("widgets/uoattendance/component", () => {
     expect(bar.style.background).not.toBe("rgba(232, 168, 104, 0.6)");
   });
 
+  it("colors the department working/scheduled count for both light and dark themes", () => {
+    // WCAG AA fix: on the light background, the department "solid" color alone
+    // (e.g. #E8A868 on #F8FAFC) falls short of 4.5:1, so light theme uses the
+    // darker "ink" shade instead. Dark theme can't reuse "solid" either: the
+    // card sits on its own translucent tint, and against that real composited
+    // background "solid" also drops under 4.5:1 — dark theme needs its own
+    // lightened "inkDark" shade, verified against the actual card background.
+    mockApi({
+      actual: { message: { employees: actualEmployees } },
+      today: { message: { today: todaySnapshot } },
+      tomorrow: { message: { tomorrow: tomorrowSnapshot } },
+    });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+
+    const officeCard = screen.getByText("温 剛").closest(".rounded-xl");
+    const productionCard = screen.getByText("周 阔").closest(".rounded-xl");
+    const officeCount = within(officeCard).getByText(/^\d+\/\d+$/);
+    const productionCount = within(productionCard).getByText(/^\d+\/\d+$/);
+
+    expect(officeCount.style.getPropertyValue("--dept-ink")).toBe("#1A6591");
+    expect(officeCount.style.getPropertyValue("--dept-ink-dark")).toBe("#8CC9EF");
+    expect(officeCount).toHaveClass("text-[color:var(--dept-ink)]");
+    expect(officeCount).toHaveClass("dark:text-[color:var(--dept-ink-dark)]");
+
+    expect(productionCount.style.getPropertyValue("--dept-ink")).toBe("#8F5A0B");
+    expect(productionCount.style.getPropertyValue("--dept-ink-dark")).toBe("#F0BC85");
+    expect(productionCount).toHaveClass("text-[color:var(--dept-ink)]");
+    expect(productionCount).toHaveClass("dark:text-[color:var(--dept-ink-dark)]");
+  });
+
   it("keeps the unscheduled badge on the employee name line", () => {
     mockApi({
       actual: { message: { employees: actualEmployees } },
@@ -341,5 +376,74 @@ describe("widgets/uoattendance/component", () => {
     renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
 
     expect(screen.getAllByText(/widget\.api_error/i).length).toBeGreaterThan(0);
+  });
+
+  it("renders both roster calendar links when the calendar is configured", () => {
+    mockApi({
+      actual: { message: { employees: actualEmployees } },
+      today: { message: { today: todaySnapshot } },
+      tomorrow: { message: { tomorrow: tomorrowSnapshot } },
+    });
+
+    renderWithProviders(<Component service={serviceWithCalendar} />, { settings: { hideErrors: false } });
+
+    // "生産" / "オフィス" also label the department cards and the summary legend,
+    // so match on the accessible name instead of the visible short label.
+    const production = screen.getByRole("link", { name: "生産シフトカレンダー（今月）" });
+    const office = screen.getByRole("link", { name: "オフィスシフトカレンダー（今月）" });
+
+    expect(production).toHaveAttribute("href", "/api/uoroster/calendar?department=Production");
+    expect(office).toHaveAttribute("href", "/api/uoroster/calendar?department=Office");
+    expect(production).toHaveAttribute("target", "_blank");
+    expect(production).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("colors roster calendar link text for both themes without touching the border", () => {
+    // Same WCAG AA fix as the department count: light theme reads "ink", dark
+    // theme reads "inkDark" (not "solid" — the button's own translucent-tint
+    // surroundings mean "solid" text also falls short of 4.5:1 against the
+    // real composited dark-theme background). The border stays keyed to
+    // "solid" only (it's decorative, not subject to the text-contrast
+    // requirement), and the svg icon should keep inheriting via currentColor
+    // so it follows along.
+    mockApi({
+      actual: { message: { employees: actualEmployees } },
+      today: { message: { today: todaySnapshot } },
+      tomorrow: { message: { tomorrow: tomorrowSnapshot } },
+    });
+
+    renderWithProviders(<Component service={serviceWithCalendar} />, { settings: { hideErrors: false } });
+
+    const production = screen.getByRole("link", { name: "生産シフトカレンダー（今月）" });
+    const office = screen.getByRole("link", { name: "オフィスシフトカレンダー（今月）" });
+
+    expect(production.style.getPropertyValue("--dept-ink")).toBe("#8F5A0B");
+    expect(production.style.getPropertyValue("--dept-ink-dark")).toBe("#F0BC85");
+    expect(production).toHaveClass("text-[color:var(--dept-ink)]");
+    expect(production).toHaveClass("dark:text-[color:var(--dept-ink-dark)]");
+    // border color is unaffected by the contrast fix: still `${solid}66`
+    expect(production.style.borderColor).toBe("rgba(232, 168, 104, 0.4)");
+
+    expect(office.style.getPropertyValue("--dept-ink")).toBe("#1A6591");
+    expect(office.style.getPropertyValue("--dept-ink-dark")).toBe("#8CC9EF");
+    expect(office).toHaveClass("text-[color:var(--dept-ink)]");
+    expect(office).toHaveClass("dark:text-[color:var(--dept-ink-dark)]");
+    expect(office.style.borderColor).toBe("rgba(94, 179, 228, 0.4)");
+
+    // the icon must keep following the link's text color automatically
+    expect(production.querySelector("svg")).toHaveAttribute("stroke", "currentColor");
+  });
+
+  it("hides the roster calendar links when the calendar is not configured", () => {
+    mockApi({
+      actual: { message: { employees: actualEmployees } },
+      today: { message: { today: todaySnapshot } },
+      tomorrow: { message: { tomorrow: tomorrowSnapshot } },
+    });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+
+    expect(screen.queryByRole("link", { name: "生産シフトカレンダー（今月）" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "オフィスシフトカレンダー（今月）" })).not.toBeInTheDocument();
   });
 });

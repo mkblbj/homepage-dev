@@ -412,6 +412,61 @@ describe("utils/config/service-helpers", () => {
     ]);
   });
 
+  it("cleanServiceGroups exposes only a boolean flag for the uoattendance roster calendar", async () => {
+    const mod = await import("./service-helpers");
+    const { cleanServiceGroups } = mod;
+
+    const rawGroups = [
+      {
+        name: "Core",
+        services: [
+          {
+            name: "Attendance",
+            weight: 100,
+            widgets: [
+              {
+                type: "uoattendance",
+                scheduleUrl: "https://hr.example.com/schedule",
+                rosterCalendarUrl: "https://hr.example.com",
+                rosterCalendarToken: "KEY:SECRET",
+              },
+            ],
+          },
+        ],
+        groups: [],
+      },
+    ];
+
+    const widget = cleanServiceGroups(rawGroups)[0].services[0].widgets[0];
+
+    expect(widget.rosterCalendar).toBe(true);
+    // credentials must never reach the browser bundle
+    expect(widget.rosterCalendarUrl).toBeUndefined();
+    expect(widget.rosterCalendarToken).toBeUndefined();
+    expect(JSON.stringify(widget)).not.toContain("SECRET");
+  });
+
+  it("cleanServiceGroups omits the roster calendar flag when credentials are incomplete", async () => {
+    const mod = await import("./service-helpers");
+    const { cleanServiceGroups } = mod;
+
+    const rawGroups = [
+      {
+        name: "Core",
+        services: [
+          {
+            name: "Attendance",
+            weight: 100,
+            widgets: [{ type: "uoattendance", rosterCalendarUrl: "https://hr.example.com" }],
+          },
+        ],
+        groups: [],
+      },
+    ];
+
+    expect(cleanServiceGroups(rawGroups)[0].services[0].widgets[0].rosterCalendar).toBeUndefined();
+  });
+
   it("findGroupByName deep-searches and annotates parent", async () => {
     const mod = await import("./service-helpers");
     const { findGroupByName } = mod;

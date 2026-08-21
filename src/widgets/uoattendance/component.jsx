@@ -26,9 +26,22 @@ import useWidgetAPI from "utils/proxy/use-widget-api";
 const GREEN = "#34C98E";
 // GREEN at low alpha — the vertical "now" spine that runs down through every row.
 const NOW_LINE = "rgba(52,201,142,0.45)";
+// Each department carries three text colors for the same hue:
+//   solid    — every non-text use (dots, bars, segments, button borders);
+//              not used for text color anymore, see below.
+//   ink      — light-theme text color. "solid" alone reads ~2:1 on the
+//              light page background, well under WCAG AA (4.5:1).
+//   inkDark  — dark-theme text color. "solid" was originally reused here
+//              too, but department cards sit on their own translucent
+//              tint (e.g. "soft" below) which lightens the effective
+//              backdrop under the text; against that real composited
+//              background "solid" drops as low as ~3:1, so dark theme
+//              needs its own lightened variant just like light theme does.
 const DEPT_STYLES = {
   Office: {
     solid: "#5EB3E4",
+    ink: "#1A6591",
+    inkDark: "#8CC9EF",
     bar: "rgba(94,179,228,0.6)",
     dot: "#5EB3E4",
     soft: "rgba(94,179,228,0.12)",
@@ -38,6 +51,8 @@ const DEPT_STYLES = {
   },
   Production: {
     solid: "#E8A868",
+    ink: "#8F5A0B",
+    inkDark: "#F0BC85",
     bar: "rgba(232,168,104,0.6)",
     dot: "#E8A868",
     soft: "rgba(232,168,104,0.12)",
@@ -48,6 +63,8 @@ const DEPT_STYLES = {
 };
 const FALLBACK_DEPT = {
   solid: "#8A94A0",
+  ink: "#525C66",
+  inkDark: "#B8BFC8",
   bar: "rgba(138,148,160,0.55)",
   dot: "#8A94A0",
   soft: "rgba(138,148,160,0.12)",
@@ -307,7 +324,10 @@ function DeptTimeline({ dept, label, working, scheduled, fteText, rows, domain, 
       <div className="flex items-center gap-2">
         <span className="h-2 w-2 shrink-0 rounded-[3px]" style={{ backgroundColor: dept.solid }} />
         <span className="text-[12px] font-bold text-theme-800 dark:text-theme-100">{label}</span>
-        <span className="text-[11.5px] font-bold tabular-nums" style={{ color: dept.solid }}>
+        <span
+          className="text-[11.5px] font-bold tabular-nums text-[color:var(--dept-ink)] dark:text-[color:var(--dept-ink-dark)]"
+          style={{ "--dept-ink": dept.ink, "--dept-ink-dark": dept.inkDark }}
+        >
           {working}/{scheduled}
         </span>
         {fteText ? (
@@ -422,6 +442,39 @@ function DeptTimeline({ dept, label, working, scheduled, fteText, rows, domain, 
         ) : null}
       </div>
     </div>
+  );
+}
+
+// ---- roster calendar: month-view entry points, one per department ----
+// Border/icon colour reuses DEPT_STYLES so the buttons read as the same two
+// departments drawn in the timelines below.
+function RosterCalendarLink({ department, label, title }) {
+  const { solid, ink, inkDark } = deptStyle(department);
+
+  return (
+    <a
+      href={`/api/uoroster/calendar?department=${department}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={title}
+      aria-label={title}
+      className="inline-flex items-center gap-1 rounded-lg border px-1.5 py-1 text-[10.5px] font-bold text-[color:var(--dept-ink)] transition-colors hover:bg-theme-200/40 dark:text-[color:var(--dept-ink-dark)] dark:hover:bg-theme-700/40"
+      style={{ borderColor: `${solid}66`, "--dept-ink": ink, "--dept-ink-dark": inkDark }}
+    >
+      <svg
+        className="h-3 w-3"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <rect x="3" y="5" width="18" height="16" rx="2" />
+        <path d="M3 10h18M8 3v4M16 3v4" />
+      </svg>
+      {label}
+    </a>
   );
 }
 
@@ -859,7 +912,13 @@ export default function Component({ service }) {
             segments={view.segments}
           />
 
-          <span className="ml-auto flex shrink-0 items-center gap-2">
+          <span className="ml-auto flex flex-wrap items-center justify-end gap-2">
+            {widget.rosterCalendar ? (
+              <>
+                <RosterCalendarLink department="Production" label="生産" title="生産シフトカレンダー（今月）" />
+                <RosterCalendarLink department="Office" label="オフィス" title="オフィスシフトカレンダー（今月）" />
+              </>
+            ) : null}
             <span className="text-[12px] font-medium tabular-nums text-theme-700 dark:text-theme-200">
               現在 {fmtClock(nowH)}
             </span>
