@@ -251,9 +251,11 @@ describe("widgets/uoattendance/component", () => {
 
   it("colors the department working/scheduled count for both light and dark themes", () => {
     // WCAG AA fix: on the light background, the department "solid" color alone
-    // (e.g. #E8A868 on #F8FAFC) falls short of 4.5:1. Light theme must use the
-    // darker "ink" shade instead; dark theme keeps the original "solid" color,
-    // which already passes against the dark background.
+    // (e.g. #E8A868 on #F8FAFC) falls short of 4.5:1, so light theme uses the
+    // darker "ink" shade instead. Dark theme can't reuse "solid" either: the
+    // card sits on its own translucent tint, and against that real composited
+    // background "solid" also drops under 4.5:1 — dark theme needs its own
+    // lightened "inkDark" shade, verified against the actual card background.
     mockApi({
       actual: { message: { employees: actualEmployees } },
       today: { message: { today: todaySnapshot } },
@@ -268,14 +270,14 @@ describe("widgets/uoattendance/component", () => {
     const productionCount = within(productionCard).getByText(/^\d+\/\d+$/);
 
     expect(officeCount.style.getPropertyValue("--dept-ink")).toBe("#1A6591");
-    expect(officeCount.style.getPropertyValue("--dept-solid")).toBe("#5EB3E4");
+    expect(officeCount.style.getPropertyValue("--dept-ink-dark")).toBe("#8CC9EF");
     expect(officeCount).toHaveClass("text-[color:var(--dept-ink)]");
-    expect(officeCount).toHaveClass("dark:text-[color:var(--dept-solid)]");
+    expect(officeCount).toHaveClass("dark:text-[color:var(--dept-ink-dark)]");
 
     expect(productionCount.style.getPropertyValue("--dept-ink")).toBe("#8F5A0B");
-    expect(productionCount.style.getPropertyValue("--dept-solid")).toBe("#E8A868");
+    expect(productionCount.style.getPropertyValue("--dept-ink-dark")).toBe("#F0BC85");
     expect(productionCount).toHaveClass("text-[color:var(--dept-ink)]");
-    expect(productionCount).toHaveClass("dark:text-[color:var(--dept-solid)]");
+    expect(productionCount).toHaveClass("dark:text-[color:var(--dept-ink-dark)]");
   });
 
   it("keeps the unscheduled badge on the employee name line", () => {
@@ -397,10 +399,13 @@ describe("widgets/uoattendance/component", () => {
   });
 
   it("colors roster calendar link text for both themes without touching the border", () => {
-    // Same WCAG AA fix as the department count: light theme reads the "ink"
-    // shade, dark theme keeps "solid". The border stays keyed to "solid" only
-    // (it's decorative, not subject to the text-contrast requirement), and the
-    // svg icon should keep inheriting via currentColor so it follows along.
+    // Same WCAG AA fix as the department count: light theme reads "ink", dark
+    // theme reads "inkDark" (not "solid" — the button's own translucent-tint
+    // surroundings mean "solid" text also falls short of 4.5:1 against the
+    // real composited dark-theme background). The border stays keyed to
+    // "solid" only (it's decorative, not subject to the text-contrast
+    // requirement), and the svg icon should keep inheriting via currentColor
+    // so it follows along.
     mockApi({
       actual: { message: { employees: actualEmployees } },
       today: { message: { today: todaySnapshot } },
@@ -413,16 +418,16 @@ describe("widgets/uoattendance/component", () => {
     const office = screen.getByRole("link", { name: "オフィスシフトカレンダー（今月）" });
 
     expect(production.style.getPropertyValue("--dept-ink")).toBe("#8F5A0B");
-    expect(production.style.getPropertyValue("--dept-solid")).toBe("#E8A868");
+    expect(production.style.getPropertyValue("--dept-ink-dark")).toBe("#F0BC85");
     expect(production).toHaveClass("text-[color:var(--dept-ink)]");
-    expect(production).toHaveClass("dark:text-[color:var(--dept-solid)]");
+    expect(production).toHaveClass("dark:text-[color:var(--dept-ink-dark)]");
     // border color is unaffected by the contrast fix: still `${solid}66`
     expect(production.style.borderColor).toBe("rgba(232, 168, 104, 0.4)");
 
     expect(office.style.getPropertyValue("--dept-ink")).toBe("#1A6591");
-    expect(office.style.getPropertyValue("--dept-solid")).toBe("#5EB3E4");
+    expect(office.style.getPropertyValue("--dept-ink-dark")).toBe("#8CC9EF");
     expect(office).toHaveClass("text-[color:var(--dept-ink)]");
-    expect(office).toHaveClass("dark:text-[color:var(--dept-solid)]");
+    expect(office).toHaveClass("dark:text-[color:var(--dept-ink-dark)]");
     expect(office.style.borderColor).toBe("rgba(94, 179, 228, 0.4)");
 
     // the icon must keep following the link's text color automatically
