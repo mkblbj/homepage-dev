@@ -1459,7 +1459,13 @@
         "partialData": "部分店铺",
         "sortOrders": "订单数",
         "sortSales": "销售额",
-        "sortUnits": "件数"
+        "sortUnits": "件数",
+        "allTimeRecords": "历史最高纪录",
+        "recordSales": "销售额 历史最高",
+        "recordOrders": "订单数 历史最高",
+        "shopBest": "各店铺 自己最好成绩",
+        "peaksCoverage": "{{year}} 年至今 · 共 {{count}} 家店铺",
+        "recordDayMark": "与公司纪录同一天"
     },
     "uoshippingdashboard": {
         "allPlatforms": "全部",

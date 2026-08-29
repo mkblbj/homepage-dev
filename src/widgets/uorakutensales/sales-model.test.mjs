@@ -3,7 +3,9 @@ import test from "node:test";
 
 import {
   buildModel,
+  buildPeaks,
   buildRanking,
+  buildShopColors,
   computeFreshness,
   DEFAULT_RANKING_DIM,
   DEFAULT_REFRESH_INTERVAL,
@@ -372,4 +374,68 @@ test("RANKING_STEPS reveals progressively and ends at the cap", () => {
   // strictly increasing so each click always reveals more
   RANKING_STEPS.forEach((v, i) => i && assert.ok(v > RANKING_STEPS[i - 1]));
   assert.equal(RANKING_STEPS[RANKING_STEPS.length - 1], RANKING_MAX_COUNT);
+});
+
+// ---- historical peaks ----
+
+const peaksPayload = {
+  ok: true,
+  status: "ready",
+  generatedAtJST: "2026-08-29 07:16 JST",
+  coverage: { startDate: "2018-01-01", endDate: "2026-08-28", shopCount: 7 },
+  shopRankings: {
+    sales: [
+      { rank: 1, shopName: "3911", salesYen: 1684009, date: "2025-10-15" },
+      { rank: 2, shopName: "松武", salesYen: 1427527, date: "2023-11-02" },
+    ],
+    orders: [{ rank: 1, shopName: "松武", orderCount: 741, date: "2022-09-10" }],
+  },
+  companyRecords: {
+    sales: {
+      salesYen: 2917505,
+      date: "2025-10-15",
+      shopContributions: [
+        { shopName: "3911", salesYen: 1684009 },
+        { shopName: "0406", salesYen: 709754 },
+        { shopName: "allcase", salesYen: 0 },
+      ],
+    },
+    orders: { orderCount: 1899, date: "2026-03-05", shopContributions: [{ shopName: "3911", orderCount: 661 }] },
+  },
+};
+
+test("buildPeaks withholds anything that is not a complete snapshot", () => {
+  assert.equal(buildPeaks(null), null);
+  assert.equal(buildPeaks({ status: "not_ready", coverage: {} }), null);
+  assert.equal(buildPeaks({ status: "ready" }), null); // ready but empty boards
+});
+
+test("buildPeaks decorates company records and drops zero contributors", () => {
+  const r = buildPeaks(peaksPayload);
+  assert.deepEqual(r.available, ["sales", "orders"]);
+  assert.equal(r.coverage.startYear, 2018);
+  assert.equal(r.coverage.shopCount, 7);
+
+  const sales = r.records.sales;
+  assert.equal(sales.value, 2917505);
+  assert.equal(sales.md, "10/15");
+  assert.equal(sales.wd, "水"); // 2025-10-15 is a Wednesday
+  assert.equal(sales.year, 2025);
+  // allcase contributed nothing that day → excluded from the stacked bar
+  assert.deepEqual(sales.contributions.map((c) => c.shopName), ["3911", "0406"]);
+  assert.equal(Number(sales.contributions[0].pct.toFixed(1)), 57.7);
+});
+
+test("buildPeaks flags a personal best that landed on a company-record day", () => {
+  const r = buildPeaks(peaksPayload);
+  // 3911 peaked on the very day the company set its sales record
+  assert.equal(r.shopBests.sales[0].onRecordDay, true);
+  assert.equal(r.shopBests.sales[1].onRecordDay, false); // 松武 peaked on its own day
+});
+
+test("buildShopColors is stable regardless of input order", () => {
+  const a = buildShopColors(["松武", "3911", "0406"]);
+  const b = buildShopColors(["0406", "松武", "3911", "3911"]);
+  assert.deepEqual(a, b); // same shops → same hues, so bar and chips always agree
+  assert.equal(new Set(Object.values(a)).size, 3); // no collisions within a set
 });

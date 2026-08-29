@@ -43,6 +43,12 @@ const REQUIRED_KEYS = [
   "sortOrders",
   "sortSales",
   "sortUnits",
+  "allTimeRecords",
+  "recordSales",
+  "recordOrders",
+  "shopBest",
+  "peaksCoverage",
+  "recordDayMark",
 ];
 
 function loadNamespace(locale) {

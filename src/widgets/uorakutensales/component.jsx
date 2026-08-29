@@ -18,11 +18,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ACCENT,
   buildModel,
+  buildPeaks,
   buildRanking,
   computeFreshness,
+  DEFAULT_PEAK_DIM,
   DEFAULT_RANKING_DIM,
   DEFAULT_REFRESH_INTERVAL,
   man,
+  PEAK_DIMS,
   RANKING_STEPS,
   spark,
 } from "./sales-model.mjs";
@@ -776,6 +779,138 @@ function RankingSection({ ranking, cardCls, t }) {
   );
 }
 
+
+// ---- all-time records (GET /api/history/peaks) ----
+
+// Record cards read as a trophy case, so they carry their own warm accents
+// rather than the daily-operations palette.
+const PEAK_TONE = {
+  sales: {
+    card: "border-amber-300/40 bg-gradient-to-br from-amber-400/[0.13] to-[rgba(214,72,61,0.07)] dark:border-amber-300/35",
+    label: "text-amber-700 dark:text-amber-300",
+    value: "text-amber-800 dark:text-amber-200",
+  },
+  orders: {
+    card: "border-sky-300/35 bg-gradient-to-br from-sky-400/[0.13] to-[rgba(90,120,200,0.06)] dark:border-sky-300/30",
+    label: "text-sky-700 dark:text-sky-300",
+    value: "text-sky-800 dark:text-sky-200",
+  },
+};
+
+function peakValueText(dim, value, t) {
+  return dim === "orders" ? `${fmt(t, value)}${t(`${NS}.ordersUnit`)}` : `\u00a5${fmt(t, value)}`;
+}
+
+// company record + the stacked shop contribution for that single day
+function RecordCard({ dim, record, shopColors, t }) {
+  const tone = PEAK_TONE[dim] ?? PEAK_TONE.sales;
+  return (
+    <div className={`flex min-w-0 flex-col gap-1 rounded-xl border p-3 ${tone.card}`}>
+      <span className={`text-[9.5px] font-extrabold uppercase tracking-[0.1em] ${tone.label}`}>
+        {t(`${NS}.${dim === "orders" ? "recordOrders" : "recordSales"}`)}
+      </span>
+      <span className={`text-[22px] font-extrabold leading-none tabular-nums ${tone.value}`}>
+        {peakValueText(dim, record.value, t)}
+      </span>
+      <span className="text-[11.5px] font-bold tabular-nums text-theme-800 dark:text-theme-50">
+        {record.year}.{record.md}（{record.wd}）
+      </span>
+      {record.contributions.length ? (
+        <span className="mt-1 flex h-[7px] overflow-hidden rounded-full bg-theme-300/40 dark:bg-white/10">
+          {record.contributions.map((c) => (
+            <span
+              key={c.shopName}
+              className="block h-full"
+              style={{ width: `${c.pct}%`, backgroundColor: shopColors[c.shopName] ?? "#9AA6B8" }}
+              title={`${c.shopName} ${c.pct.toFixed(1)}%`}
+            />
+          ))}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function PeaksSection({ peaks, cardCls, t }) {
+  const [dim, setDim] = useState(DEFAULT_PEAK_DIM);
+  // a dimension can disappear across refreshes → fall back to what is present
+  const activeDim = peaks.shopBests[dim] ? dim : peaks.available.find((d) => peaks.shopBests[d]);
+  const bests = activeDim ? peaks.shopBests[activeDim] : [];
+  const hasRecordDay = bests.some((b) => b.onRecordDay);
+
+  const dimChip = (key) => (
+    <button
+      key={key}
+      type="button"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDim(key);
+      }}
+      className={`rounded px-2 py-0.5 text-[10px] font-bold transition-colors ${
+        activeDim === key
+          ? "bg-theme-700 text-white dark:bg-theme-100 dark:text-theme-900"
+          : "text-theme-600 hover:bg-theme-200/60 dark:text-theme-300 dark:hover:bg-theme-700/60"
+      }`}
+    >
+      {t(`${NS}.${key === "orders" ? "sortOrders" : "sortSales"}`)}
+    </button>
+  );
+
+  return (
+    <section className={`flex flex-col gap-2.5 p-4 ${cardCls}`}>
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+        <span className="text-[12px] font-bold text-theme-700 dark:text-theme-200">{t(`${NS}.allTimeRecords`)}</span>
+        <span className="text-[10px] font-semibold tabular-nums text-theme-700 dark:text-theme-200">
+          {t(`${NS}.peaksCoverage`, { year: peaks.coverage.startYear, count: peaks.coverage.shopCount })}
+        </span>
+      </div>
+
+      {/* the record cards leave a lot of horizontal room, so the shop chips share
+          the row once there is space: 1 column on phones, records paired at @lg,
+          all three side by side at @4xl. */}
+      <div className="grid grid-cols-1 gap-2.5 @lg:grid-cols-2 @4xl:grid-cols-[minmax(180px,0.8fr)_minmax(180px,0.8fr)_minmax(0,1.6fr)]">
+        {PEAK_DIMS.filter((d) => peaks.records[d]).map((d) => (
+          <RecordCard key={d} dim={d} record={peaks.records[d]} shopColors={peaks.shopColors} t={t} />
+        ))}
+
+        {bests.length ? (
+          <div className="flex min-w-0 flex-col gap-1.5 @lg:col-span-2 @4xl:col-span-1">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="text-[10.5px] font-bold tracking-wide text-theme-600 dark:text-theme-300">{t(`${NS}.shopBest`)}</span>
+              {/* the chips double as the stacked bars' legend, so their colours match */}
+              <div className="ml-auto flex shrink-0 gap-0.5 rounded-md border border-theme-300/60 bg-theme-100/50 p-0.5 dark:border-theme-600/60 dark:bg-theme-900/30">
+                {peaks.available.filter((d) => peaks.shopBests[d]).map(dimChip)}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {bests.map((b) => (
+                <span
+                  key={b.shopName}
+                  className="inline-flex min-w-0 items-center gap-1 rounded-full border border-theme-300/70 bg-theme-100/60 px-1.5 py-0.5 text-[10px] tabular-nums dark:border-white/[0.18] dark:bg-white/[0.06]"
+                >
+                  <span className="block h-[7px] w-[7px] shrink-0 rounded-sm" style={{ backgroundColor: peaks.shopColors[b.shopName] ?? "#9AA6B8" }} />
+                  <span className="truncate font-semibold text-theme-800 dark:text-theme-100">{b.shopName}</span>
+                  <span className="font-bold text-theme-900 dark:text-theme-50">{peakValueText(activeDim, b.value, t)}</span>
+                  <span className="hidden text-[9.5px] font-semibold text-theme-700 @md:inline dark:text-theme-200">
+                    {b.year}.{b.md}
+                  </span>
+                  {b.onRecordDay ? <span className="text-[9px] leading-none text-amber-600 dark:text-amber-300">★</span> : null}
+                </span>
+              ))}
+            </div>
+            {hasRecordDay ? (
+              <span className="text-[9.5px] font-medium text-theme-600 dark:text-theme-300">
+                <span className="text-amber-600 dark:text-amber-300">★</span> {t(`${NS}.recordDayMark`)}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
 function LoadingSkeleton() {
   return (
     <div className="@container flex w-full min-w-0 flex-col gap-3 p-1.5">
@@ -805,10 +940,12 @@ export default function Component({ service }) {
   const { data: history, mutate: mutateHistory } = useWidgetAPI(widget, "history", { refreshInterval });
   const { data: logos } = useWidgetAPI(widget, "logos", { refreshInterval });
   const { data: rankingData, mutate: mutateRanking } = useWidgetAPI(widget, "ranking", { refreshInterval });
+  const { data: peaksData } = useWidgetAPI(widget, "peaks", { refreshInterval });
 
   const freshness = useFreshness(sales?.generatedAtJST, refreshInterval);
   const model = useMemo(() => buildModel(sales, history, logos), [sales, history, logos]);
   const ranking = useMemo(() => buildRanking(rankingData), [rankingData]);
+  const peaks = useMemo(() => buildPeaks(peaksData), [peaksData]);
 
   const handleRefresh = useCallback(
     (e) => {
@@ -989,6 +1126,8 @@ export default function Component({ service }) {
           </div>
         </section>
 
+        {ranking ? <RankingSection ranking={ranking} cardCls={cardCls} t={t} /> : null}
+
         {model.hasHistory ? (
           <section className={`grid grid-cols-1 gap-x-5 gap-y-4 p-4 @4xl:grid-cols-[300px_1fr] ${cardCls}`}>
             <div className="min-w-0 @4xl:border-r @4xl:border-theme-300/30 dark:@4xl:border-white/10 @4xl:pr-5">
@@ -1034,7 +1173,7 @@ export default function Component({ service }) {
           </section>
         ) : null}
 
-        {ranking ? <RankingSection ranking={ranking} cardCls={cardCls} t={t} /> : null}
+        {peaks ? <PeaksSection peaks={peaks} cardCls={cardCls} t={t} /> : null}
       </div>
     </Container>
   );

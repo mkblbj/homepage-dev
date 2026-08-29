@@ -329,3 +329,97 @@ export function buildModel(sales, history, logos) {
     hasHistory: Boolean(history && (history.shops || []).length),
   };
 }
+
+// ---- historical peaks (GET /api/history/peaks) ----
+
+// Record boards the API exposes: best single day by yen, and by order count.
+export const PEAK_DIMS = Object.freeze(["sales", "orders"]);
+export const DEFAULT_PEAK_DIM = PEAK_DIMS[0];
+// value key per dimension, as the API names it
+const PEAK_VALUE_KEY = { sales: "salesYen", orders: "orderCount" };
+
+// Stable per-shop hues. Shops are sorted so a given shop keeps its colour across
+// dimensions and re-renders; the stacked record bar and the shop chips below it
+// share this map, which lets the chips double as the bar's legend.
+const SHOP_PALETTE = Object.freeze(["#E0A878", "#7FB2E8", "#8FD0B0", "#C39BE0", "#E8B26A", "#E295B4", "#9AA6B8", "#B0C97E"]);
+
+export function buildShopColors(shopNames) {
+  const unique = [...new Set((shopNames || []).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ja"));
+  const colors = {};
+  unique.forEach((name, i) => {
+    colors[name] = SHOP_PALETTE[i % SHOP_PALETTE.length];
+  });
+  return colors;
+}
+
+function yearOf(dateStr) {
+  const y = Number(String(dateStr || "").slice(0, 4));
+  return Number.isFinite(y) && y > 0 ? y : null;
+}
+
+function decorateDate(dateStr) {
+  return { date: dateStr || "", md: mdLabel(dateStr), wd: weekdayJp(dateStr), year: yearOf(dateStr) };
+}
+
+// Build the "all-time records" view model. Returns null unless the snapshot is
+// complete (`status: "ready"`) — the API deliberately withholds partial boards
+// rather than publishing a record that later moves.
+export function buildPeaks(peaks) {
+  if (!peaks || peaks.status !== "ready") return null;
+
+  const records = {};
+  const shopBests = {};
+  const recordDates = new Set();
+
+  PEAK_DIMS.forEach((dim) => {
+    const key = PEAK_VALUE_KEY[dim];
+    const rec = peaks?.companyRecords?.[dim];
+    if (rec) {
+      const total = toNumber(rec[key]);
+      recordDates.add(rec.date);
+      records[dim] = {
+        ...decorateDate(rec.date),
+        value: total,
+        // only shops that actually sold that day appear in the stacked bar
+        contributions: (rec.shopContributions || [])
+          .map((c) => ({ shopName: c.shopName, value: toNumber(c[key]) }))
+          .filter((c) => c.value > 0)
+          .map((c) => ({ ...c, pct: total > 0 ? (c.value / total) * 100 : 0 })),
+      };
+    }
+
+    const rows = (peaks?.shopRankings?.[dim] || []).map((s) => ({
+      rank: toNumber(s.rank),
+      shopName: s.shopName,
+      value: toNumber(s[key]),
+      ...decorateDate(s.date),
+    }));
+    if (rows.length) shopBests[dim] = rows;
+  });
+
+  const available = PEAK_DIMS.filter((d) => records[d] || shopBests[d]);
+  if (!available.length) return null;
+
+  // a shop whose personal best landed on a company-record day — the same date
+  // carrying several records is the "legendary day" worth calling out
+  available.forEach((dim) => {
+    (shopBests[dim] || []).forEach((row) => {
+      row.onRecordDay = recordDates.has(row.date);
+    });
+  });
+
+  const cov = peaks?.coverage || {};
+  return {
+    generatedAt: normalizeText(peaks?.generatedAtJST),
+    coverage: {
+      startDate: normalizeText(cov.startDate),
+      endDate: normalizeText(cov.endDate),
+      startYear: yearOf(cov.startDate),
+      shopCount: toNumber(cov.shopCount),
+    },
+    records,
+    shopBests,
+    available,
+    shopColors: buildShopColors(available.flatMap((d) => (shopBests[d] || []).map((r) => r.shopName))),
+  };
+}

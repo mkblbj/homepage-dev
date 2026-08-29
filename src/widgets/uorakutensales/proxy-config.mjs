@@ -11,6 +11,7 @@ const ENDPOINT_PATHS = {
   campaigns: "/api/campaigns",
   logos: "/api/shops/logos",
   ranking: "/api/item-rankings",
+  peaks: "/api/history/peaks",
 };
 
 export function normalizeSalesServiceUrl(baseUrl = DEFAULT_SALES_SERVICE_URL) {
