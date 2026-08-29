@@ -20,10 +20,12 @@ import {
   buildModel,
   buildPeaks,
   buildRanking,
+  buildShopColors,
   computeFreshness,
   DEFAULT_PEAK_DIM,
   DEFAULT_RANKING_DIM,
   DEFAULT_REFRESH_INTERVAL,
+  FALLBACK_SHOP_COLOR,
   man,
   PEAK_DIMS,
   RANKING_STEPS,
@@ -821,7 +823,7 @@ function RecordCard({ dim, record, shopColors, t }) {
             <span
               key={c.shopName}
               className="block h-full"
-              style={{ width: `${c.pct}%`, backgroundColor: shopColors[c.shopName] ?? "#9AA6B8" }}
+              style={{ width: `${c.pct}%`, backgroundColor: shopColors[c.shopName] ?? FALLBACK_SHOP_COLOR }}
               title={`${c.shopName} ${c.pct.toFixed(1)}%`}
             />
           ))}
@@ -831,7 +833,7 @@ function RecordCard({ dim, record, shopColors, t }) {
   );
 }
 
-function PeaksSection({ peaks, cardCls, t }) {
+function PeaksSection({ peaks, shopColors, cardCls, t }) {
   const [dim, setDim] = useState(DEFAULT_PEAK_DIM);
   // a dimension can disappear across refreshes → fall back to what is present
   const activeDim = peaks.shopBests[dim] ? dim : peaks.available.find((d) => peaks.shopBests[d]);
@@ -871,7 +873,7 @@ function PeaksSection({ peaks, cardCls, t }) {
           all three side by side at @4xl. */}
       <div className="grid grid-cols-1 gap-2.5 @lg:grid-cols-2 @4xl:grid-cols-[minmax(180px,0.8fr)_minmax(180px,0.8fr)_minmax(0,1.6fr)]">
         {PEAK_DIMS.filter((d) => peaks.records[d]).map((d) => (
-          <RecordCard key={d} dim={d} record={peaks.records[d]} shopColors={peaks.shopColors} t={t} />
+          <RecordCard key={d} dim={d} record={peaks.records[d]} shopColors={shopColors} t={t} />
         ))}
 
         {bests.length ? (
@@ -889,7 +891,7 @@ function PeaksSection({ peaks, cardCls, t }) {
                   key={b.shopName}
                   className="inline-flex min-w-0 items-center gap-1 rounded-full border border-theme-300/70 bg-theme-100/60 px-1.5 py-0.5 text-[10px] tabular-nums dark:border-white/[0.18] dark:bg-white/[0.06]"
                 >
-                  <span className="block h-[7px] w-[7px] shrink-0 rounded-sm" style={{ backgroundColor: peaks.shopColors[b.shopName] ?? "#9AA6B8" }} />
+                  <span className="block h-[7px] w-[7px] shrink-0 rounded-sm" style={{ backgroundColor: shopColors[b.shopName] ?? FALLBACK_SHOP_COLOR }} />
                   <span className="truncate font-semibold text-theme-800 dark:text-theme-100">{b.shopName}</span>
                   <span className="font-bold text-theme-900 dark:text-theme-50">{peakValueText(activeDim, b.value, t)}</span>
                   <span className="hidden text-[9.5px] font-semibold text-theme-700 @md:inline dark:text-theme-200">
@@ -946,6 +948,12 @@ export default function Component({ service }) {
   const model = useMemo(() => buildModel(sales, history, logos), [sales, history, logos]);
   const ranking = useMemo(() => buildRanking(rankingData), [rankingData]);
   const peaks = useMemo(() => buildPeaks(peaksData), [peaksData]);
+  // one palette for the whole widget, built from every shop either board draws —
+  // assigning per board would let the two disagree when their shop sets differ
+  const shopColors = useMemo(
+    () => buildShopColors([...(model?.rows || []).map((r) => r.name), ...(peaks?.shopNames || [])]),
+    [model, peaks],
+  );
 
   const handleRefresh = useCallback(
     (e) => {
@@ -1021,6 +1029,22 @@ export default function Component({ service }) {
               </span>
             </span>
             {/* pace vs 7-day avg */}
+            {/* today's shop mix — same hues as the rows beside it and the record
+                board below, so one colour always means one shop */}
+            {model.rtTotal > 0 ? (
+              <span className="mt-0.5 flex h-[7px] overflow-hidden rounded-full bg-theme-300/40 dark:bg-white/10">
+                {model.rows
+                  .filter((r) => r.rtSales > 0)
+                  .map((r) => (
+                    <span
+                      key={r.name}
+                      className="block h-full"
+                      style={{ width: `${r.rtShare}%`, backgroundColor: shopColors[r.name] ?? FALLBACK_SHOP_COLOR }}
+                      title={`${r.name} ${r.rtShare.toFixed(1)}%`}
+                    />
+                  ))}
+              </span>
+            ) : null}
             <div className="mt-1.5 flex flex-col gap-1.5">
               <div className="flex items-baseline justify-between gap-2">
                 <span className="text-[11px] font-medium text-theme-600 dark:text-theme-300">{t(`${NS}.vsSevenDayAvg`, { avg: fmt(t, Math.round(model.avg)) })}</span>
@@ -1082,6 +1106,11 @@ export default function Component({ service }) {
                   <div key={r.name} className="contents">
                     <span className="flex min-w-0 items-center gap-1.5">
                       <ShopLogo name={r.name} url={r.logoUrl} size={16} />
+                      <span
+                        aria-hidden="true"
+                        className="block h-[9px] w-[3px] shrink-0 rounded-full"
+                        style={{ backgroundColor: shopColors[r.name] ?? FALLBACK_SHOP_COLOR }}
+                      />
                       <span className="truncate text-[12.5px] font-semibold text-theme-900 dark:text-theme-50">{r.name}</span>
                     </span>
                     <span className={`text-right text-[13px] font-bold tabular-nums ${r.rtSales > 0 ? ACCENT_TEXT : "text-theme-400 dark:text-theme-500"}`}>
@@ -1098,8 +1127,11 @@ export default function Component({ service }) {
                         className="absolute inset-y-0 left-0 rounded-full"
                         style={{
                           width: `${Math.min(100, (r.rtShare / model.shareScale) * 100)}%`,
-                          backgroundColor: overIndex ? ACCENT : "rgba(148,163,184,0.75)",
-                          opacity: overIndex ? 0.9 : 1,
+                          backgroundColor: shopColors[r.name] ?? FALLBACK_SHOP_COLOR,
+                          // above its own 7-day norm reads solid; below it dims.
+                          // The tick still marks the baseline, so the comparison
+                          // stays readable from the geometry alone.
+                          opacity: overIndex ? 1 : 0.42,
                         }}
                       />
                       {r.h7Share > 0 ? (
@@ -1173,7 +1205,7 @@ export default function Component({ service }) {
           </section>
         ) : null}
 
-        {peaks ? <PeaksSection peaks={peaks} cardCls={cardCls} t={t} /> : null}
+        {peaks ? <PeaksSection peaks={peaks} shopColors={shopColors} cardCls={cardCls} t={t} /> : null}
       </div>
     </Container>
   );

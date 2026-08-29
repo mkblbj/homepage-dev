@@ -338,13 +338,17 @@ export const DEFAULT_PEAK_DIM = PEAK_DIMS[0];
 // value key per dimension, as the API names it
 const PEAK_VALUE_KEY = { sales: "salesYen", orders: "orderCount" };
 
-// Stable per-shop hues. Shops are sorted so a given shop keeps its colour across
-// dimensions and re-renders; the stacked record bar and the shop chips below it
-// share this map, which lets the chips double as the bar's legend.
-const SHOP_PALETTE = Object.freeze(["#E0A878", "#7FB2E8", "#8FD0B0", "#C39BE0", "#E8B26A", "#E295B4", "#9AA6B8", "#B0C97E"]);
+// Stable per-shop hues, assigned by sorted position so the palette stays evenly
+// spread and every shop is clearly distinguishable. Callers must build this ONCE
+// from the union of every shop they will draw (today's rows + the record board),
+// otherwise two boards with different shop sets would disagree on colours.
+const SHOP_PALETTE = Object.freeze([
+  "#E0A878", "#7FB2E8", "#8FD0B0", "#C39BE0", "#E8B26A", "#E295B4", "#9AA6B8", "#B0C97E",
+]);
+export const FALLBACK_SHOP_COLOR = "#9AA6B8";
 
 export function buildShopColors(shopNames) {
-  const unique = [...new Set((shopNames || []).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ja"));
+  const unique = [...new Set((shopNames || []).map(normalizeText).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ja"));
   const colors = {};
   unique.forEach((name, i) => {
     colors[name] = SHOP_PALETTE[i % SHOP_PALETTE.length];
@@ -420,6 +424,8 @@ export function buildPeaks(peaks) {
     records,
     shopBests,
     available,
-    shopColors: buildShopColors(available.flatMap((d) => (shopBests[d] || []).map((r) => r.shopName))),
+    // every shop that appears on any board — the component unions this with
+    // today's rows to assign one palette across the whole widget
+    shopNames: [...new Set(available.flatMap((d) => (shopBests[d] || []).map((r) => r.shopName)))],
   };
 }

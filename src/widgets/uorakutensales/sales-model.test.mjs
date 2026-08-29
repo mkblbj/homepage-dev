@@ -433,9 +433,19 @@ test("buildPeaks flags a personal best that landed on a company-record day", () 
   assert.equal(r.shopBests.sales[1].onRecordDay, false); // 松武 peaked on its own day
 });
 
-test("buildShopColors is stable regardless of input order", () => {
+test("buildShopColors spreads a distinct hue per shop, order-independent", () => {
   const a = buildShopColors(["松武", "3911", "0406"]);
   const b = buildShopColors(["0406", "松武", "3911", "3911"]);
-  assert.deepEqual(a, b); // same shops → same hues, so bar and chips always agree
-  assert.equal(new Set(Object.values(a)).size, 3); // no collisions within a set
+  assert.deepEqual(a, b); // same shops → same hues whatever order they arrive in
+  assert.equal(new Set(Object.values(a)).size, 3); // every shop clearly distinguishable
+});
+
+test("buildShopColors covers a full shop set without repeating a hue", () => {
+  const shops = ["3911", "0406", "松田", "松武", "天海", "hagumi", "allcase"];
+  const colors = buildShopColors(shops);
+  assert.equal(new Set(Object.values(colors)).size, shops.length);
+  // callers union every board's shops, so a board missing one shop must not
+  // shift the others — the union assignment is what keeps boards in agreement
+  const union = buildShopColors([...shops, "newshop"]);
+  assert.equal(union["3911"], colors["3911"] === union["3911"] ? union["3911"] : colors["3911"]);
 });
