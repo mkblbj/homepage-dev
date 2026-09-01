@@ -1452,7 +1452,11 @@
         "recordOrders": "件数 歴代最高",
         "shopBest": "店舗別 自己ベスト",
         "peaksCoverage": "{{year}}年〜 · 全{{count}}店舗",
-        "recordDayMark": "全社記録と同じ日"
+        "recordDayMark": "全社記録と同じ日",
+        "recordUnits": "個数 歴代最高",
+        "unitsPerOrder": "平均購入点数",
+        "noRecord": "記録なし",
+        "unitsSince": "個数は{{year}}年〜"
     },
     "uoshippingdashboard": {
         "allPlatforms": "全部",

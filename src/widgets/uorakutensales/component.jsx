@@ -316,7 +316,8 @@ function ShopMiniChart({ points, mode, cvr = 0, t, height = 32 }) {
             <span className="block text-[11px] font-extrabold tabular-nums text-white">¥{fmt(t, hp.sales)}</span>
             <span className="block text-[8.5px] font-medium tabular-nums text-slate-400">
               {fmt(t, hp.orders)}
-              {t(`${NS}.ordersUnit`)}
+              {t(`${NS}.ordersUnit`)} · {fmt(t, hp.units)}
+              {t(`${NS}.unitsShort`)}
               {hp.cvr > 0 ? ` · CVR ${hp.cvr.toFixed(2)}%` : ""}
             </span>
           </div>
@@ -435,7 +436,8 @@ function DailyChart({ model, mode, onModeChange, t }) {
               <span className="block text-[12.5px] font-extrabold tabular-nums text-white">¥{fmt(t, hd.sales)}</span>
               <span className="block text-[9px] font-medium tabular-nums text-slate-400">
                 {fmt(t, hd.orders)}
-                {t(`${NS}.ordersUnit`)}
+                {t(`${NS}.ordersUnit`)} · {fmt(t, hd.units)}
+                {t(`${NS}.unitsShort`)}
                 {hd.cvr > 0 ? ` · CVR ${hd.cvr.toFixed(2)}%` : ""}
               </span>
             </div>
@@ -792,6 +794,11 @@ const PEAK_TONE = {
     label: "text-amber-700 dark:text-amber-300",
     value: "text-amber-800 dark:text-amber-200",
   },
+  units: {
+    card: "border-emerald-300/35 bg-gradient-to-br from-emerald-400/[0.13] to-[rgba(60,150,120,0.06)] dark:border-emerald-300/30",
+    label: "text-emerald-700 dark:text-emerald-300",
+    value: "text-emerald-800 dark:text-emerald-200",
+  },
   orders: {
     card: "border-sky-300/35 bg-gradient-to-br from-sky-400/[0.13] to-[rgba(90,120,200,0.06)] dark:border-sky-300/30",
     label: "text-sky-700 dark:text-sky-300",
@@ -799,23 +806,38 @@ const PEAK_TONE = {
   },
 };
 
+// label + toggle text differ per record dimension
+const PEAK_LABEL_KEY = { sales: "recordSales", units: "recordUnits", orders: "recordOrders" };
+const PEAK_DIM_TOGGLE_KEY = { sales: "sortSales", units: "sortUnits", orders: "sortOrders" };
+
 function peakValueText(dim, value, t) {
-  return dim === "orders" ? `${fmt(t, value)}${t(`${NS}.ordersUnit`)}` : `\u00a5${fmt(t, value)}`;
+  if (dim === "orders") return `${fmt(t, value)}${t(`${NS}.ordersUnit`)}`;
+  if (dim === "units") return `${fmt(t, value)}${t(`${NS}.unitsShort`)}`;
+  return `¥${fmt(t, value)}`;
 }
 
 // company record + the stacked shop contribution for that single day
-function RecordCard({ dim, record, shopColors, t }) {
+function RecordCard({ dim, record, shopColors, sinceYear, t }) {
   const tone = PEAK_TONE[dim] ?? PEAK_TONE.sales;
   return (
     <div className={`flex min-w-0 flex-col gap-1 rounded-xl border p-3 ${tone.card}`}>
       <span className={`text-[9.5px] font-extrabold uppercase tracking-[0.1em] ${tone.label}`}>
-        {t(`${NS}.${dim === "orders" ? "recordOrders" : "recordSales"}`)}
+        {t(`${NS}.${PEAK_LABEL_KEY[dim] ?? "recordSales"}`)}
       </span>
       <span className={`text-[22px] font-extrabold leading-none tabular-nums ${tone.value}`}>
         {peakValueText(dim, record.value, t)}
       </span>
-      <span className="text-[11.5px] font-bold tabular-nums text-theme-800 dark:text-theme-50">
-        {record.year}.{record.md}（{record.wd}）
+      <span className="flex flex-wrap items-baseline gap-x-1.5">
+        <span className="text-[11.5px] font-bold tabular-nums text-theme-800 dark:text-theme-50">
+          {record.year}.{record.md}（{record.wd}）
+        </span>
+        {/* units were backfilled later than sales/orders — say so rather than
+            implying this record spans the same years */}
+        {sinceYear ? (
+          <span className="text-[9px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
+            {t(`${NS}.unitsSince`, { year: sinceYear })}
+          </span>
+        ) : null}
       </span>
       {record.contributions.length ? (
         <span className="mt-1 flex h-[7px] overflow-hidden rounded-full bg-theme-300/40 dark:bg-white/10">
@@ -855,7 +877,7 @@ function PeaksSection({ peaks, shopColors, cardCls, t }) {
           : "text-theme-600 hover:bg-theme-200/60 dark:text-theme-300 dark:hover:bg-theme-700/60"
       }`}
     >
-      {t(`${NS}.${key === "orders" ? "sortOrders" : "sortSales"}`)}
+      {t(`${NS}.${PEAK_DIM_TOGGLE_KEY[key] ?? "sortSales"}`)}
     </button>
   );
 
@@ -871,13 +893,26 @@ function PeaksSection({ peaks, shopColors, cardCls, t }) {
       {/* the record cards leave a lot of horizontal room, so the shop chips share
           the row once there is space: 1 column on phones, records paired at @lg,
           all three side by side at @4xl. */}
-      <div className="grid grid-cols-1 gap-2.5 @lg:grid-cols-2 @4xl:grid-cols-[minmax(180px,0.8fr)_minmax(180px,0.8fr)_minmax(0,1.6fr)]">
+      {/* three record cards share a row once there is width; the shop chips get
+          their own full-width row so they never squeeze the records */}
+      <div className="grid grid-cols-1 gap-2.5 @lg:grid-cols-3">
         {PEAK_DIMS.filter((d) => peaks.records[d]).map((d) => (
-          <RecordCard key={d} dim={d} record={peaks.records[d]} shopColors={shopColors} t={t} />
+          <RecordCard
+            key={d}
+            dim={d}
+            record={peaks.records[d]}
+            shopColors={shopColors}
+            sinceYear={
+              d === "units" && peaks.coverage.unitsStartYear && peaks.coverage.unitsStartYear !== peaks.coverage.startYear
+                ? peaks.coverage.unitsStartYear
+                : null
+            }
+            t={t}
+          />
         ))}
 
         {bests.length ? (
-          <div className="flex min-w-0 flex-col gap-1.5 @lg:col-span-2 @4xl:col-span-1">
+          <div className="flex min-w-0 flex-col gap-1.5 @lg:col-span-3">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <span className="text-[10.5px] font-bold tracking-wide text-theme-600 dark:text-theme-300">{t(`${NS}.shopBest`)}</span>
               {/* the chips double as the stacked bars' legend, so their colours match */}
@@ -893,11 +928,17 @@ function PeaksSection({ peaks, shopColors, cardCls, t }) {
                 >
                   <span className="block h-[7px] w-[7px] shrink-0 rounded-sm" style={{ backgroundColor: shopColors[b.shopName] ?? FALLBACK_SHOP_COLOR }} />
                   <span className="truncate font-semibold text-theme-800 dark:text-theme-100">{b.shopName}</span>
-                  <span className="font-bold text-theme-900 dark:text-theme-50">{peakValueText(activeDim, b.value, t)}</span>
-                  <span className="hidden text-[9.5px] font-semibold text-theme-700 @md:inline dark:text-theme-200">
-                    {b.year}.{b.md}
-                  </span>
-                  {b.onRecordDay ? <span className="text-[9px] leading-none text-amber-600 dark:text-amber-300">★</span> : null}
+                  {b.noRecord ? (
+                    <span className="text-[9.5px] font-medium text-theme-500 dark:text-theme-400">{t(`${NS}.noRecord`)}</span>
+                  ) : (
+                    <>
+                      <span className="font-bold text-theme-900 dark:text-theme-50">{peakValueText(activeDim, b.value, t)}</span>
+                      <span className="hidden text-[9.5px] font-semibold text-theme-700 @md:inline dark:text-theme-200">
+                        {b.year}.{b.md}
+                      </span>
+                      {b.onRecordDay ? <span className="text-[9px] leading-none text-amber-600 dark:text-amber-300">★</span> : null}
+                    </>
+                  )}
                 </span>
               ))}
             </div>
@@ -1023,8 +1064,12 @@ export default function Component({ service }) {
                 {fmt(t, model.rtOrders)}
                 <span className="ml-0.5 text-[12px] font-semibold text-theme-600 dark:text-theme-300">{t(`${NS}.ordersUnit`)}</span>
               </span>
+              <span className="text-[15px] font-bold leading-none tabular-nums text-theme-700 dark:text-theme-200">
+                {fmt(t, model.rtUnits)}
+                <span className="ml-0.5 text-[10px] font-semibold text-theme-600 dark:text-theme-300">{t(`${NS}.unitsShort`)}</span>
+              </span>
               <span className="text-[12.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
-                {t(`${NS}.aov`)} ¥{fmt(t, model.aov)}
+                {t(`${NS}.aov`)} ¥{fmt(t, model.aov)} · {t(`${NS}.unitsPerOrder`)} ×{model.rtUnitsPerOrder.toFixed(2)}
                 {model.time ? ` · ${t(`${NS}.asOf`, { time: model.time })}` : ""}
               </span>
             </span>
@@ -1068,6 +1113,13 @@ export default function Component({ service }) {
                       {fmt(t, model.grandOrders)}
                       {t(`${NS}.ordersUnit`)}
                     </span>
+                    <span className="text-[11.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
+                      {fmt(t, model.grandUnits)}
+                      {t(`${NS}.unitsShort`)}
+                    </span>
+                    <span className="text-[11.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
+                      ×{model.unitsPerOrder.toFixed(2)}
+                    </span>
                   </span>
                   <span className="text-[10px] font-medium text-theme-500 dark:text-theme-400">{t(`${NS}.avgLabel`)}</span>
                   <span className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
@@ -1078,6 +1130,11 @@ export default function Component({ service }) {
                     <span className="text-[11.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
                       {fmt(t, Math.round(model.avgOrders))}
                       {t(`${NS}.ordersUnit`)}
+                      {t(`${NS}.perDay`)}
+                    </span>
+                    <span className="text-[11.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
+                      {fmt(t, Math.round(model.avgUnits))}
+                      {t(`${NS}.unitsShort`)}
                       {t(`${NS}.perDay`)}
                     </span>
                     <span className="text-[11.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">CVR {model.grandCvr.toFixed(2)}%</span>
@@ -1099,7 +1156,7 @@ export default function Component({ service }) {
               ) : null}
             </div>
             {/* name + numbers cluster on the left (no cross-row eye travel); bullet trails right */}
-            <div className="grid grid-cols-[minmax(0,120px)_100px_48px_46px_minmax(56px,1fr)] items-center gap-x-2.5 gap-y-2">
+            <div className="grid grid-cols-[minmax(0,120px)_100px_44px_minmax(0,52px)_44px_minmax(56px,1fr)] items-center gap-x-2 gap-y-2">
               {model.rows.map((r) => {
                 const overIndex = r.rtShare >= r.h7Share;
                 return (
@@ -1119,6 +1176,23 @@ export default function Component({ service }) {
                     <span className="text-right text-[11px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
                       {fmt(t, r.rtOrders)}
                       {t(`${NS}.ordersUnit`)}
+                    </span>
+                    <span className="flex min-w-0 flex-col items-end leading-tight">
+                      <span className="truncate text-[11px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
+                        {fmt(t, r.rtUnits)}
+                        {t(`${NS}.unitsShort`)}
+                      </span>
+                      {/* pieces per order — a high ratio marks wholesale-style buying */}
+                      {r.rtUnitsPerOrder > 0 ? (
+                        <span
+                          className={`text-[9px] tabular-nums ${
+                            r.rtUnitsPerOrder >= 2 ? "font-bold text-amber-600 dark:text-amber-300" : "text-theme-500 dark:text-theme-400"
+                          }`}
+                          title={t(`${NS}.unitsPerOrder`)}
+                        >
+                          ×{r.rtUnitsPerOrder.toFixed(2)}
+                        </span>
+                      ) : null}
                     </span>
                     <span className="text-right text-[10.5px] font-medium tabular-nums text-theme-500 dark:text-theme-400">{r.rtShare.toFixed(1)}%</span>
                     {/* bullet: fill = today share, tick = this shop's 7-day share; red when today ≥ normal */}
@@ -1151,6 +1225,10 @@ export default function Component({ service }) {
               <span className="text-right text-[11px] font-bold tabular-nums text-theme-700 dark:text-theme-200">
                 {fmt(t, model.rtOrders)}
                 {t(`${NS}.ordersUnit`)}
+              </span>
+              <span className="truncate text-right text-[11px] font-bold tabular-nums text-theme-700 dark:text-theme-200">
+                {fmt(t, model.rtUnits)}
+                {t(`${NS}.unitsShort`)}
               </span>
               <span />
               <span />
@@ -1195,7 +1273,8 @@ export default function Component({ service }) {
                       <ShopMiniChart points={r.daily} mode={chartMode} cvr={r.cvr} t={t} />
                       <span className="border-t border-theme-300/30 pt-1.5 text-[9px] font-medium tabular-nums text-theme-600 dark:border-white/10 dark:text-theme-300">
                         {fmt(t, r.h7Orders)}
-                        {t(`${NS}.ordersUnit`)} · CVR {r.cvr.toFixed(2)}%
+                        {t(`${NS}.ordersUnit`)} · {fmt(t, r.h7Units)}
+                        {t(`${NS}.unitsShort`)} · CVR {r.cvr.toFixed(2)}%
                       </span>
                     </div>
                   </div>

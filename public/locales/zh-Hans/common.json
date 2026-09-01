@@ -1465,7 +1465,11 @@
         "recordOrders": "订单数 历史最高",
         "shopBest": "各店铺 自己最好成绩",
         "peaksCoverage": "{{year}} 年至今 · 共 {{count}} 家店铺",
-        "recordDayMark": "与公司纪录同一天"
+        "recordDayMark": "与公司纪录同一天",
+        "recordUnits": "销售个数 历史最高",
+        "unitsPerOrder": "平均购买件数",
+        "noRecord": "暂无纪录",
+        "unitsSince": "个数自 {{year}} 年起"
     },
     "uoshippingdashboard": {
         "allPlatforms": "全部",

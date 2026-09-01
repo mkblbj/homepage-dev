@@ -211,10 +211,12 @@ export function buildModel(sales, history, logos) {
 
   const rtTotal = toNumber(sales?.totals?.salesYen);
   const rtOrders = toNumber(sales?.totals?.orderCount);
+  const rtUnits = toNumber(sales?.totals?.unitsSold);
   const rtShops = (sales?.shops || []).map((s) => ({
     name: s.shopName,
     sales: toNumber(s.salesYen),
     orders: toNumber(s.orderCount),
+    units: toNumber(s.unitsSold),
   }));
 
   // history context, keyed by shopName. Each shop keeps per-day detail so the
@@ -225,6 +227,7 @@ export function buildModel(sales, history, logos) {
     histByName.set(s.shopName, {
       total: toNumber(s?.totals?.salesYen),
       orders: toNumber(s?.totals?.orderCount),
+      units: toNumber(s?.totals?.unitsSold),
       cvr: toNumber(s?.totals?.conversionRate),
       daily: (s.daily || []).map((d) => ({
         date: d.date,
@@ -232,6 +235,7 @@ export function buildModel(sales, history, logos) {
         wd: weekdayJp(d.date),
         sales: toNumber(d.salesYen),
         orders: toNumber(d.orderCount),
+        units: toNumber(d.unitsSold),
         // per-shop daily CVR is authoritative — it comes straight from the API
         cvr: toNumber(d.conversionRate),
       })),
@@ -239,6 +243,7 @@ export function buildModel(sales, history, logos) {
   });
   const grandTotal = toNumber(history?.totals?.salesYen);
   const grandOrders = toNumber(history?.totals?.orderCount);
+  const grandUnits = toNumber(history?.totals?.unitsSold);
   const grandCvr = toNumber(history?.totals?.conversionRate);
   const nDays = dates.length || 7;
   const avg = grandTotal / nDays;
@@ -251,6 +256,7 @@ export function buildModel(sales, history, logos) {
   const dailyTotals = dates.map((date, i) => {
     let s = 0;
     let o = 0;
+    let u = 0;
     let visits = 0;
     (history?.shops || []).forEach((sh) => {
       const d = (sh.daily || [])[i];
@@ -259,6 +265,7 @@ export function buildModel(sales, history, logos) {
         const cvr = toNumber(d.conversionRate);
         s += toNumber(d.salesYen);
         o += orders;
+        u += toNumber(d.unitsSold);
         if (cvr > 0) visits += (orders * 100) / cvr;
       }
     });
@@ -268,6 +275,7 @@ export function buildModel(sales, history, logos) {
       md: mdLabel(date),
       sales: s,
       orders: o,
+      units: u,
       cvr: visits > 0 ? (o / visits) * 100 : 0,
     };
   });
@@ -292,12 +300,15 @@ export function buildModel(sales, history, logos) {
         name: s.name,
         rtSales: s.sales,
         rtOrders: s.orders,
+        rtUnits: s.units,
+        rtUnitsPerOrder: s.orders > 0 ? s.units / s.orders : 0,
         rtShare: rtTotal > 0 ? (s.sales / rtTotal) * 100 : 0,
         rtBarPct: (s.sales / rtMax) * 100,
         // this shop's share of the trailing-7d total — the "normal" baseline the
         // bullet compares today's share against (today ≥ baseline = over-indexing).
         h7Share: grandTotal > 0 ? (h.total / grandTotal) * 100 : 0,
         h7Total: h.total,
+        h7Units: h.units,
         h7Orders: h.orders,
         cvr: h.cvr,
         daily: h.daily,
@@ -314,13 +325,20 @@ export function buildModel(sales, history, logos) {
     time: timeFromJST(sales?.generatedAtJST),
     rtTotal,
     rtOrders,
+    rtUnits,
     aov: rtOrders > 0 ? Math.round(rtTotal / rtOrders) : 0,
+    // units per order — how many pieces a single order carries. Separates
+    // wholesale-style buying from one-piece shoppers.
+    rtUnitsPerOrder: rtOrders > 0 ? rtUnits / rtOrders : 0,
+    unitsPerOrder: grandOrders > 0 ? grandUnits / grandOrders : 0,
     rows,
     grandTotal,
     grandOrders,
+    grandUnits,
     grandCvr,
     avg,
     avgOrders: grandOrders / nDays,
+    avgUnits: grandUnits / nDays,
     nDays,
     days,
     maxDaily,
@@ -333,10 +351,10 @@ export function buildModel(sales, history, logos) {
 // ---- historical peaks (GET /api/history/peaks) ----
 
 // Record boards the API exposes: best single day by yen, and by order count.
-export const PEAK_DIMS = Object.freeze(["sales", "orders"]);
+export const PEAK_DIMS = Object.freeze(["sales", "units", "orders"]);
 export const DEFAULT_PEAK_DIM = PEAK_DIMS[0];
 // value key per dimension, as the API names it
-const PEAK_VALUE_KEY = { sales: "salesYen", orders: "orderCount" };
+const PEAK_VALUE_KEY = { sales: "salesYen", units: "unitsSold", orders: "orderCount" };
 
 // Stable per-shop hues, assigned by sorted position so the palette stays evenly
 // spread and every shop is clearly distinguishable. Callers must build this ONCE
@@ -380,7 +398,9 @@ export function buildPeaks(peaks) {
     const rec = peaks?.companyRecords?.[dim];
     if (rec) {
       const total = toNumber(rec[key]);
-      recordDates.add(rec.date);
+      // a zero record carries no date; never seed the "legendary day" set with
+      // an empty value or every shop without a record would appear to match it
+      if (rec.date) recordDates.add(rec.date);
       records[dim] = {
         ...decorateDate(rec.date),
         value: total,
@@ -392,12 +412,18 @@ export function buildPeaks(peaks) {
       };
     }
 
-    const rows = (peaks?.shopRankings?.[dim] || []).map((s) => ({
-      rank: toNumber(s.rank),
-      shopName: s.shopName,
-      value: toNumber(s[key]),
-      ...decorateDate(s.date),
-    }));
+    const rows = (peaks?.shopRankings?.[dim] || []).map((s) => {
+      const value = toNumber(s[key]);
+      return {
+        rank: toNumber(s.rank),
+        shopName: s.shopName,
+        value,
+        // a peak of 0 means the shop never sold — its "record date" is just the
+        // last day scanned, so the UI must not present it as an achievement
+        noRecord: value <= 0,
+        ...decorateDate(s.date),
+      };
+    });
     if (rows.length) shopBests[dim] = rows;
   });
 
@@ -419,6 +445,10 @@ export function buildPeaks(peaks) {
       startDate: normalizeText(cov.startDate),
       endDate: normalizeText(cov.endDate),
       startYear: yearOf(cov.startDate),
+      // units were only backfilled from a later date than sales/orders, so the
+      // units record covers a shorter window and has to say so
+      unitsStartDate: normalizeText(cov.unitsStartDate),
+      unitsStartYear: yearOf(cov.unitsStartDate),
       shopCount: toNumber(cov.shopCount),
     },
     records,

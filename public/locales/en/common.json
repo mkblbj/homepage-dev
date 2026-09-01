@@ -1452,7 +1452,11 @@
         "recordOrders": "Best day by orders",
         "shopBest": "Personal best by shop",
         "peaksCoverage": "since {{year}} · {{count}} shops",
-        "recordDayMark": "same day as a company record"
+        "recordDayMark": "same day as a company record",
+        "recordUnits": "Best day by units",
+        "unitsPerOrder": "Units/order",
+        "noRecord": "No record",
+        "unitsSince": "units since {{year}}"
     },
     "uoshippingdashboard": {
         "allPlatforms": "All",

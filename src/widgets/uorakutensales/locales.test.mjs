@@ -49,6 +49,10 @@ const REQUIRED_KEYS = [
   "shopBest",
   "peaksCoverage",
   "recordDayMark",
+  "recordUnits",
+  "unitsPerOrder",
+  "noRecord",
+  "unitsSince",
 ];
 
 function loadNamespace(locale) {

@@ -449,3 +449,135 @@ test("buildShopColors covers a full shop set without repeating a hue", () => {
   const union = buildShopColors([...shops, "newshop"]);
   assert.equal(union["3911"], colors["3911"] === union["3911"] ? union["3911"] : colors["3911"]);
 });
+
+test("buildModel surfaces unitsSold at every level", () => {
+  const s = { totals: { salesYen: 300, orderCount: 3, unitsSold: 9 }, shops: [{ shopName: "3911", salesYen: 300, orderCount: 3, unitsSold: 9 }] };
+  const h = {
+    range: { dates: ["2026-08-31"] },
+    totals: { salesYen: 1000, orderCount: 10, unitsSold: 25 },
+    shops: [{ shopName: "3911", totals: { salesYen: 1000, orderCount: 10, unitsSold: 25 }, daily: [{ date: "2026-08-31", salesYen: 1000, orderCount: 10, unitsSold: 25 }] }],
+  };
+  const m = buildModel(s, h);
+  assert.equal(m.rtUnits, 9); // today's company total
+  assert.equal(m.rows[0].rtUnits, 9); // and per shop
+  assert.equal(m.grandUnits, 25); // 7-day total
+  assert.equal(m.avgUnits, 25); // per-day average over one day
+  assert.equal(m.rows[0].h7Units, 25); // per-shop 7-day total
+  assert.equal(m.days[0].units, 25); // aggregated per-day, summable unlike CVR
+  assert.equal(m.rows[0].daily[0].units, 25); // per-shop per-day
+});
+
+test("buildPeaks exposes the units record board", () => {
+  const dim = (key, value) => ({
+    overall: { items: [] },
+    shops: [],
+    shopRankings: undefined,
+  });
+  const payload = {
+    status: "ready",
+    coverage: { startDate: "2021-01-01", endDate: "2026-08-31", shopCount: 2 },
+    shopRankings: {
+      sales: [{ rank: 1, shopName: "3911", salesYen: 500, date: "2026-08-20" }],
+      units: [{ rank: 1, shopName: "3911", unitsSold: 620, date: "2026-08-22" }],
+      orders: [{ rank: 1, shopName: "0406", orderCount: 90, date: "2026-08-21" }],
+    },
+    companyRecords: {
+      sales: { salesYen: 900, date: "2026-08-20", shopContributions: [{ shopName: "3911", salesYen: 500 }] },
+      units: { unitsSold: 1100, date: "2026-08-22", shopContributions: [{ shopName: "3911", unitsSold: 620 }] },
+      orders: { orderCount: 150, date: "2026-08-21", shopContributions: [{ shopName: "0406", orderCount: 90 }] },
+    },
+  };
+  const r = buildPeaks(payload);
+  assert.deepEqual(r.available, ["sales", "units", "orders"]);
+  assert.equal(r.records.units.value, 1100); // reads unitsSold, not salesYen
+  assert.equal(r.records.units.md, "8/22");
+  assert.equal(r.shopBests.units[0].value, 620);
+  assert.equal(r.records.units.contributions[0].pct, (620 / 1100) * 100);
+});
+
+test("buildModel exposes units-per-order at company and shop level", () => {
+  const s = {
+    totals: { salesYen: 300, orderCount: 10, unitsSold: 30 },
+    shops: [
+      { shopName: "3911", salesYen: 200, orderCount: 2, unitsSold: 24 }, // wholesale-ish
+      { shopName: "0406", salesYen: 100, orderCount: 8, unitsSold: 6 },
+    ],
+  };
+  const h = { range: { dates: [] }, totals: { salesYen: 0, orderCount: 4, unitsSold: 10 }, shops: [] };
+  const m = buildModel(s, h);
+  assert.equal(m.rtUnitsPerOrder, 3); // 30 units / 10 orders
+  assert.equal(m.unitsPerOrder, 2.5); // 7-day: 10 / 4
+  assert.equal(m.rows.find((r) => r.name === "3911").rtUnitsPerOrder, 12); // 24 / 2
+  assert.equal(m.rows.find((r) => r.name === "0406").rtUnitsPerOrder, 0.75);
+});
+
+test("buildModel reports zero units-per-order rather than dividing by zero", () => {
+  const m = buildModel({ totals: { orderCount: 0, unitsSold: 0 }, shops: [{ shopName: "kurumu", orderCount: 0, unitsSold: 0 }] }, null);
+  assert.equal(m.rtUnitsPerOrder, 0);
+  assert.equal(m.rows[0].rtUnitsPerOrder, 0); // component hides the ×N badge
+});
+
+test("buildPeaks marks a zero peak as no record at all", () => {
+  const payload = {
+    status: "ready",
+    coverage: { startDate: "2018-01-01", endDate: "2026-08-31", unitsStartDate: "2021-01-01", shopCount: 2 },
+    shopRankings: {
+      sales: [
+        { rank: 1, shopName: "3911", salesYen: 500, date: "2026-08-20" },
+        // never sold: the API still reports a date (the last day scanned)
+        { rank: 2, shopName: "kurumu", salesYen: 0, date: "2026-08-31" },
+      ],
+    },
+    companyRecords: { sales: { salesYen: 500, date: "2026-08-20", shopContributions: [{ shopName: "3911", salesYen: 500 }] } },
+  };
+  const r = buildPeaks(payload);
+  assert.equal(r.shopBests.sales[0].noRecord, false);
+  assert.equal(r.shopBests.sales[1].noRecord, true); // → rendered as 記録なし, no date
+});
+
+test("buildPeaks keeps the units coverage window separate from sales", () => {
+  const r = buildPeaks({
+    status: "ready",
+    coverage: { startDate: "2018-01-01", endDate: "2026-08-31", unitsStartDate: "2021-01-01", shopCount: 8 },
+    shopRankings: { units: [{ rank: 1, shopName: "3911", unitsSold: 620, date: "2026-08-22" }] },
+    companyRecords: {},
+  });
+  assert.equal(r.coverage.startYear, 2018);
+  assert.equal(r.coverage.unitsStartYear, 2021); // card annotates the shorter window
+});
+
+test("buildPeaks handles the trimmed zero-record shape (date null, no tiedDates)", () => {
+  // the API omits the date and tied list entirely once a peak is 0
+  const payload = {
+    status: "ready",
+    coverage: { startDate: "2018-01-01", endDate: "2026-08-31", unitsStartDate: "2021-01-01", shopCount: 2 },
+    shopRankings: {
+      units: [
+        { rank: 1, shopName: "松武", unitsSold: 1374, date: "2025-06-27", tiedDates: ["2025-06-27"] },
+        { rank: 2, shopName: "kurumu", unitsSold: 0, date: null, tiedDates: [] },
+      ],
+    },
+    companyRecords: {
+      units: { unitsSold: 2267, date: "2026-03-05", shopContributions: [{ shopName: "松武", unitsSold: 1374 }, { shopName: "kurumu", unitsSold: 0 }] },
+    },
+  };
+  const r = buildPeaks(payload);
+  const zero = r.shopBests.units[1];
+  assert.equal(zero.noRecord, true);
+  assert.equal(zero.date, ""); // null normalizes to empty, never "null" or NaN
+  assert.equal(zero.md, "");
+  assert.equal(zero.year, null);
+  assert.equal(zero.onRecordDay, false); // must not match the company record day
+  // a shop that sold nothing that day stays out of the stacked contribution bar
+  assert.deepEqual(r.records.units.contributions.map((c) => c.shopName), ["松武"]);
+});
+
+test("buildPeaks never treats a dateless company record as a legendary day", () => {
+  const r = buildPeaks({
+    status: "ready",
+    coverage: { startDate: "2026-01-01", endDate: "2026-08-31", shopCount: 1 },
+    shopRankings: { sales: [{ rank: 1, shopName: "kurumu", salesYen: 0, date: null }] },
+    companyRecords: { sales: { salesYen: 0, date: null, shopContributions: [] } },
+  });
+  assert.equal(r.shopBests.sales[0].onRecordDay, false); // "" must not match ""
+});
