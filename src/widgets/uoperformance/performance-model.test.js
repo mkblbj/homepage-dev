@@ -197,6 +197,85 @@ describe("widgets/uoperformance/performance-model", () => {
     expect(model.shops[0].trendStatus).toBe("unknown");
   });
 
+  it("restores display trends from comparable stale traffic without masking real unknowns", () => {
+    const staleSource = { ...snapshot.sources.traffic, stale: true };
+    const shop = snapshot.shops[0];
+    const model = buildPerformanceModel({
+      ...snapshot,
+      partial: true,
+      status: "unknown",
+      traffic: {
+        ...snapshot.traffic,
+        status: "unknown",
+        trendStatus: "unknown",
+        visitDeltaPercent: 13.8,
+      },
+      sources: { ...snapshot.sources, traffic: staleSource },
+      shops: [
+        {
+          ...shop,
+          status: "unknown",
+          sources: { traffic: staleSource },
+          traffic: {
+            ...shop.traffic,
+            status: "unknown",
+            trendStatus: "unknown",
+            visitDeltaPercent: 22.8,
+          },
+        },
+        {
+          ...shop,
+          shopName: "no-comparison",
+          status: "unknown",
+          sources: { traffic: staleSource },
+          traffic: {
+            ...shop.traffic,
+            status: "unknown",
+            trendStatus: "unknown",
+            visitDeltaPercent: null,
+          },
+        },
+      ],
+    });
+
+    expect(model.trendStatus).toBe("stable");
+    expect(model.shops.map(({ trendStatus }) => trendStatus)).toEqual(["increase", "unknown"]);
+
+    const freshUnknown = buildPerformanceModel({
+      ...snapshot,
+      traffic: { ...snapshot.traffic, trendStatus: "unknown", visitDeltaPercent: 43.9 },
+    });
+    expect(freshUnknown.trendStatus).toBe("unknown");
+  });
+
+  it("does not restore a stale trend when the sample count is invalid", () => {
+    const model = buildPerformanceModel({
+      ...snapshot,
+      traffic: {
+        ...snapshot.traffic,
+        trendStatus: "unknown",
+        visitDeltaPercent: 43.9,
+        sampleCount: "invalid",
+      },
+      sources: { ...snapshot.sources, traffic: { ...snapshot.sources.traffic, stale: true } },
+    });
+
+    expect(model.trendStatus).toBe("unknown");
+  });
+
+  it("does not restore a stale trend when the source is unavailable", () => {
+    const model = buildPerformanceModel({
+      ...snapshot,
+      traffic: { ...snapshot.traffic, trendStatus: "unknown", visitDeltaPercent: 43.9 },
+      sources: {
+        ...snapshot.sources,
+        traffic: { ...snapshot.sources.traffic, ok: false, stale: true },
+      },
+    });
+
+    expect(model.trendStatus).toBe("unknown");
+  });
+
   it("merges shop logos by name and tolerates a missing snapshot", () => {
     const logos = { shops: [{ shopName: "3911", logoUrl: "https://cabinet.example/3911.jpg" }] };
 

@@ -26,6 +26,32 @@ function normalizeTrendStatus(value) {
   return TREND_STATUSES.has(value) ? value : "unknown";
 }
 
+function resolveTrendStatus(value, source, sampleCount, delta) {
+  const normalized = normalizeTrendStatus(value);
+  if (normalized !== "unknown" || value !== "unknown") {
+    return normalized;
+  }
+
+  const numericDelta = Number(delta);
+  const numericSampleCount = Number(sampleCount);
+  if (
+    source?.ok !== true ||
+    source.stale !== true ||
+    !Number.isInteger(numericSampleCount) ||
+    numericSampleCount < 3 ||
+    isNil(delta) ||
+    !Number.isFinite(numericDelta)
+  ) {
+    return "unknown";
+  }
+
+  if (numericDelta >= 35) return "surge";
+  if (numericDelta >= 20) return "increase";
+  if (numericDelta <= -35) return "sharp_decrease";
+  if (numericDelta <= -20) return "decrease";
+  return "stable";
+}
+
 export function pctLabel(value) {
   return isNil(value) ? DASH : `${value > 0 ? "+" : ""}${Number(value).toFixed(1)}%`;
 }
@@ -138,7 +164,12 @@ export function buildPerformanceModel(data, logos) {
     partial: data.partial === true,
     shopCount: Number(data.shopCount || (data.shops || []).length),
     trafficStatus: traffic.status || "unknown",
-    trendStatus: normalizeTrendStatus(traffic.trendStatus),
+    trendStatus: resolveTrendStatus(
+      traffic.trendStatus,
+      data.sources?.traffic,
+      traffic.sampleCount,
+      traffic.visitDeltaPercent,
+    ),
     // The RMS business day is NOT the snapshot fetch time — both are surfaced separately.
     dataDateJST: traffic.dataDateJST || null,
     visit: toNullableNumber(traffic.visitCount),
@@ -163,7 +194,12 @@ export function buildPerformanceModel(data, logos) {
         name: shop.shopName,
         logoUrl: logoByName.get(shop.shopName) || null,
         status: shopTraffic.status || shop.status || "unknown",
-        trendStatus: normalizeTrendStatus(shopTraffic.trendStatus),
+        trendStatus: resolveTrendStatus(
+          shopTraffic.trendStatus,
+          shop.sources?.traffic,
+          shopTraffic.sampleCount,
+          shopTraffic.visitDeltaPercent,
+        ),
         sampleCount: Number(shopTraffic.sampleCount || 0),
         visit: toNullableNumber(shopTraffic.visitCount),
         uu: toNullableNumber(shopTraffic.uniqueVisitorCount),

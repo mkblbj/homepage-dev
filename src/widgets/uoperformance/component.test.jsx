@@ -429,6 +429,48 @@ describe("widgets/uoperformance/component", () => {
     expect(screen.getByText("uoperformance.sourceMix")).toBeInTheDocument();
   });
 
+  it("keeps stale snapshot data colored while the source chips carry the warning", () => {
+    const base = snapshot();
+    const staleSource = { ...okSource, stale: true };
+    const shop = base.shops[0];
+    mockData(
+      snapshot({
+        partial: true,
+        status: "unknown",
+        traffic: {
+          ...base.traffic,
+          status: "unknown",
+          trendStatus: "unknown",
+          visitDeltaPercent: 13.8,
+        },
+        sources: { traffic: staleSource, customerMix: staleSource },
+        shops: [
+          {
+            ...shop,
+            status: "unknown",
+            sources: { traffic: staleSource, customerMix: staleSource },
+            traffic: {
+              ...shop.traffic,
+              status: "unknown",
+              trendStatus: "unknown",
+              visitDeltaPercent: 22.8,
+            },
+          },
+        ],
+      }),
+    );
+    render();
+
+    expect(screen.getAllByText("uoperformance.sourceStale")).toHaveLength(2);
+    expect(screen.getByText("uoperformance.trend.stable")).toBeInTheDocument();
+    expect(screen.getByText("uoperformance.trend.increase")).toBeInTheDocument();
+    expect(screen.queryByText("uoperformance.trend.unknown")).not.toBeInTheDocument();
+    screen.getAllByText("+13.8%").forEach((label) => {
+      expect(label).toHaveClass("text-emerald-700", "dark:text-emerald-400");
+    });
+    expect(screen.getByText("+22.8%")).toHaveClass("text-blue-700", "dark:text-blue-400");
+  });
+
   it("shows a shop logo when one is available", () => {
     mockData(snapshot(), vi.fn(), { shops: [{ shopName: "3911", logoUrl: "https://cabinet.example/3911.jpg" }] });
     const { container } = render();
