@@ -556,13 +556,20 @@ export function buildMonthly(monthly, sales) {
   // today's live figures, and only when the API says today really is part of
   // this month's running total — otherwise there is nothing to strip out
   const hasLiveDay = dayWithinMonth(cur.liveDate, month) > 0;
-  const today = hasLiveDay ? metricsOf(sales?.totals) : null;
-  // the month total carries a running day we cannot measure: the finished-day
-  // span is unknowable, so no dimension gets a pace rather than one inflated by
-  // dividing today's partial figures across the completed days
+  // Folding a live day in makes the rollup stamp that day's own source, so
+  // currentMonth.updatedAtJST IS the realtime snapshot's generatedAtJST. An
+  // exact match is therefore proof that both payloads saw the same snapshot.
+  // Any other value means the two boards polled a refresh apart: the totals
+  // would disagree by a whole tick without the difference ever going negative,
+  // so subtracting one from the other would bias the average and say nothing.
+  const liveStamp = normalizeText(cur.updatedAtJST);
+  const sameSnapshot = hasLiveDay && liveStamp !== "" && liveStamp === normalizeText(sales?.generatedAtJST);
+  const today = sameSnapshot ? metricsOf(sales?.totals) : null;
+  // a live day we cannot measure leaves the finished-day span unknowable: report
+  // no pace rather than one inflated by spreading a partial day over whole ones
   const paceDays = hasLiveDay && !today ? 0 : completedDays;
   const todayByShop = new Map(
-    hasLiveDay ? (sales?.shops || []).map((s) => [s.shopName, metricsOf(s)]) : [],
+    sameSnapshot ? (sales?.shops || []).map((s) => [s.shopName, metricsOf(s)]) : [],
   );
 
   const prevByShop = new Map(

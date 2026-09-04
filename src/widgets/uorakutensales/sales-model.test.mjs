@@ -622,8 +622,11 @@ const monthlyPayload = {
   },
 };
 
-// the matching realtime snapshot — today's share of the running month total
+// The matching realtime snapshot — today's share of the running month total.
+// Its generatedAtJST is what the rollup republishes as currentMonth.updatedAtJST
+// whenever it folds today in, so the two must agree for the pair to be coherent.
 const monthlyToday = {
+  generatedAtJST: "2026-09-04 11:55 JST",
   totals: { salesYen: 714904, orderCount: 161, unitsSold: 286 },
   shops: [
     { shopName: "松武", salesYen: 52107, orderCount: 40, unitsSold: 48 },
@@ -708,15 +711,58 @@ test("buildMonthly still reports month-to-date without the realtime snapshot", (
   assert.equal(m.metrics.sales.paceDeltaPct, null);
 });
 
-test("buildMonthly subtracts nothing when the live day is outside this month", () => {
+test("buildMonthly divides the whole total when the rollup carries no live day", () => {
+  // A null liveDate and totals that exclude today are the same state upstream:
+  // one `liveShops` check drives both, so a payload cannot pair a null liveDate
+  // with a total that still contains today. The figures below drop today's
+  // contribution from the company and every shop, which is what the API sends.
   const payload = {
     ...monthlyPayload,
-    currentMonth: { ...monthlyPayload.currentMonth, liveDate: null, completedThroughDate: "2026-09-03" },
+    partial: true,
+    currentMonth: {
+      ...monthlyPayload.currentMonth,
+      status: "provisional",
+      liveDate: null,
+      // no live day → the stamp is the historical snapshot's, not today's
+      updatedAtJST: "2026-09-04 03:10 JST",
+      totals: { salesYen: 2245871, orderCount: 2278, unitsSold: 2435 },
+      shops: [
+        { shopName: "松武", salesYen: 574018, orderCount: 557, unitsSold: 589 },
+        { shopName: "3911", salesYen: 803350, orderCount: 924, unitsSold: 992 },
+        { shopName: "kurumu", salesYen: 0, orderCount: 0, unitsSold: 0 },
+      ],
+    },
   };
   const m = buildMonthly(payload, monthlyToday);
   assert.equal(m.current.hasLiveDay, false);
-  // the whole total is already finished days: 2,960,775 / 3
-  near(m.metrics.sales.pace, 986925);
+  // nothing to strip out — the finished days are the whole of it: 2,245,871 / 3
+  near(m.metrics.sales.pace, 748623.67);
+  near(m.shops.find((x) => x.name === "3911").metrics.sales.pace, 267783.33);
+});
+
+test("buildMonthly withholds the pace when the two snapshots disagree", () => {
+  // A realtime payload one refresh newer than the rollup still subtracts to a
+  // positive number, so the negative guard never fires — the average would just
+  // be quietly wrong. Only an exact stamp match proves they are the same read.
+  const m = buildMonthly(monthlyPayload, { ...monthlyToday, generatedAtJST: "2026-09-04 12:10 JST" });
+  assert.equal(m.current.hasLiveDay, true);
+  for (const dim of MONTH_DIMS) {
+    assert.equal(m.metrics[dim].pace, null, `${dim} company pace`);
+    assert.equal(m.metrics[dim].paceDeltaPct, null, `${dim} company delta`);
+  }
+  assert.equal(m.shops.find((x) => x.name === "3911").metrics.sales.pace, null);
+  // month-to-date comes from the rollup alone, so it is unaffected and stays
+  assert.equal(m.metrics.sales.current, 2960775);
+  near(m.metrics.sales.vsPrevPct, 11.33);
+});
+
+test("buildMonthly does not accept two blank stamps as a match", () => {
+  const payload = {
+    ...monthlyPayload,
+    currentMonth: { ...monthlyPayload.currentMonth, updatedAtJST: null },
+  };
+  const m = buildMonthly(payload, { ...monthlyToday, generatedAtJST: null });
+  assert.equal(m.metrics.sales.pace, null);
 });
 
 test("buildMonthly drops the comparison when last month is not complete", () => {
@@ -736,11 +782,13 @@ test("buildMonthly drops the comparison when last month is not complete", () => 
 });
 
 test("buildMonthly withholds a pace when today outruns the whole month total", () => {
-  // the two snapshots refresh independently; a total below today means they
-  // disagree, and a negative "completed" figure must never reach the UI
+  // Defence in depth behind the stamp check: matching stamps that still
+  // disagree in magnitude would be an upstream bug, and a negative "completed"
+  // figure must never reach the UI even then. The stamp is kept identical here
+  // so the payload gets past the snapshot guard and reaches this one.
   const m = buildMonthly(monthlyPayload, {
+    ...monthlyToday,
     totals: { salesYen: 3000000, orderCount: 161, unitsSold: 286 },
-    shops: monthlyToday.shops,
   });
   assert.equal(m.metrics.sales.pace, null);
   assert.equal(m.metrics.sales.paceDeltaPct, null);
