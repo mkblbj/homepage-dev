@@ -1003,6 +1003,24 @@ function PaceBar({ fillPct, markerPct, color, height = 8 }) {
   );
 }
 
+// The two metrics the toggle is NOT showing. Sales, orders and units are all
+// headline figures; leaving two of the three behind a control the reader may
+// never notice hides most of the board's data.
+function OtherMetrics({ metrics, dim, field, className = "", t }) {
+  const others = MONTH_DIMS.filter((d) => d !== dim && metrics[d] && metrics[d][field] != null);
+  if (!others.length) return null;
+  return (
+    <span className={`tabular-nums ${className}`}>
+      {others.map((d, i) => (
+        <span key={d}>
+          {i > 0 ? " · " : ""}
+          {monthValueText(d, metrics[d][field], t)}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 function MonthShopRow({ shop, dim, markerPct, logoUrl, color, t }) {
   const m = shop.metrics[dim];
   // quiet on both sides is dormant, not a −100% collapse
@@ -1024,7 +1042,7 @@ function MonthShopRow({ shop, dim, markerPct, logoUrl, color, t }) {
           <span className="col-start-2 row-start-1 shrink-0 text-right text-[11.5px] font-bold tabular-nums text-theme-900 dark:text-theme-50">
             {monthValueText(dim, m.current, t)}
           </span>
-          <span className="col-span-2 row-start-2 @md:col-span-1 @md:col-start-3 @md:row-start-1">
+          <span className="col-span-3 row-start-2 @md:col-span-1 @md:col-start-3 @md:row-start-1">
             {/* a bar with no baseline would read as "sold nothing" rather than
                 "nothing to compare against" — leave the track out entirely */}
             {m.vsPrevPct != null ? (
@@ -1037,36 +1055,18 @@ function MonthShopRow({ shop, dim, markerPct, logoUrl, color, t }) {
           >
             <Delta value={m.paceDeltaPct} />
           </span>
-          {/* phone: last month's total rides alongside the bar it scales, so the
-              track's far end has a number instead of being an unlabelled 100% */}
-          {m.previous != null ? (
-            <span className="col-start-3 row-start-2 shrink-0 text-right text-[9px] font-medium tabular-nums text-theme-600 @md:hidden dark:text-theme-300">
-              {t(`${NS}.lastMonth`)} {monthValueText(dim, m.previous, t)}
-            </span>
-          ) : null}
-          {/* wide: this month's daily pace on the left, and the baseline it is
-              measured against on the right — the two figures the ± is a ratio of */}
-          {m.pace != null ? (
-            <span className="hidden text-[9px] font-medium tabular-nums text-theme-600 @md:col-span-2 @md:col-start-3 @md:row-start-2 @md:flex @md:items-baseline @md:gap-x-2 dark:text-theme-300">
-              <span className="shrink-0">
-                {monthValueText(dim, m.pace, t)}
-                {t(`${NS}.perDay`)}
+          {/* both months in full: the headline carries the toggled metric, this
+              line carries everything the toggle would otherwise have hidden */}
+          <span className="col-span-3 row-start-3 flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5 text-[9px] font-medium tabular-nums text-theme-600 @md:col-span-2 @md:col-start-3 @md:row-start-2 dark:text-theme-300">
+            <OtherMetrics metrics={shop.metrics} dim={dim} field="current" t={t} className="shrink-0" />
+            {m.previous != null ? (
+              <span className="ml-auto shrink-0 text-right">
+                {t(`${NS}.lastMonth`)}{" "}
+                <span className="font-bold text-theme-800 dark:text-theme-100">{monthValueText(dim, m.previous, t)}</span>
+                <OtherMetrics metrics={shop.metrics} dim={dim} field="previous" t={t} className="before:content-['_·_']" />
               </span>
-              {m.previous != null ? (
-                <span className="ml-auto shrink-0 text-right">
-                  {t(`${NS}.lastMonth`)}{" "}
-                  <span className="font-bold text-theme-800 dark:text-theme-100">{monthValueText(dim, m.previous, t)}</span>
-                  {m.prevPace != null ? (
-                    <>
-                      {" · "}
-                      {monthValueText(dim, m.prevPace, t)}
-                      {t(`${NS}.perDay`)}
-                    </>
-                  ) : null}
-                </span>
-              ) : null}
-            </span>
-          ) : null}
+            ) : null}
+          </span>
         </>
       )}
     </div>
@@ -1111,6 +1111,9 @@ function MonthlySection({ monthly, logoByName, shopColors, cardCls, t }) {
     <section className={`flex flex-col gap-3 p-4 ${cardCls}`}>
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
         <span className="text-[12px] font-bold text-theme-700 dark:text-theme-200">{t(`${NS}.monthly`)}</span>
+        <div className="flex shrink-0 gap-0.5 rounded-md border border-theme-300/60 bg-theme-100/50 p-0.5 dark:border-theme-600/60 dark:bg-theme-900/30">
+          {MONTH_DIMS.map(dimChip)}
+        </div>
         {/* the snapshot says so itself when a day is still landing — never let a
             running total read as a settled one */}
         {cur.status === "provisional" || monthly.partial ? (
@@ -1118,9 +1121,6 @@ function MonthlySection({ monthly, logoByName, shopColors, cardCls, t }) {
             {t(`${NS}.monthProvisional`)}
           </span>
         ) : null}
-        <div className="ml-auto flex shrink-0 gap-0.5 rounded-md border border-theme-300/60 bg-theme-100/50 p-0.5 dark:border-theme-600/60 dark:bg-theme-900/30">
-          {MONTH_DIMS.map(dimChip)}
-        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-x-5 gap-y-3.5 @4xl:grid-cols-[minmax(300px,1fr)_2fr]">
@@ -1137,8 +1137,17 @@ function MonthlySection({ monthly, logoByName, shopColors, cardCls, t }) {
               </span>
             </div>
 
-            <span className={`text-[24px] font-extrabold leading-none tabular-nums @6xl:text-[34px] ${tone.value}`}>
-              {monthValueText(dim, m.current, t)}
+            <span className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
+              <span className={`text-[24px] font-extrabold leading-none tabular-nums @6xl:text-[34px] ${tone.value}`}>
+                {monthValueText(dim, m.current, t)}
+              </span>
+              <OtherMetrics
+                metrics={monthly.metrics}
+                dim={dim}
+                field="current"
+                t={t}
+                className="text-[11px] font-bold text-theme-700 dark:text-theme-200"
+              />
             </span>
 
             {/* the bullet only means anything against a complete month; without
@@ -1198,8 +1207,17 @@ function MonthlySection({ monthly, logoByName, shopColors, cardCls, t }) {
                   {monthly.previous.month}
                 </span>
                 <span className="text-[9px] font-medium text-theme-500 dark:text-theme-400">{t(`${NS}.monthBaseline`)}</span>
-                <span className="ml-auto text-[14px] font-bold tabular-nums text-theme-900 dark:text-theme-50">
-                  {monthValueText(dim, m.previous, t)}
+                <span className="ml-auto flex items-baseline gap-x-2">
+                  <span className="text-[14px] font-bold tabular-nums text-theme-900 dark:text-theme-50">
+                    {monthValueText(dim, m.previous, t)}
+                  </span>
+                  <OtherMetrics
+                    metrics={monthly.metrics}
+                    dim={dim}
+                    field="previous"
+                    t={t}
+                    className="text-[10px] font-semibold text-theme-600 dark:text-theme-300"
+                  />
                 </span>
               </>
             ) : (
