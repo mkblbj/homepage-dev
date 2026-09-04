@@ -3,9 +3,13 @@
  *
  * BODY = realtime (今日) sales; CONTEXT = trailing 7 days (excl. today).
  *
- * Two read-only endpoints (both defined in the widget proxy mapping):
+ * Read-only endpoints (all defined in the widget proxy mapping):
  *   "sales"   → GET /api/sales          realtime snapshot (main body)
  *   "history" → GET /api/history/sales  trailing-7d snapshot (context)
+ *   "ranking" → GET /api/item-rankings  today's item boards
+ *   "monthly" → GET /api/sales/monthly  this month so far + last month complete
+ *   "peaks"   → GET /api/history/peaks  all-time record boards
+ *   "logos"   → GET /api/shops/logos    shop logo urls
  *
  * Realtime has NO conversionRate → per-row CVR comes from the 7-day history.
  * Freshness pill (LIVE / 遅延 / 停止) is derived from sales.generatedAtJST.
@@ -18,15 +22,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ACCENT,
   buildModel,
+  buildMonthly,
   buildPeaks,
   buildRanking,
   buildShopColors,
   computeFreshness,
+  DEFAULT_MONTH_DIM,
   DEFAULT_PEAK_DIM,
   DEFAULT_RANKING_DIM,
   DEFAULT_REFRESH_INTERVAL,
   FALLBACK_SHOP_COLOR,
   man,
+  MONTH_DIMS,
   PEAK_DIMS,
   RANKING_STEPS,
   spark,
@@ -954,6 +961,265 @@ function PeaksSection({ peaks, shopColors, cardCls, t }) {
   );
 }
 
+// ---- monthly rollup (今月 vs 先月) ----
+
+// solid bar colours matching PEAK_TONE, readable on both the light and dark track
+const MONTH_BAR = { sales: "#D97706", units: "#059669", orders: "#0284C7" };
+
+function monthValueText(dim, value, t) {
+  // 万 already carries one decimal; counts are whole things, so a derived
+  // daily average like 759.33 rounds before it reaches the reader
+  if (dim === "sales") return `¥${man(value)}${t(`${NS}.manUnit`)}`;
+  return peakValueText(dim, Math.round(value), t);
+}
+
+// signed percentage — ahead of last month's pace reads green, behind reads rose
+function Delta({ value, className = "" }) {
+  if (value == null) return <span className={`tabular-nums text-theme-500 dark:text-theme-400 ${className}`}>—</span>;
+  const up = value >= 0;
+  return (
+    <span className={`tabular-nums ${up ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"} ${className}`}>
+      {up ? "+" : "−"}
+      {Math.abs(value).toFixed(1)}%
+    </span>
+  );
+}
+
+// A bullet: the fill is how much of last month this month has already matched,
+// the tick is how far the finished days carry us into the month. Fill reaching
+// past the tick is exactly what "ahead of last month's pace" means, so the
+// comparison is readable without doing any arithmetic.
+function PaceBar({ fillPct, markerPct, color, height = 8 }) {
+  const fill = Math.max(0, Math.min(100, fillPct ?? 0));
+  const marker = Math.max(0, Math.min(100, markerPct ?? 0));
+  return (
+    <span className="relative block w-full overflow-hidden rounded-full bg-theme-300/45 dark:bg-white/10" style={{ height }}>
+      <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${fill}%`, backgroundColor: color }} />
+      <span
+        className="absolute inset-y-0 w-[2px] rounded-full bg-theme-800/70 dark:bg-white/85"
+        style={{ left: `calc(${marker}% - 1px)` }}
+      />
+    </span>
+  );
+}
+
+function MonthShopRow({ shop, dim, markerPct, logoUrl, color, t }) {
+  const m = shop.metrics[dim];
+  // quiet on both sides is dormant, not a −100% collapse
+  const dormant = !shop.hasCurrent && !shop.hasPrevious;
+
+  return (
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2 gap-y-1 @md:grid-cols-[minmax(0,116px)_auto_minmax(56px,1fr)_auto]">
+      <span className="col-start-1 row-start-1 flex min-w-0 items-center gap-1.5">
+        <ShopLogo name={shop.name} url={logoUrl} size={14} />
+        <span className="truncate text-[11px] font-semibold text-theme-800 dark:text-theme-100">{shop.name}</span>
+      </span>
+
+      {dormant ? (
+        <span className="col-start-2 row-start-1 shrink-0 text-[9.5px] font-medium text-theme-500 @md:col-span-3 dark:text-theme-400">
+          {t(`${NS}.noActivity`)}
+        </span>
+      ) : (
+        <>
+          <span className="col-start-2 row-start-1 shrink-0 text-right text-[11.5px] font-bold tabular-nums text-theme-900 dark:text-theme-50">
+            {monthValueText(dim, m.current, t)}
+          </span>
+          <span className="col-span-3 row-start-2 @md:col-span-1 @md:col-start-3 @md:row-start-1">
+            {/* a bar with no baseline would read as "sold nothing" rather than
+                "nothing to compare against" — leave the track out entirely */}
+            {m.vsPrevPct != null ? (
+              <PaceBar fillPct={m.vsPrevPct} markerPct={markerPct} color={color} height={6} />
+            ) : null}
+          </span>
+          <span
+            className="col-start-3 row-start-1 w-[50px] shrink-0 text-right text-[11px] font-bold @md:col-start-4"
+            title={t(`${NS}.paceNote`)}
+          >
+            <Delta value={m.paceDeltaPct} />
+          </span>
+          {/* the two figures the ± is the ratio of — without them the verdict is
+              unaccountable, and they are what fills a wide row instead of track */}
+          {m.pace != null ? (
+            <span className="hidden text-[9px] font-medium tabular-nums text-theme-600 @md:col-span-2 @md:col-start-3 @md:row-start-2 @md:block dark:text-theme-300">
+              {monthValueText(dim, m.pace, t)}
+              {t(`${NS}.perDay`)}
+              {m.prevPace != null ? (
+                <>
+                  {" · "}
+                  {t(`${NS}.lastMonth`)} {monthValueText(dim, m.prevPace, t)}
+                  {t(`${NS}.perDay`)}
+                </>
+              ) : null}
+            </span>
+          ) : null}
+        </>
+      )}
+    </div>
+  );
+}
+
+// This month against last, in actuals only. No month-end projection: 楽天's
+// campaign days make the intra-month rhythm far too uneven for a straight line
+// through it to be honest.
+function MonthlySection({ monthly, logoByName, shopColors, cardCls, t }) {
+  const [dim, setDim] = useState(DEFAULT_MONTH_DIM);
+  const cur = monthly.current;
+  const m = monthly.metrics[dim];
+  const tone = PEAK_TONE[dim] ?? PEAK_TONE.sales;
+  // the toggle re-ranks the board so the leaders are always the leaders of the
+  // metric on screen
+  const shops = useMemo(
+    () => [...monthly.shops].sort((a, b) => b.metrics[dim].current - a.metrics[dim].current),
+    [monthly, dim],
+  );
+
+  const dimChip = (key) => (
+    <button
+      key={key}
+      type="button"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDim(key);
+      }}
+      className={`rounded px-2 py-0.5 text-[10px] font-bold transition-colors ${
+        dim === key
+          ? "bg-theme-700 text-white dark:bg-theme-100 dark:text-theme-900"
+          : "text-theme-600 hover:bg-theme-200/60 dark:text-theme-300 dark:hover:bg-theme-700/60"
+      }`}
+    >
+      {t(`${NS}.${PEAK_DIM_TOGGLE_KEY[key] ?? "sortSales"}`)}
+    </button>
+  );
+
+  return (
+    <section className={`flex flex-col gap-3 p-4 ${cardCls}`}>
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+        <span className="text-[12px] font-bold text-theme-700 dark:text-theme-200">{t(`${NS}.monthly`)}</span>
+        {/* the snapshot says so itself when a day is still landing — never let a
+            running total read as a settled one */}
+        {cur.status === "provisional" || monthly.partial ? (
+          <span className="rounded bg-amber-400/15 px-1.5 py-0.5 text-[9.5px] font-bold text-amber-700 dark:text-amber-300">
+            {t(`${NS}.monthProvisional`)}
+          </span>
+        ) : null}
+        <div className="ml-auto flex shrink-0 gap-0.5 rounded-md border border-theme-300/60 bg-theme-100/50 p-0.5 dark:border-theme-600/60 dark:bg-theme-900/30">
+          {MONTH_DIMS.map(dimChip)}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-x-5 gap-y-3.5 @4xl:grid-cols-[minmax(300px,1fr)_2fr]">
+        <div className="flex min-w-0 flex-col gap-2">
+          <div className={`flex min-w-0 flex-col gap-2 rounded-xl border p-3 ${tone.card}`}>
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+              <span className={`text-[9.5px] font-extrabold uppercase tracking-[0.1em] ${tone.label}`}>
+                {t(`${NS}.thisMonth`)}
+              </span>
+              <span className="text-[10px] font-semibold tabular-nums text-theme-700 dark:text-theme-200">{cur.month}</span>
+              <span className="ml-auto text-[9.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
+                {t(`${NS}.monthCompleted`, { count: cur.completedDays })}
+                {cur.hasLiveDay ? ` ${t(`${NS}.plusToday`)}` : ""}
+              </span>
+            </div>
+
+            <span className={`text-[24px] font-extrabold leading-none tabular-nums @6xl:text-[34px] ${tone.value}`}>
+              {monthValueText(dim, m.current, t)}
+            </span>
+
+            {/* the bullet only means anything against a complete month; without
+                one the row below says so instead of drawing an empty track */}
+            {m.vsPrevPct != null ? (
+              <div className="flex flex-col gap-1">
+                <PaceBar fillPct={m.vsPrevPct} markerPct={cur.progressPct} color={MONTH_BAR[dim]} />
+                <div className="flex items-baseline justify-between gap-2 text-[9.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
+                  <span>{t(`${NS}.monthProgress`, { pct: cur.progressPct.toFixed(1) })}</span>
+                  <span className="font-bold text-theme-800 dark:text-theme-100">{m.vsPrevPct.toFixed(1)}%</span>
+                </div>
+              </div>
+            ) : null}
+
+            {m.pace != null ? (
+              <div
+                className="grid grid-cols-3 gap-x-2 border-t border-theme-300/40 pt-2 dark:border-white/10"
+                title={t(`${NS}.paceNote`)}
+              >
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className="truncate text-[9px] font-bold text-theme-600 dark:text-theme-300">
+                    {t(`${NS}.thisMonth`)} {t(`${NS}.dailyPace`)}
+                  </span>
+                  <span className="text-[13px] font-bold tabular-nums text-theme-900 dark:text-theme-50">
+                    {monthValueText(dim, m.pace, t)}
+                    <span className="text-[9px] font-medium text-theme-600 dark:text-theme-300">{t(`${NS}.perDay`)}</span>
+                  </span>
+                </span>
+                {m.prevPace != null ? (
+                  <span className="flex min-w-0 flex-col gap-0.5">
+                    <span className="truncate text-[9px] font-bold text-theme-600 dark:text-theme-300">
+                      {t(`${NS}.lastMonth`)} {t(`${NS}.dailyPace`)}
+                    </span>
+                    <span className="text-[13px] font-bold tabular-nums text-theme-700 dark:text-theme-200">
+                      {monthValueText(dim, m.prevPace, t)}
+                      <span className="text-[9px] font-medium text-theme-600 dark:text-theme-300">{t(`${NS}.perDay`)}</span>
+                    </span>
+                  </span>
+                ) : null}
+                {m.paceDeltaPct != null ? (
+                  <span className="flex min-w-0 flex-col items-end gap-0.5">
+                    <span className="truncate text-[9px] font-bold text-theme-600 dark:text-theme-300">{t(`${NS}.vsLastMonth`)}</span>
+                    <Delta value={m.paceDeltaPct} className="text-[15px] font-extrabold" />
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-xl border border-theme-300/30 bg-theme-100/50 px-3 py-2 dark:border-white/[0.08] dark:bg-white/[0.03]">
+            <span className="text-[9.5px] font-extrabold uppercase tracking-[0.1em] text-theme-600 dark:text-theme-300">
+              {t(`${NS}.lastMonth`)}
+            </span>
+            {monthly.previous ? (
+              <>
+                <span className="text-[10px] font-semibold tabular-nums text-theme-700 dark:text-theme-200">
+                  {monthly.previous.month}
+                </span>
+                <span className="text-[9px] font-medium text-theme-500 dark:text-theme-400">{t(`${NS}.monthBaseline`)}</span>
+                <span className="ml-auto text-[14px] font-bold tabular-nums text-theme-900 dark:text-theme-50">
+                  {monthValueText(dim, m.previous, t)}
+                </span>
+              </>
+            ) : (
+              // a partial month is never dressed up as a baseline
+              <span className="ml-auto text-[10px] font-medium text-theme-600 dark:text-theme-300">
+                {t(`${NS}.lastMonthPending`)}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-2.5">
+          <span className="min-w-0 truncate text-[10.5px] font-bold tracking-wide text-theme-600 dark:text-theme-300">
+            {t(`${NS}.monthShops`)}{" "}
+            <span className="text-[9px] font-medium text-theme-500 dark:text-theme-400">· {t(`${NS}.paceNote`)}</span>
+          </span>
+          <div className="grid grid-cols-1 gap-x-8 gap-y-2 @6xl:grid-cols-none @6xl:grid-flow-col @6xl:grid-rows-4 @6xl:auto-cols-fr @6xl:gap-y-4">
+            {shops.map((s) => (
+              <MonthShopRow
+                key={s.name}
+                shop={s}
+                dim={dim}
+                markerPct={cur.progressPct}
+                logoUrl={logoByName.get(s.name) || null}
+                color={shopColors[s.name] ?? FALLBACK_SHOP_COLOR}
+                t={t}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function LoadingSkeleton() {
   return (
     <div className="@container flex w-full min-w-0 flex-col gap-3 p-1.5">
@@ -983,17 +1249,27 @@ export default function Component({ service }) {
   const { data: history, mutate: mutateHistory } = useWidgetAPI(widget, "history", { refreshInterval });
   const { data: logos } = useWidgetAPI(widget, "logos", { refreshInterval });
   const { data: rankingData, mutate: mutateRanking } = useWidgetAPI(widget, "ranking", { refreshInterval });
+  const { data: monthlyData, mutate: mutateMonthly } = useWidgetAPI(widget, "monthly", { refreshInterval });
   const { data: peaksData } = useWidgetAPI(widget, "peaks", { refreshInterval });
 
   const freshness = useFreshness(sales?.generatedAtJST, refreshInterval);
   const model = useMemo(() => buildModel(sales, history, logos), [sales, history, logos]);
   const ranking = useMemo(() => buildRanking(rankingData), [rankingData]);
   const peaks = useMemo(() => buildPeaks(peaksData), [peaksData]);
+  // the month total still carries today, so the realtime snapshot is what lets
+  // the completed-day pace be measured without a half-run day in it
+  const monthly = useMemo(() => buildMonthly(monthlyData, sales), [monthlyData, sales]);
+  const logoByName = useMemo(() => new Map((model?.rows || []).map((r) => [r.name, r.logoUrl])), [model]);
   // one palette for the whole widget, built from every shop either board draws —
   // assigning per board would let the two disagree when their shop sets differ
   const shopColors = useMemo(
-    () => buildShopColors([...(model?.rows || []).map((r) => r.name), ...(peaks?.shopNames || [])]),
-    [model, peaks],
+    () =>
+      buildShopColors([
+        ...(model?.rows || []).map((r) => r.name),
+        ...(monthly?.shopNames || []),
+        ...(peaks?.shopNames || []),
+      ]),
+    [model, monthly, peaks],
   );
 
   const handleRefresh = useCallback(
@@ -1003,8 +1279,9 @@ export default function Component({ service }) {
       mutateSales();
       mutateHistory();
       mutateRanking();
+      mutateMonthly();
     },
-    [mutateSales, mutateHistory, mutateRanking],
+    [mutateSales, mutateHistory, mutateRanking, mutateMonthly],
   );
 
   if (salesError) return <Container service={service} error={salesError} />;
@@ -1282,6 +1559,10 @@ export default function Component({ service }) {
               </div>
             </div>
           </section>
+        ) : null}
+
+        {monthly ? (
+          <MonthlySection monthly={monthly} logoByName={logoByName} shopColors={shopColors} cardCls={cardCls} t={t} />
         ) : null}
 
         {peaks ? <PeaksSection peaks={peaks} shopColors={shopColors} cardCls={cardCls} t={t} /> : null}
