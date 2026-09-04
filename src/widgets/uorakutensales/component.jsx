@@ -1469,11 +1469,11 @@ export default function Component({ service }) {
             <div className="@container/shops flex min-w-0 flex-1 flex-col gap-2">
               {/* grid-flow-col with a fixed row count keeps the sales ranking
                   readable DOWN each column; row-major would interleave it */}
-              <div className="grid grid-cols-1 gap-x-7 gap-y-2 @5xl/shops:grid-cols-none @5xl/shops:grid-flow-col @5xl/shops:grid-rows-4 @5xl/shops:auto-cols-fr">
+              <div className="grid grid-cols-1 gap-x-7 gap-y-2 @2xl/shops:grid-cols-none @2xl/shops:grid-flow-col @2xl/shops:grid-rows-4 @2xl/shops:auto-cols-fr">
                 {model.rows.map((r) => {
                 const overIndex = r.rtShare >= r.h7Share;
                 return (
-                  <div key={r.name} className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto_auto] @lg/shops:grid-cols-[minmax(0,120px)_100px_44px_minmax(0,52px)_44px_minmax(56px,1fr)] items-center gap-x-2 gap-y-1">
+                  <div key={r.name} className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto_auto] @5xl/shops:grid-cols-[minmax(0,120px)_100px_44px_minmax(0,52px)_44px_minmax(56px,1fr)] items-center gap-x-2 gap-y-1">
                     <span className="flex min-w-0 items-center gap-1.5">
                       <ShopLogo name={r.name} url={r.logoUrl} size={16} />
                       <span
@@ -1507,11 +1507,11 @@ export default function Component({ service }) {
                         </span>
                       ) : null}
                     </span>
-                    <span className="col-start-4 row-start-2 text-right text-[10.5px] font-medium tabular-nums text-theme-500 @lg/shops:col-start-5 @lg/shops:row-start-1 dark:text-theme-400">
+                    <span className="col-start-4 row-start-2 text-right text-[10.5px] font-medium tabular-nums text-theme-500 @5xl/shops:col-start-5 @5xl/shops:row-start-1 dark:text-theme-400">
                       {r.rtShare.toFixed(1)}%
                     </span>
                     {/* bullet: fill = today share, tick = this shop's 7-day share; red when today ≥ normal */}
-                    <span className="relative col-span-3 row-start-2 block h-2 self-center rounded-full bg-theme-300/40 @lg/shops:col-span-1 @lg/shops:col-start-6 @lg/shops:row-start-1 dark:bg-white/10">
+                    <span className="relative col-span-3 row-start-2 block h-2 self-center rounded-full bg-theme-300/40 @5xl/shops:col-span-1 @5xl/shops:col-start-6 @5xl/shops:row-start-1 dark:bg-white/10">
                       <span
                         className="absolute inset-y-0 left-0 rounded-full"
                         style={{
@@ -1537,8 +1537,8 @@ export default function Component({ service }) {
               {/* one child of the same two-column grid lands in the first column
                   and resolves the same tracks, so the totals keep lining up under
                   the figures they add up instead of drifting off on an ml-auto */}
-              <div className="mt-auto grid grid-cols-1 gap-x-7 border-t border-theme-300/60 pt-2 @5xl/shops:grid-cols-2 dark:border-white/15">
-                <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto_auto] @lg/shops:grid-cols-[minmax(0,120px)_100px_44px_minmax(0,52px)_44px_minmax(56px,1fr)] items-center gap-x-2">
+              <div className="mt-auto grid grid-cols-1 gap-x-7 border-t border-theme-300/60 pt-2 @2xl/shops:grid-cols-2 dark:border-white/15">
+                <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto_auto] @5xl/shops:grid-cols-[minmax(0,120px)_100px_44px_minmax(0,52px)_44px_minmax(56px,1fr)] items-center gap-x-2">
                   <span className="text-[12px] font-bold text-theme-900 dark:text-theme-50">{t(`${NS}.total`)}</span>
                   <span className={`text-right text-[13px] font-extrabold tabular-nums ${ACCENT_TEXT}`}>¥{fmt(t, model.rtTotal)}</span>
                   <span className="text-right text-[11px] font-bold tabular-nums text-theme-700 dark:text-theme-200">
