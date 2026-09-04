@@ -3,14 +3,17 @@ import test from "node:test";
 
 import {
   buildModel,
+  buildMonthly,
   buildPeaks,
   buildRanking,
   buildShopColors,
   computeFreshness,
+  DEFAULT_MONTH_DIM,
   DEFAULT_RANKING_DIM,
   DEFAULT_REFRESH_INTERVAL,
   man,
   mdLabel,
+  MONTH_DIMS,
   pointX,
   RANKING_MAX_COUNT,
   RANKING_STEPS,
@@ -580,4 +583,224 @@ test("buildPeaks never treats a dateless company record as a legendary day", () 
     companyRecords: { sales: { salesYen: 0, date: null, shopContributions: [] } },
   });
   assert.equal(r.shopBests.sales[0].onRecordDay, false); // "" must not match ""
+});
+
+// ---- monthly rollup ----
+
+// Trimmed from the live GET /api/sales/monthly response on 2026-09-04 11:59 JST.
+// The figures are real, so the derived pace below is verifiable against the
+// service: history 9/1-9/3 (2,245,871) + today live (714,904) = 2,960,775.
+const monthlyPayload = {
+  ok: true,
+  partial: false,
+  generatedAtJST: "2026-09-04 11:59 JST",
+  shopCount: 3,
+  currentMonth: {
+    month: "2026-09",
+    status: "live",
+    completedThroughDate: "2026-09-03",
+    liveDate: "2026-09-04",
+    updatedAtJST: "2026-09-04 11:55 JST",
+    totals: { salesYen: 2960775, orderCount: 2439, unitsSold: 2721 },
+    shops: [
+      { shopName: "松武", salesYen: 626125, orderCount: 597, unitsSold: 637 },
+      { shopName: "3911", salesYen: 1408644, orderCount: 992, unitsSold: 1173 },
+      { shopName: "kurumu", salesYen: 0, orderCount: 0, unitsSold: 0 },
+    ],
+  },
+  previousMonth: {
+    month: "2026-08",
+    status: "complete",
+    startDate: "2026-08-01",
+    endDate: "2026-08-31",
+    totals: { salesYen: 26128885, orderCount: 24619, unitsSold: 26786 },
+    shops: [
+      { shopName: "松武", salesYen: 6805926, orderCount: 5889, unitsSold: 6491 },
+      { shopName: "3911", salesYen: 9548875, orderCount: 10267, unitsSold: 11106 },
+      { shopName: "kurumu", salesYen: 0, orderCount: 0, unitsSold: 0 },
+    ],
+  },
+};
+
+// the matching realtime snapshot — today's share of the running month total
+const monthlyToday = {
+  totals: { salesYen: 714904, orderCount: 161, unitsSold: 286 },
+  shops: [
+    { shopName: "松武", salesYen: 52107, orderCount: 40, unitsSold: 48 },
+    { shopName: "3911", salesYen: 605294, orderCount: 68, unitsSold: 181 },
+    { shopName: "kurumu", salesYen: 0, orderCount: 0, unitsSold: 0 },
+  ],
+};
+
+const near = (actual, expected, eps = 0.01) =>
+  assert.ok(Math.abs(actual - expected) < eps, `${actual} is not within ${eps} of ${expected}`);
+
+test("MONTH_DIMS matches the record board's toggle so the two read as one control", () => {
+  assert.deepEqual([...MONTH_DIMS], ["sales", "units", "orders"]);
+  assert.equal(DEFAULT_MONTH_DIM, "sales");
+});
+
+test("buildMonthly withholds anything without this month's own totals", () => {
+  assert.equal(buildMonthly(null, monthlyToday), null);
+  assert.equal(buildMonthly({ ok: false }, monthlyToday), null);
+  // status "not_ready" nulls the totals — there is nothing to render
+  assert.equal(
+    buildMonthly({ ok: true, currentMonth: { month: "2026-09", status: "not_ready", totals: null } }, monthlyToday),
+    null,
+  );
+});
+
+test("buildMonthly derives the month geometry from the snapshot's own dates", () => {
+  const m = buildMonthly(monthlyPayload, monthlyToday);
+  assert.equal(m.current.month, "2026-09");
+  assert.equal(m.current.days, 30); // September, computed in UTC
+  assert.equal(m.current.completedDays, 3); // 9/1-9/3, today excluded
+  near(m.current.progressPct, 10);
+  assert.equal(m.current.hasLiveDay, true);
+  assert.equal(m.previous.days, 31); // August
+});
+
+test("buildMonthly strips today out before averaging the completed days", () => {
+  const m = buildMonthly(monthlyPayload, monthlyToday);
+  // (2,960,775 - 714,904) / 3 completed days
+  near(m.metrics.sales.pace, 748623.67);
+  near(m.metrics.sales.prevPace, 842867.26); // 26,128,885 / 31
+  near(m.metrics.sales.paceDeltaPct, -11.18);
+  assert.equal(m.metrics.sales.ahead, false);
+  near(m.metrics.orders.pace, 759.33);
+  near(m.metrics.units.pace, 811.67);
+});
+
+test("buildMonthly reports month-to-date as a share of last month for the bullet fill", () => {
+  const m = buildMonthly(monthlyPayload, monthlyToday);
+  near(m.metrics.sales.vsPrevPct, 11.33); // 2,960,775 / 26,128,885
+  assert.equal(m.metrics.sales.current, 2960775);
+  assert.equal(m.metrics.sales.previous, 26128885);
+});
+
+test("buildMonthly withholds the pace on the first day of a month", () => {
+  // nothing has finished yet: completedThroughDate still points at last month
+  const payload = {
+    ...monthlyPayload,
+    currentMonth: {
+      ...monthlyPayload.currentMonth,
+      completedThroughDate: "2026-08-31",
+      liveDate: "2026-09-01",
+      totals: { salesYen: 300000, orderCount: 250, unitsSold: 270 },
+    },
+  };
+  const m = buildMonthly(payload, monthlyToday);
+  assert.equal(m.current.completedDays, 0); // "31" must not leak out of August
+  assert.equal(m.metrics.sales.pace, null);
+  assert.equal(m.metrics.sales.paceDeltaPct, null);
+  assert.equal(m.metrics.sales.ahead, null);
+  // the plain month-to-date figure is still real and still shown
+  assert.equal(m.metrics.sales.current, 300000);
+  near(m.metrics.sales.vsPrevPct, 1.15);
+});
+
+test("buildMonthly still reports month-to-date without the realtime snapshot", () => {
+  const m = buildMonthly(monthlyPayload, null);
+  assert.equal(m.metrics.sales.current, 2960775);
+  near(m.metrics.sales.vsPrevPct, 11.33);
+  // nothing to subtract → no honest completed-day average
+  assert.equal(m.metrics.sales.pace, null);
+  assert.equal(m.metrics.sales.paceDeltaPct, null);
+});
+
+test("buildMonthly subtracts nothing when the live day is outside this month", () => {
+  const payload = {
+    ...monthlyPayload,
+    currentMonth: { ...monthlyPayload.currentMonth, liveDate: null, completedThroughDate: "2026-09-03" },
+  };
+  const m = buildMonthly(payload, monthlyToday);
+  assert.equal(m.current.hasLiveDay, false);
+  // the whole total is already finished days: 2,960,775 / 3
+  near(m.metrics.sales.pace, 986925);
+});
+
+test("buildMonthly drops the comparison when last month is not complete", () => {
+  const payload = {
+    ...monthlyPayload,
+    partial: true,
+    previousMonth: { month: "2026-08", status: "not_ready", totals: null, shops: [] },
+  };
+  const m = buildMonthly(payload, monthlyToday);
+  assert.equal(m.previous, null);
+  assert.equal(m.partial, true);
+  assert.equal(m.metrics.sales.previous, null);
+  assert.equal(m.metrics.sales.vsPrevPct, null); // no baseline → no bullet fill
+  assert.equal(m.metrics.sales.paceDeltaPct, null);
+  // this month's own pace is still knowable and still reported
+  near(m.metrics.sales.pace, 748623.67);
+});
+
+test("buildMonthly withholds a pace when today outruns the whole month total", () => {
+  // the two snapshots refresh independently; a total below today means they
+  // disagree, and a negative "completed" figure must never reach the UI
+  const m = buildMonthly(monthlyPayload, {
+    totals: { salesYen: 3000000, orderCount: 161, unitsSold: 286 },
+    shops: monthlyToday.shops,
+  });
+  assert.equal(m.metrics.sales.pace, null);
+  assert.equal(m.metrics.sales.paceDeltaPct, null);
+  near(m.metrics.orders.pace, 759.33); // the sound dimensions still report
+});
+
+test("buildMonthly flags a shop that is dormant on both sides", () => {
+  const m = buildMonthly(monthlyPayload, monthlyToday);
+  const kurumu = m.shops.find((s) => s.name === "kurumu");
+  assert.equal(kurumu.hasCurrent, false);
+  assert.equal(kurumu.hasPrevious, false);
+  assert.equal(kurumu.metrics.sales.current, 0);
+  assert.equal(kurumu.metrics.sales.vsPrevPct, null); // never divide by a zero baseline
+  assert.equal(kurumu.metrics.sales.paceDeltaPct, null);
+});
+
+test("buildMonthly skips the comparison for a shop with no last month", () => {
+  const payload = {
+    ...monthlyPayload,
+    previousMonth: {
+      ...monthlyPayload.previousMonth,
+      shops: [{ shopName: "松武", salesYen: 6805926, orderCount: 5889, unitsSold: 6491 }],
+    },
+  };
+  const m = buildMonthly(payload, monthlyToday);
+  const fresh = m.shops.find((s) => s.name === "3911");
+  assert.equal(fresh.hasCurrent, true);
+  assert.equal(fresh.hasPrevious, false);
+  assert.equal(fresh.metrics.sales.previous, null);
+  assert.equal(fresh.metrics.sales.vsPrevPct, null);
+  assert.equal(fresh.metrics.sales.paceDeltaPct, null);
+  // its own pace needs no baseline: (1,408,644 - 605,294) / 3
+  near(fresh.metrics.sales.pace, 267783.33);
+});
+
+test("buildMonthly gives each shop its own pace against its own last month", () => {
+  const m = buildMonthly(monthlyPayload, monthlyToday);
+  const matsutake = m.shops.find((s) => s.name === "松武");
+  near(matsutake.metrics.sales.pace, 191339.33); // (626,125 - 52,107) / 3
+  near(matsutake.metrics.sales.prevPace, 219546); // 6,805,926 / 31
+  near(matsutake.metrics.sales.paceDeltaPct, -12.85);
+  assert.equal(matsutake.metrics.sales.ahead, false);
+});
+
+test("buildMonthly orders shops by this month's sales and names them all", () => {
+  const m = buildMonthly(monthlyPayload, monthlyToday);
+  assert.deepEqual(m.shops.map((s) => s.name), ["3911", "松武", "kurumu"]);
+  assert.deepEqual(m.shopNames, ["3911", "松武", "kurumu"]);
+});
+
+test("buildMonthly marks a month running ahead of last month's pace", () => {
+  const payload = {
+    ...monthlyPayload,
+    currentMonth: {
+      ...monthlyPayload.currentMonth,
+      totals: { salesYen: 3714904, orderCount: 2439, unitsSold: 2721 },
+    },
+  };
+  const m = buildMonthly(payload, monthlyToday);
+  near(m.metrics.sales.pace, 1000000); // (3,714,904 - 714,904) / 3
+  assert.equal(m.metrics.sales.ahead, true);
+  assert.ok(m.metrics.sales.paceDeltaPct > 0);
 });

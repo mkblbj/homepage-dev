@@ -353,8 +353,9 @@ export function buildModel(sales, history, logos) {
 // Record boards the API exposes: best single day by yen, and by order count.
 export const PEAK_DIMS = Object.freeze(["sales", "units", "orders"]);
 export const DEFAULT_PEAK_DIM = PEAK_DIMS[0];
-// value key per dimension, as the API names it
-const PEAK_VALUE_KEY = { sales: "salesYen", units: "unitsSold", orders: "orderCount" };
+// value key per dimension, as the API names it — shared by the record boards
+// and the monthly rollup, which expose the same three metrics
+const METRIC_KEY = { sales: "salesYen", units: "unitsSold", orders: "orderCount" };
 
 // Stable per-shop hues, assigned by sorted position so the palette stays evenly
 // spread and every shop is clearly distinguishable. Callers must build this ONCE
@@ -394,7 +395,7 @@ export function buildPeaks(peaks) {
   const recordDates = new Set();
 
   PEAK_DIMS.forEach((dim) => {
-    const key = PEAK_VALUE_KEY[dim];
+    const key = METRIC_KEY[dim];
     const rec = peaks?.companyRecords?.[dim];
     if (rec) {
       const total = toNumber(rec[key]);
@@ -457,5 +458,162 @@ export function buildPeaks(peaks) {
     // every shop that appears on any board — the component unions this with
     // today's rows to assign one palette across the whole widget
     shopNames: [...new Set(available.flatMap((d) => (shopBests[d] || []).map((r) => r.shopName)))],
+  };
+}
+
+// ---- monthly rollup (GET /api/sales/monthly) ----
+
+// The month board offers the same three metrics in the same order as the record
+// board, so the two toggles read as one control.
+export const MONTH_DIMS = PEAK_DIMS;
+export const DEFAULT_MONTH_DIM = MONTH_DIMS[0];
+
+// "2026-09" → 30. Day 0 of the next month is the last day of this one; computed
+// in UTC so it never shifts with the runtime's timezone.
+function daysInMonth(monthStr) {
+  const [y, m] = String(monthStr || "").split("-").map(Number);
+  if (!y || !m || m < 1 || m > 12) return 0;
+  return new Date(Date.UTC(y, m, 0)).getUTCDate();
+}
+
+// Day number of `dateStr`, but only when it genuinely falls inside `monthStr`.
+// On the 1st, completedThroughDate still points at last month's final day —
+// reading "31" straight out of it would claim 31 finished days of the new month.
+function dayWithinMonth(dateStr, monthStr) {
+  const date = normalizeText(dateStr);
+  const month = normalizeText(monthStr);
+  if (!date || !month || !date.startsWith(`${month}-`)) return 0;
+  const day = Number(date.slice(8, 10));
+  return Number.isFinite(day) && day > 0 ? day : 0;
+}
+
+// Pull the three metrics off any object the API keys by its own field names
+// (a totals block or a shop row). Null in, null out — "not ready" is not zero.
+function metricsOf(source) {
+  if (!source) return null;
+  const out = {};
+  MONTH_DIMS.forEach((dim) => {
+    out[dim] = toNumber(source[METRIC_KEY[dim]]);
+  });
+  return out;
+}
+
+// Daily average over the days that are actually finished. Today is stripped out
+// because a half-run day would drag the average down all morning and make every
+// month look like it started badly.
+//
+// The monthly and realtime snapshots refresh independently, so they can sit a
+// tick apart; against several finished days that is well under a percent and it
+// corrects itself on the next poll. A total that has fallen *below* today is a
+// real disagreement, though, and reports nothing rather than a negative day.
+function paceOf(monthTotal, todayValue, completedDays) {
+  if (completedDays <= 0) return null;
+  const completed = monthTotal - (todayValue ?? 0);
+  return completed < 0 ? null : completed / completedDays;
+}
+
+function monthMetrics(current, previous, today, completedDays, prevDays) {
+  const out = {};
+  MONTH_DIMS.forEach((dim) => {
+    const value = current[dim];
+    // null (not "0") when there is no complete month to compare against
+    const base = previous ? previous[dim] : null;
+    const pace = paceOf(value, today?.[dim], completedDays);
+    const prevPace = base != null && prevDays > 0 ? base / prevDays : null;
+    const comparable = pace != null && prevPace > 0;
+    out[dim] = {
+      current: value,
+      previous: base,
+      // bullet fill: how much of last month this month has already matched
+      vsPrevPct: base > 0 ? (value / base) * 100 : null,
+      pace,
+      prevPace,
+      paceDeltaPct: comparable ? (pace / prevPace - 1) * 100 : null,
+      ahead: comparable ? pace >= prevPace : null,
+    };
+  });
+  return out;
+}
+
+// Build the "this month vs last month" view model. Everything here is actual —
+// no month-end projection — because 楽天's campaign days make the intra-month
+// rhythm far too uneven for a linear extrapolation to be honest.
+export function buildMonthly(monthly, sales) {
+  const cur = monthly?.currentMonth;
+  const curTotals = metricsOf(cur?.totals);
+  // status "not_ready" nulls the totals; without them the section has nothing
+  if (!monthly || monthly.ok === false || !cur || !curTotals) return null;
+
+  const month = normalizeText(cur.month);
+  const days = daysInMonth(month);
+  const completedDays = dayWithinMonth(cur.completedThroughDate, month);
+
+  const prev = monthly.previousMonth;
+  // a partial month is never dressed up as a baseline
+  const prevTotals = prev?.status === "complete" ? metricsOf(prev.totals) : null;
+  const prevDays = prevTotals ? daysInMonth(prev.month) : 0;
+
+  // today's live figures, and only when the API says today really is part of
+  // this month's running total — otherwise there is nothing to strip out
+  const hasLiveDay = dayWithinMonth(cur.liveDate, month) > 0;
+  const today = hasLiveDay ? metricsOf(sales?.totals) : null;
+  // the month total carries a running day we cannot measure: the finished-day
+  // span is unknowable, so no dimension gets a pace rather than one inflated by
+  // dividing today's partial figures across the completed days
+  const paceDays = hasLiveDay && !today ? 0 : completedDays;
+  const todayByShop = new Map(
+    hasLiveDay ? (sales?.shops || []).map((s) => [s.shopName, metricsOf(s)]) : [],
+  );
+
+  const prevByShop = new Map(
+    prevTotals ? (prev.shops || []).map((s) => [s.shopName, metricsOf(s)]) : [],
+  );
+
+  const shops = (cur.shops || [])
+    .map((s) => {
+      const metrics = monthMetrics(
+        metricsOf(s),
+        prevByShop.get(s.shopName) || null,
+        todayByShop.get(s.shopName) || null,
+        paceDays,
+        prevDays,
+      );
+      return {
+        name: s.shopName,
+        metrics,
+        // a shop quiet on both sides is dormant, not underperforming — the UI
+        // says so instead of drawing an empty bar next to a -100%
+        hasCurrent: MONTH_DIMS.some((d) => metrics[d].current > 0),
+        hasPrevious: MONTH_DIMS.some((d) => (metrics[d].previous ?? 0) > 0),
+      };
+    })
+    .sort((a, b) => b.metrics.sales.current - a.metrics.sales.current);
+
+  return {
+    generatedAt: normalizeText(monthly.generatedAtJST),
+    partial: Boolean(monthly.partial),
+    current: {
+      month,
+      status: normalizeText(cur.status),
+      completedThroughDate: normalizeText(cur.completedThroughDate),
+      completedMd: mdLabel(cur.completedThroughDate),
+      liveDate: hasLiveDay ? normalizeText(cur.liveDate) : "",
+      liveMd: hasLiveDay ? mdLabel(cur.liveDate) : "",
+      updatedAt: normalizeText(cur.updatedAtJST),
+      completedDays,
+      days,
+      // marker for the bullet: how far the finished days take us into the month.
+      // Today is excluded here too, so the marker and the pace measure the same span.
+      progressPct: days > 0 ? (completedDays / days) * 100 : 0,
+      hasLiveDay,
+    },
+    previous: prevTotals
+      ? { month: normalizeText(prev.month), status: normalizeText(prev.status), days: prevDays }
+      : null,
+    metrics: monthMetrics(curTotals, prevTotals, today, paceDays, prevDays),
+    shops,
+    // every shop on this board — the component unions this with the other boards
+    // to assign one palette across the whole widget
+    shopNames: shops.map((s) => s.name),
   };
 }
