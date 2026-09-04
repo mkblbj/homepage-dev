@@ -18,6 +18,8 @@ test("buildSalesProxyRequest maps every allowed endpoint to its read-only path",
     campaigns: "/api/campaigns",
     logos: "/api/shops/logos",
     ranking: "/api/item-rankings",
+    peaks: "/api/history/peaks",
+    monthly: "/api/sales/monthly",
   };
 
   for (const [endpoint, path] of Object.entries(cases)) {

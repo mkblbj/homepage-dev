@@ -53,6 +53,20 @@ const REQUIRED_KEYS = [
   "unitsPerOrder",
   "noRecord",
   "unitsSince",
+  "monthly",
+  "thisMonth",
+  "lastMonth",
+  "monthProgress",
+  "monthCompleted",
+  "plusToday",
+  "dailyPace",
+  "paceNote",
+  "vsLastMonth",
+  "monthBaseline",
+  "monthProvisional",
+  "lastMonthPending",
+  "noActivity",
+  "monthShops",
 ];
 
 function loadNamespace(locale) {
@@ -78,5 +92,7 @@ test("interpolation placeholders are preserved across locales", () => {
     assert.match(ns.subtitle, /\{\{count\}\}/, `${locale}.subtitle needs {{count}}`);
     assert.match(ns.asOf, /\{\{time\}\}/, `${locale}.asOf needs {{time}}`);
     assert.match(ns.vsSevenDayAvg, /\{\{avg\}\}/, `${locale}.vsSevenDayAvg needs {{avg}}`);
+    assert.match(ns.monthProgress, /\{\{pct\}\}/, `${locale}.monthProgress needs {{pct}}`);
+    assert.match(ns.monthCompleted, /\{\{count\}\}/, `${locale}.monthCompleted needs {{count}}`);
   }
 });

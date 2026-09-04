@@ -1469,7 +1469,21 @@
         "recordUnits": "销售个数 历史最高",
         "unitsPerOrder": "平均购买件数",
         "noRecord": "暂无纪录",
-        "unitsSince": "个数自 {{year}} 年起"
+        "unitsSince": "个数自 {{year}} 年起",
+        "monthly": "本月 · 上月",
+        "thisMonth": "本月",
+        "lastMonth": "上月",
+        "monthProgress": "月进度 {{pct}}%",
+        "monthCompleted": "已完成 {{count}} 天",
+        "plusToday": "＋今天",
+        "dailyPace": "日均",
+        "paceNote": "已完成日的平均值，不含今天",
+        "vsLastMonth": "对比上月",
+        "monthBaseline": "基准",
+        "monthProvisional": "暂定",
+        "lastMonthPending": "上月数据准备中",
+        "noActivity": "无实绩",
+        "monthShops": "各店铺 本月配速"
     },
     "uoshippingdashboard": {
         "allPlatforms": "全部",
