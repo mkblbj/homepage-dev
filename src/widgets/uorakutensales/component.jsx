@@ -1024,7 +1024,7 @@ function MonthShopRow({ shop, dim, markerPct, logoUrl, color, t }) {
           <span className="col-start-2 row-start-1 shrink-0 text-right text-[11.5px] font-bold tabular-nums text-theme-900 dark:text-theme-50">
             {monthValueText(dim, m.current, t)}
           </span>
-          <span className="col-span-3 row-start-2 @md:col-span-1 @md:col-start-3 @md:row-start-1">
+          <span className="col-span-2 row-start-2 @md:col-span-1 @md:col-start-3 @md:row-start-1">
             {/* a bar with no baseline would read as "sold nothing" rather than
                 "nothing to compare against" — leave the track out entirely */}
             {m.vsPrevPct != null ? (
@@ -1037,18 +1037,33 @@ function MonthShopRow({ shop, dim, markerPct, logoUrl, color, t }) {
           >
             <Delta value={m.paceDeltaPct} />
           </span>
-          {/* the two figures the ± is the ratio of — without them the verdict is
-              unaccountable, and they are what fills a wide row instead of track */}
+          {/* phone: last month's total rides alongside the bar it scales, so the
+              track's far end has a number instead of being an unlabelled 100% */}
+          {m.previous != null ? (
+            <span className="col-start-3 row-start-2 shrink-0 text-right text-[9px] font-medium tabular-nums text-theme-600 @md:hidden dark:text-theme-300">
+              {t(`${NS}.lastMonth`)} {monthValueText(dim, m.previous, t)}
+            </span>
+          ) : null}
+          {/* wide: this month's daily pace on the left, and the baseline it is
+              measured against on the right — the two figures the ± is a ratio of */}
           {m.pace != null ? (
-            <span className="hidden text-[9px] font-medium tabular-nums text-theme-600 @md:col-span-2 @md:col-start-3 @md:row-start-2 @md:block dark:text-theme-300">
-              {monthValueText(dim, m.pace, t)}
-              {t(`${NS}.perDay`)}
-              {m.prevPace != null ? (
-                <>
-                  {" · "}
-                  {t(`${NS}.lastMonth`)} {monthValueText(dim, m.prevPace, t)}
-                  {t(`${NS}.perDay`)}
-                </>
+            <span className="hidden text-[9px] font-medium tabular-nums text-theme-600 @md:col-span-2 @md:col-start-3 @md:row-start-2 @md:flex @md:items-baseline @md:gap-x-2 dark:text-theme-300">
+              <span className="shrink-0">
+                {monthValueText(dim, m.pace, t)}
+                {t(`${NS}.perDay`)}
+              </span>
+              {m.previous != null ? (
+                <span className="ml-auto shrink-0 text-right">
+                  {t(`${NS}.lastMonth`)}{" "}
+                  <span className="font-bold text-theme-800 dark:text-theme-100">{monthValueText(dim, m.previous, t)}</span>
+                  {m.prevPace != null ? (
+                    <>
+                      {" · "}
+                      {monthValueText(dim, m.prevPace, t)}
+                      {t(`${NS}.perDay`)}
+                    </>
+                  ) : null}
+                </span>
               ) : null}
             </span>
           ) : null}
