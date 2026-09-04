@@ -1456,7 +1456,21 @@
         "recordUnits": "Best day by units",
         "unitsPerOrder": "Units/order",
         "noRecord": "No record",
-        "unitsSince": "units since {{year}}"
+        "unitsSince": "units since {{year}}",
+        "monthly": "This month vs last",
+        "thisMonth": "This month",
+        "lastMonth": "Last month",
+        "monthProgress": "{{pct}}% of the month",
+        "monthCompleted": "{{count}} days done",
+        "plusToday": "+ today",
+        "dailyPace": "Daily pace",
+        "paceNote": "Average of completed days, today excluded",
+        "vsLastMonth": "vs last month",
+        "monthBaseline": "Baseline",
+        "monthProvisional": "Provisional",
+        "lastMonthPending": "Last month not ready",
+        "noActivity": "No activity",
+        "monthShops": "Monthly pace by shop"
     },
     "uoshippingdashboard": {
         "allPlatforms": "All",

@@ -1456,7 +1456,21 @@
         "recordUnits": "個数 歴代最高",
         "unitsPerOrder": "平均購入点数",
         "noRecord": "記録なし",
-        "unitsSince": "個数は{{year}}年〜"
+        "unitsSince": "個数は{{year}}年〜",
+        "monthly": "今月・先月",
+        "thisMonth": "今月",
+        "lastMonth": "先月",
+        "monthProgress": "月進捗 {{pct}}%",
+        "monthCompleted": "{{count}}日完了",
+        "plusToday": "＋本日",
+        "dailyPace": "日平均",
+        "paceNote": "本日を除く、完了した日の平均",
+        "vsLastMonth": "先月比",
+        "monthBaseline": "基準",
+        "monthProvisional": "暫定",
+        "lastMonthPending": "先月データ準備中",
+        "noActivity": "実績なし",
+        "monthShops": "店舗別 今月ペース"
     },
     "uoshippingdashboard": {
         "allPlatforms": "全部",
