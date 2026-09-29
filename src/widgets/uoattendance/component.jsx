@@ -1,147 +1,153 @@
 import Container from "components/services/widget/container";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 
 import { buildTodayAttendanceModel, buildTomorrowScheduleModel, formatScheduledFte } from "./attendance-model.mjs";
+import {
+  buildTile,
+  dayProgress,
+  daySpan,
+  diffRosters,
+  formatClock,
+  parseShiftSlot,
+  planLayout,
+  summaryRings,
+  TILE_RINGS,
+} from "./ring-model.mjs";
 import { getNextTakadaManualStatus, isTakadaEmployee } from "./takada-manual-status.mjs";
 
 import useWidgetAPI from "utils/proxy/use-widget-api";
 
 /*
- * uoattendance — タイムライン表示
+ * uoattendance — リング表示(定稿)
  *
- * データ層は attendance-model.mjs をそのまま利用し(サーバ側で算出した
- * attendance_status: working / off_work / not_checked_in が正)、ここでは
- * 見た目だけをタイムラインに刷新する。
+ * データ層は attendance-model.mjs(サーバ算出の attendance_status が正)、
+ * 状態の判定とリングの幾何は ring-model.mjs。ここは見た目だけを持つ。
  *
- * 各行は「予定(薄)＋実績(濃)」の二層バー。打刻は1人1件(last_checkin_time)
- * しか無いため、確実に言える範囲だけを濃いバーで描く:
- *   working       → 濃: 出勤打刻 → 現在。予定より遅い出勤は左側の薄い帯で可視化。
- *   off_work      → 濃: 予定開始 → 退勤打刻。早退は右側の薄い帯で可視化。
- *                    (出勤打刻は残らないため、退勤済の「遅い出勤」は再現不可)
- *   not_checked_in → 薄い破線の予定帯のみ(右ラベルで これから / 未打刻 を区別)
- * 緑(emerald)は「現在」を示すシグナル専用: 出勤中の人数 / LIVE / 現在ライン。
+ *   左   総覧: 部門ごとの出勤率 + 今日の経過を同心リングで、中央に出勤人数。
+ *   右   部門パネル: 1 人 1 リング = 予定の班次に対する経過。下に予定の退勤時刻。
+ *        どの部門も 7 人以下なら大きいリング、超えたら全部門そろって小さいリング。
+ *        リングの中央は顔写真(名前・数字は置かない)。予定前の人は写真を淡く。
+ *        退勤すると灰色の閉じたリングになり、写真を暗く沈めてチェックを重ねる。
+ *        どの状態でも位置は動かない。
+ *        進捗率・残り時間・実際の打刻時刻はホバーの title に入れる。
+ *   下   明日: 人数・内訳・今日との入れ替わり(名前つき)。詳細で班次別の一覧。
+ *
+ * 色は半透明の白/黒の重ねと部門色だけで組み、ダッシュボードのテーマ色には
+ * 依存しない。部門色は CSS 変数で渡し、ライト/ダークの値は下のクラスで選ぶ。
  */
 
-// ---- palette (accent hex used inline; neutrals via theme tokens) ----
-const GREEN = "#34C98E";
-// GREEN at low alpha — the vertical "now" spine that runs down through every row.
-const NOW_LINE = "rgba(52,201,142,0.45)";
-// Each department carries three text colors for the same hue:
-//   solid    — every non-text use (dots, bars, segments, button borders);
-//              not used for text color anymore, see below.
-//   ink      — light-theme text color. "solid" alone reads ~2:1 on the
-//              light page background, well under WCAG AA (4.5:1).
-//   inkDark  — dark-theme text color. "solid" was originally reused here
-//              too, but department cards sit on their own translucent
-//              tint (e.g. "soft" below) which lightens the effective
-//              backdrop under the text; against that real composited
-//              background "solid" drops as low as ~3:1, so dark theme
-//              needs its own lightened variant just like light theme does.
-const DEPT_STYLES = {
+// 部門色。dark はデザインの値そのまま。light は明るい面の上で進捗の先端
+// (head)が埋もれないよう、先端を濃い側に倒している。ink は文字色で、
+// light は明るい面に対して WCAG AA(4.5:1)を満たす濃さ。
+const PALETTES = {
   Office: {
-    solid: "#5EB3E4",
-    ink: "#1A6591",
-    inkDark: "#8CC9EF",
-    bar: "rgba(94,179,228,0.6)",
-    dot: "#5EB3E4",
-    soft: "rgba(94,179,228,0.12)",
-    softBorder: "rgba(94,179,228,0.34)",
-    seg: "#5EB3E4",
-    plan: "rgba(94,179,228,0.2)",
+    dark: {
+      start: "#2E9BFF",
+      head: "#8FE0FF",
+      track: "rgba(46,155,255,0.24)",
+      lap: "#E3F8FF",
+      ink: "#8FE0FF",
+    },
+    light: {
+      start: "#2E9BFF",
+      head: "#0F5FC2",
+      track: "rgba(46,155,255,0.18)",
+      lap: "#0A3A7A",
+      ink: "#1A6591",
+    },
   },
   Production: {
-    solid: "#E8A868",
-    ink: "#8F5A0B",
-    inkDark: "#F0BC85",
-    bar: "rgba(232,168,104,0.6)",
-    dot: "#E8A868",
-    soft: "rgba(232,168,104,0.12)",
-    softBorder: "rgba(232,168,104,0.34)",
-    seg: "#E8A868",
-    plan: "rgba(232,168,104,0.22)",
+    dark: {
+      start: "#FF6A2B",
+      head: "#FFC56E",
+      track: "rgba(255,106,43,0.24)",
+      lap: "#FFF1D2",
+      ink: "#FFC56E",
+    },
+    light: {
+      start: "#FF6A2B",
+      head: "#C2410C",
+      track: "rgba(255,106,43,0.18)",
+      lap: "#7C2D12",
+      ink: "#8F5A0B",
+    },
   },
 };
-const FALLBACK_DEPT = {
-  solid: "#8A94A0",
-  ink: "#525C66",
-  inkDark: "#B8BFC8",
-  bar: "rgba(138,148,160,0.55)",
-  dot: "#8A94A0",
-  soft: "rgba(138,148,160,0.12)",
-  softBorder: "rgba(138,148,160,0.34)",
-  seg: "#8A94A0",
-  plan: "rgba(138,148,160,0.2)",
+const FALLBACK_PALETTE = {
+  dark: {
+    start: "#8A94A0",
+    head: "#D5DCE3",
+    track: "rgba(138,148,160,0.26)",
+    lap: "#F1F4F7",
+    ink: "#D5DCE3",
+  },
+  light: {
+    start: "#8A94A0",
+    head: "#4B5563",
+    track: "rgba(138,148,160,0.22)",
+    lap: "#1F2937",
+    ink: "#525C66",
+  },
 };
-const NEUTRAL_SEG = "#8A94A0";
-const DONE_SEG = "#66757F";
-const DONE_BAR = "rgba(102,117,127,0.82)";
-const DONE_BAR_BORDER = "1px solid rgba(226,232,240,0.28)";
-// 予定(薄い下地)— scheduled window drawn faint behind the solid "actual" bar.
-const PLAN_DASH_BORDER = "1.5px dashed rgba(148,163,175,0.5)";
-const DONE_PLAN = "rgba(102,117,127,0.2)";
+const DAY_PALETTE = {
+  dark: {
+    start: "#8C6BFF",
+    head: "#D9CCFF",
+    track: "rgba(140,107,255,0.26)",
+    lap: "#D9CCFF",
+    ink: "#D9CCFF",
+  },
+  light: {
+    start: "#8C6BFF",
+    head: "#5B3CC4",
+    track: "rgba(140,107,255,0.2)",
+    lap: "#5B3CC4",
+    ink: "#5B3CC4",
+  },
+};
 
-function deptStyle(key) {
-  return DEPT_STYLES[key] || FALLBACK_DEPT;
+function paletteFor(key) {
+  return PALETTES[key] || FALLBACK_PALETTE;
 }
 
-// ---- time helpers ----
-function hm(str) {
-  if (!str) {
-    return null;
-  }
-  const [h, m] = String(str).split(":");
-  const hh = Number(h);
-  const mm = Number(m) || 0;
-  if (Number.isNaN(hh)) {
-    return null;
-  }
-  return hh + mm / 60;
+const PALETTE_KEYS = ["start", "head", "track", "lap", "ink"];
+
+// Both themes' values ride along as --x-l / --x-d; PALETTE_SWITCH picks one into --x.
+function paletteStyle(palette) {
+  const style = {};
+  PALETTE_KEYS.forEach((key) => {
+    const name = key === "ink" ? "--ink" : `--ring-${key}`;
+    style[`${name}-l`] = palette.light[key];
+    style[`${name}-d`] = palette.dark[key];
+  });
+  return style;
 }
 
-// "9-18" / "09:00-18:00" / "13:00-18:00" → { start, end } (decimal hours)
-function parseShiftBounds(text) {
-  if (!text) {
-    return null;
-  }
-  const match = String(text).match(/(\d{1,2})(?::(\d{2}))?\s*-\s*(\d{1,2})(?::(\d{2}))?/);
-  if (!match) {
-    return null;
-  }
-  const [, startHour, startMinute = "0", endHour, endMinute = "0"] = match;
-  const start = Number(startHour) + Number(startMinute) / 60;
-  const end = Number(endHour) + Number(endMinute) / 60;
-  if (Number.isNaN(start) || Number.isNaN(end) || end <= start) {
-    return null;
-  }
-  return { start, end };
-}
+// Written out in full so Tailwind can find every class in the source.
+const PALETTE_SWITCH = [
+  "[--ring-start:var(--ring-start-l)] dark:[--ring-start:var(--ring-start-d)]",
+  "[--ring-head:var(--ring-head-l)] dark:[--ring-head:var(--ring-head-d)]",
+  "[--ring-track:var(--ring-track-l)] dark:[--ring-track:var(--ring-track-d)]",
+  "[--ring-lap:var(--ring-lap-l)] dark:[--ring-lap:var(--ring-lap-d)]",
+  "[--ink:var(--ink-l)] dark:[--ink:var(--ink-d)]",
+].join(" ");
 
-// scheduled start/end (decimal hours) from the richest source available.
-function scheduledBounds(employee) {
-  let start = hm(employee.custom_start_time || employee.start_time);
-  let end = hm(employee.custom_end_time || employee.end_time);
-  if (start == null || end == null) {
-    const parsed = parseShiftBounds(employee.shiftText);
-    if (parsed) {
-      if (start == null) {
-        start = parsed.start;
-      }
-      if (end == null) {
-        end = parsed.end;
-      }
-    }
-  }
-  return { start, end };
-}
+// Department-independent ring colors: not-yet-started track, closed ring once off work,
+// late/absent track, and the head's shadow.
+const RING_BASE_VARS = [
+  "[--ring-idle:rgba(15,23,42,0.1)] dark:[--ring-idle:rgba(255,255,255,0.14)]",
+  "[--ring-closed:rgba(15,23,42,0.2)] dark:[--ring-closed:rgba(255,255,255,0.26)]",
+  "[--ring-alert:rgba(220,70,50,0.3)] dark:[--ring-alert:rgba(255,142,126,0.38)]",
+  "[--ring-shadow:rgba(0,0,0,0.3)] dark:[--ring-shadow:rgba(0,0,0,0.5)]",
+].join(" ");
 
-function fmtClock(dec) {
-  if (dec == null) {
-    return "";
-  }
-  const h = Math.floor(dec);
-  const m = Math.round((dec - h) * 60);
-  return `${h}:${String(m).padStart(2, "0")}`;
-}
+const TEXT_SOFT = "text-neutral-700 dark:text-white/80";
+const TEXT_MUTED = "text-neutral-600 dark:text-white/70";
+const SUMMARY_SURFACE = "bg-white/45 dark:bg-black/[0.34]";
+const PANEL_SURFACE = "bg-white/40 dark:bg-black/[0.26]";
+
+// 明日の「+N」に名前を並べる上限。超えた分は「ほかN名」。
+const MAX_ADDED_NAMES = 4;
 
 function formatShortDate(dateString) {
   if (!dateString) {
@@ -163,293 +169,153 @@ function weekdayJp(dateString) {
   return Number.isNaN(date.getTime()) ? "" : WEEKDAY_JP[date.getDay()];
 }
 
-// live clock (updates every 30s — enough for a home-board)
+function formatDay(dateString) {
+  const short = formatShortDate(dateString);
+  const weekday = weekdayJp(dateString);
+  return short ? `${short}${weekday ? ` (${weekday})` : ""}` : null;
+}
+
+function resolvePhotoUrl(image, baseUrl) {
+  if (typeof image !== "string" || !image.startsWith("/files/") || !baseUrl) return null;
+  try {
+    const base = new URL(baseUrl);
+    if (base.protocol !== "http:" && base.protocol !== "https:") return null;
+    const url = new URL(image, base);
+    return url.origin === base.origin && url.pathname.startsWith("/files/") ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+// Live clock, re-read on every minute boundary so the header time never lags.
 function useNow() {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 30000);
-    return () => clearInterval(id);
+    let timer;
+    const schedule = () => {
+      const current = new Date();
+      const untilNextMinute = 60000 - (current.getSeconds() * 1000 + current.getMilliseconds());
+      timer = setTimeout(() => {
+        setNow(new Date());
+        schedule();
+      }, untilNextMinute + 50);
+    };
+    schedule();
+    return () => clearTimeout(timer);
   }, []);
   return now;
 }
 
-// shared time axis from the day's rostered shifts (unscheduled walk-ins don't widen it).
-function buildDomain(employees) {
-  let rawMin = 24;
-  let rawMax = 0;
-  employees.forEach((employee) => {
-    const { start, end } = scheduledBounds(employee);
-    if (start != null) {
-      rawMin = Math.min(rawMin, start);
+// Width of the element behind the returned callback ref, kept current on resize.
+// A callback ref (not useRef) so it still attaches when the element mounts late,
+// after the loading skeleton. Measured before paint so the layout never flashes.
+function useWidth() {
+  const [node, setNode] = useState(null);
+  const [width, setWidth] = useState(0);
+  useLayoutEffect(() => {
+    if (!node) {
+      return undefined;
     }
-    if (end != null) {
-      rawMax = Math.max(rawMax, end);
+    setWidth(node.getBoundingClientRect().width);
+    if (typeof ResizeObserver === "undefined") {
+      return undefined;
     }
-  });
-  if (rawMin >= rawMax) {
-    rawMin = 9;
-    rawMax = 18;
-  }
-  const start = Math.floor(rawMin * 2) / 2 - 0.5;
-  const end = Math.ceil(rawMax * 2) / 2 + 0.5;
-  const ticks = [];
-  for (let h = Math.ceil(start); h <= Math.floor(end); h += 1) {
-    if (h % 3 === 0) {
-      ticks.push({ h, label: `${h}:00`, pct: ((h - start) / (end - start)) * 100 });
-    }
-  }
-  return { start, end, ticks };
+    const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [node]);
+  return [setNode, width];
 }
 
-// ---- one person's timeline row (fed by an attendance-model employee) ----
-const ROW_STYLE = {
-  working: {
-    border: "none",
-    nameCls: "text-theme-900 dark:text-theme-50",
-    rightCls: "text-theme-600 dark:text-theme-300",
-  },
-  upcoming: {
-    bg: "transparent",
-    border: "1.5px dashed rgba(148,163,175,0.45)",
-    dot: NEUTRAL_SEG,
-    nameCls: "text-theme-700 dark:text-theme-200",
-    rightCls: "text-theme-600 dark:text-theme-300",
-  },
-  missing: {
-    bg: "transparent",
-    border: "1.5px dashed rgba(148,163,175,0.45)",
-    dot: NEUTRAL_SEG,
-    nameCls: "text-theme-700 dark:text-theme-200",
-    rightCls: "text-theme-600 dark:text-theme-300",
-  },
-  done: {
-    bg: DONE_BAR,
-    border: DONE_BAR_BORDER,
-    dot: DONE_SEG,
-    nameCls: "text-theme-500 dark:text-theme-400",
-    rightCls: "text-theme-500 dark:text-theme-400",
-  },
-};
-
-function buildRow(employee, dept, domain, nowH) {
-  const { start: schedStart, end: schedEnd } = scheduledBounds(employee);
-  const hasSchedule = schedStart != null && schedEnd != null;
-  const unscheduled = employee.shiftText === "予定外";
-  // one punch per person: IN time when working, OUT time when off_work.
-  const punch = hm(employee.displayTime);
-
-  let state;
-  if (employee.attendance_status === "working") {
-    state = "working";
-  } else if (employee.attendance_status === "off_work") {
-    state = "done";
-  } else {
-    const scheduleStartH = schedStart ?? domain.start;
-    state = nowH < scheduleStartH ? "upcoming" : "missing";
-  }
-
-  const base = ROW_STYLE[state];
-
-  const clamp = (h) => Math.max(domain.start, Math.min(domain.end, h));
-  const pct = (h) => ((clamp(h) - domain.start) / (domain.end - domain.start)) * 100;
-  const band = (s, e) => {
-    if (s == null || e == null || e <= s) {
-      return null;
-    }
-    const left = pct(s);
-    return { left, width: Math.max(1.5, pct(e) - left) };
-  };
-
-  // 予定(薄い下地): rostered window. Walk-ins have no roster window.
-  const plannedGeom = hasSchedule ? band(schedStart, schedEnd) : null;
-
-  // 実績(濃いバー): only the span the single punch can actually prove.
-  let actualGeom = null;
-  let rightLabel;
-  if (state === "working") {
-    const s = punch ?? schedStart ?? domain.start; // 出勤打刻(なければ予定開始で代用)
-    const e = Math.max(s + 1 / 12, Math.min(nowH, domain.end)); // 〜現在(ライブに伸びる)
-    actualGeom = band(s, e);
-    rightLabel = employee.displayTime || fmtClock(s);
-  } else if (state === "done") {
-    const e = punch ?? schedEnd ?? domain.end; // 退勤打刻
-    const s = schedStart ?? Math.max(domain.start, e - 1 / 12); // 出勤打刻は残らない→予定開始で代用
-    actualGeom = band(Math.min(s, e), e);
-    rightLabel = "退勤済";
-  } else {
-    rightLabel = state === "upcoming" ? `${fmtClock(schedStart ?? domain.start)}〜` : "未打刻";
-  }
-
-  const style = {
-    ...base,
-    dot: state === "working" ? dept.dot : base.dot,
-    plannedFill: state === "working" ? dept.plan : state === "done" ? DONE_PLAN : "transparent",
-    plannedBorder: state === "upcoming" || state === "missing" ? PLAN_DASH_BORDER : "none",
-    actualFill: state === "working" ? dept.bar : state === "done" ? DONE_BAR : "none",
-    actualBorder: state === "done" ? DONE_BAR_BORDER : "none",
-  };
-
-  return {
-    id: employee.employee,
-    name: employee.employee_name,
-    unscheduled,
-    state,
-    attendanceStatus: employee.attendance_status,
-    canManualToggle: isTakadaEmployee(employee),
-    plannedGeom,
-    actualGeom,
-    style,
-    rightLabel,
-    title: [
-      employee.employee_name,
-      employee.shiftText,
-      employee.attendance_status_label,
-      employee.displayTime ? `${employee.last_log_type || "IN"} ${employee.displayTime}` : null,
-      unscheduled ? "予定外" : null,
-    ]
-      .filter(Boolean)
-      .join(" / "),
-  };
+// ---- icons ----
+function RefreshIcon({ className, style }) {
+  return (
+    <svg className={className} style={style} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35Z" />
+    </svg>
+  );
 }
 
-// ---- department timeline card ----
-function DeptTimeline({ dept, label, working, scheduled, fteText, rows, domain, nowH, onTakadaManualToggle }) {
-  const nowPct = Math.max(0, Math.min(100, ((nowH - domain.start) / (domain.end - domain.start)) * 100));
+function CheckIcon({ size }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M5 12.5l4.5 4.5L19 7.5" />
+    </svg>
+  );
+}
+
+function CalendarIcon({ className }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M3 10h18M8 3v4M16 3v4" />
+    </svg>
+  );
+}
+
+// ---- ring: conic-gradient layers masked to a band, plus round caps at both ends ----
+// children sit on top, over the ring's open centre: the photo, and the check once someone has left.
+function Ring({ ring, children }) {
+  const { size, stroke, glow } = ring;
+  const mask = `radial-gradient(farthest-side, transparent calc(100% - ${stroke}px), #000 calc(100% - ${stroke - 0.5}px))`;
+  const band = (background) => (
+    <span aria-hidden="true" className="absolute inset-0 rounded-full" style={{ background, mask, WebkitMask: mask }} />
+  );
+  const cap = (point, shadow) =>
+    point ? (
+      <span
+        aria-hidden="true"
+        className="absolute rounded-full"
+        style={{
+          left: point.left,
+          top: point.top,
+          width: stroke,
+          height: stroke,
+          background: point.color,
+          boxShadow: shadow ? `0 0 ${glow}px 1px var(--ring-shadow)` : undefined,
+        }}
+      />
+    ) : null;
 
   return (
-    <div
-      className="flex min-w-0 flex-col gap-1.5 rounded-xl border p-2.5 px-3.5"
-      style={{ backgroundColor: dept.soft, borderColor: dept.softBorder }}
-    >
-      <div className="flex items-center gap-2">
-        <span className="h-2 w-2 shrink-0 rounded-[3px]" style={{ backgroundColor: dept.solid }} />
-        <span className="text-[12px] font-bold text-theme-800 dark:text-theme-100">{label}</span>
-        <span
-          className="text-[11.5px] font-bold tabular-nums text-[color:var(--dept-ink)] dark:text-[color:var(--dept-ink-dark)]"
-          style={{ "--dept-ink": dept.ink, "--dept-ink-dark": dept.inkDark }}
-        >
-          {working}/{scheduled}
-        </span>
-        {fteText ? (
-          <span className="ml-auto text-[10px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
-            換算 {fteText}人
-          </span>
-        ) : null}
-      </div>
-
-      {/* time axis — a single line of hour ticks. "Now" is a green playhead: a
-          small triangle here plus a line continuing down through every row, so it
-          costs no extra line and never collides with a tick label (the exact time
-          already lives in the header "現在 HH:MM"). */}
-      <div className="grid" style={{ gridTemplateColumns: "104px 1fr 64px", columnGap: "10px", height: "16px" }}>
-        <span />
-        <span className="relative block h-full">
-          {domain.ticks.map((tick) => (
-            <span
-              key={tick.h}
-              className="absolute top-0 -translate-x-1/2 whitespace-nowrap text-[9.5px] font-bold tabular-nums text-theme-600 dark:text-theme-200"
-              style={{ left: `${tick.pct}%` }}
-            >
-              {tick.label}
-            </span>
-          ))}
-          <span
-            className="absolute bottom-0 h-0 w-0"
-            style={{
-              left: `${nowPct}%`,
-              marginLeft: "-3.5px",
-              borderLeft: "3.5px solid transparent",
-              borderRight: "3.5px solid transparent",
-              borderTop: `5px solid ${GREEN}`,
-            }}
-          />
-        </span>
-        <span />
-      </div>
-
-      {/* rows */}
-      <div className="flex flex-col gap-1">
-        {rows.map((row) => (
-          <div
-            key={row.id}
-            title={row.title}
-            className="grid items-center"
-            style={{ gridTemplateColumns: "104px 1fr 64px", columnGap: "10px", height: "18px" }}
-          >
-            <span className="inline-flex min-w-0 items-center gap-1.5">
-              <span className="h-[5.5px] w-[5.5px] shrink-0 rounded-full" style={{ backgroundColor: row.style.dot }} />
-              <span className="inline-flex min-w-0 max-w-full items-baseline whitespace-nowrap">
-                {row.canManualToggle ? (
-                  <button
-                    type="button"
-                    className={`block min-w-0 max-w-full cursor-pointer appearance-none truncate rounded-sm border-0 bg-transparent p-0 text-left text-[11.5px] font-semibold transition-colors hover:text-amber-500 focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-amber-400 ${row.style.nameCls}`}
-                    title="表示打刻を切り替え"
-                    aria-label={`${row.name}の表示打刻を切り替え`}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      onTakadaManualToggle(row);
-                    }}
-                  >
-                    {row.name}
-                  </button>
-                ) : (
-                  <span className={`block min-w-0 max-w-full truncate text-[11.5px] font-semibold ${row.style.nameCls}`}>
-                    {row.name}
-                  </span>
-                )}
-                {row.unscheduled ? (
-                  <span className="ml-1 shrink-0 text-[8.5px] font-bold text-theme-500 dark:text-theme-400">予定外</span>
-                ) : null}
-              </span>
-            </span>
-            <span className="relative block h-[9px] rounded-full bg-theme-300/40 dark:bg-white/[0.06]">
-              {/* 実績(濃): keep first in the DOM so it stays the row's primary bar; z-index lifts it above 予定. */}
-              {row.actualGeom ? (
-                <span
-                  className="absolute inset-y-0 z-10 box-border rounded-full"
-                  style={{
-                    left: `${row.actualGeom.left}%`,
-                    width: `${row.actualGeom.width}%`,
-                    background: row.style.actualFill,
-                    border: row.style.actualBorder,
-                  }}
-                />
-              ) : null}
-              {/* 予定(薄): scheduled window behind the actual bar; the exposed part = 予定なのに未稼働(遅刻/早退)。 */}
-              {row.plannedGeom ? (
-                <span
-                  className="absolute inset-y-0 z-0 box-border rounded-full"
-                  style={{
-                    left: `${row.plannedGeom.left}%`,
-                    width: `${row.plannedGeom.width}%`,
-                    background: row.style.plannedFill,
-                    border: row.style.plannedBorder,
-                  }}
-                />
-              ) : null}
-              <span className="absolute -inset-y-0.5 z-20 w-px" style={{ left: `${nowPct}%`, backgroundColor: NOW_LINE }} />
-            </span>
-            <span
-              className={`whitespace-nowrap text-right text-[10px] font-semibold tabular-nums ${row.style.rightCls}`}
-            >
-              {row.rightLabel}
-            </span>
-          </div>
-        ))}
-        {rows.length === 0 ? (
-          <div className="py-1 text-center text-[10px] text-theme-500 dark:text-theme-400">予定なし</div>
-        ) : null}
-      </div>
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      {band(ring.track)}
+      {ring.lap1 ? band(ring.lap1) : null}
+      {cap(ring.startCap, false)}
+      {ring.lap2 ? band(ring.lap2) : null}
+      {cap(ring.endCap, true)}
+      {children}
     </div>
   );
 }
 
-// ---- roster calendar: month-view entry points, one per department ----
-// Border/icon colour reuses DEPT_STYLES so the buttons read as the same two
-// departments drawn in the timelines below.
-function RosterCalendarLink({ department, label, title }) {
-  const { solid, ink, inkDark } = deptStyle(department);
+// ---- roster calendar: month view per department, opened from its panel header ----
+const CALENDAR_TITLES = {
+  Office: "オフィスシフトカレンダー（今月）",
+  Production: "生産シフトカレンダー（今月）",
+};
+
+function RosterCalendarLink({ department, children = "シフト表" }) {
+  const title = CALENDAR_TITLES[department];
 
   return (
     <a
@@ -458,119 +324,265 @@ function RosterCalendarLink({ department, label, title }) {
       rel="noopener noreferrer"
       title={title}
       aria-label={title}
-      className="inline-flex items-center gap-1 rounded-lg border px-1.5 py-1 text-[10.5px] font-bold text-[color:var(--dept-ink)] transition-colors hover:bg-theme-200/40 dark:text-[color:var(--dept-ink-dark)] dark:hover:bg-theme-700/40"
-      style={{ borderColor: `${solid}66`, "--dept-ink": ink, "--dept-ink-dark": inkDark }}
+      className="inline-flex h-[22px] shrink-0 items-center gap-1 rounded-lg border border-black/10 px-2 text-[11px] font-medium text-neutral-700 transition-colors hover:bg-black/5 dark:border-white/15 dark:text-white/85 dark:hover:bg-white/10"
     >
-      <svg
-        className="h-3 w-3"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.8}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <rect x="3" y="5" width="18" height="16" rx="2" />
-        <path d="M3 10h18M8 3v4M16 3v4" />
-      </svg>
-      {label}
+      <CalendarIcon className="h-3.5 w-3.5" />
+      {children}
     </a>
   );
 }
 
-// ---- summary: big count + segment bar + legend ----
-function SummaryBar({ workingTotal, scheduledTotal, segments }) {
-  const denom = scheduledTotal > 0 ? scheduledTotal : segments.reduce((sum, seg) => sum + seg.n, 0) || 1;
-
+// ---- summary: concentric rings + legend ----
+function SummaryPanel({ rings, present, total, legend }) {
   return (
-    <>
-      <span className="flex shrink-0 items-baseline gap-1.5 pl-1">
-        <span className="text-[23px] font-extrabold leading-none tracking-tight tabular-nums" style={{ color: GREEN }}>
-          {workingTotal}
-        </span>
-        <span className="text-[11.5px] font-bold text-theme-800 dark:text-theme-100">名出勤中</span>
-        {scheduledTotal > 0 ? (
-          <span className="text-[10.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
-            / {scheduledTotal} 名予定
+    <div
+      role="group"
+      aria-label="今日の概要"
+      className={`flex flex-col items-center justify-center gap-4 rounded-[22px] px-5 pb-[18px] pt-[22px] @md:flex-row @md:gap-6 @3xl:flex-col @3xl:gap-4 ${SUMMARY_SURFACE}`}
+    >
+      <div className="relative h-[188px] w-[188px] shrink-0">
+        {rings.map((ring) => (
+          <div
+            key={ring.key}
+            className={`absolute ${PALETTE_SWITCH}`}
+            style={{ left: ring.offset, top: ring.offset, ...paletteStyle(ring.palette) }}
+          >
+            <Ring ring={ring} />
+          </div>
+        ))}
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-[26px] font-extrabold leading-none tabular-nums">{present}</span>
+          <span className={`mt-0.5 text-[10.5px] font-extrabold leading-none tabular-nums ${TEXT_MUTED}`}>
+            /{total}
           </span>
-        ) : null}
-      </span>
-      {segments.length > 0 ? (
-        <span className="flex min-w-[210px] flex-1 flex-col gap-1 self-center px-0.5">
-          <span className="flex h-1.5 gap-0.5 overflow-hidden rounded-full">
-            {segments.map((seg) => (
-              <span
-                key={seg.label}
-                className="block h-full"
-                style={{ width: `${(seg.n / denom) * 100}%`, backgroundColor: seg.color }}
-              />
-            ))}
-          </span>
-          <span className="flex flex-wrap gap-x-3 gap-y-0.5">
-            {segments.map((seg) => (
-              <span
-                key={seg.label}
-                className="inline-flex items-center gap-1.5 text-[10px] font-medium text-theme-700 dark:text-theme-200"
-              >
-                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: seg.color }} />
-                {seg.label}
-                <span className="tabular-nums text-theme-600 dark:text-theme-300">{seg.count}</span>
-              </span>
-            ))}
-          </span>
-        </span>
-      ) : null}
-    </>
+        </div>
+      </div>
+      <div className="flex w-full max-w-[280px] flex-col gap-2 @3xl:max-w-none">
+        {legend.map((row) => (
+          <div
+            key={row.key}
+            className={`flex items-baseline gap-2 whitespace-nowrap text-[12.5px] ${PALETTE_SWITCH}`}
+            style={paletteStyle(row.palette)}
+          >
+            <span className="h-2 w-2 shrink-0 self-center rounded-full" style={{ background: "var(--ring-start)" }} />
+            {row.label}
+            {row.note ? <span className={`text-[11px] ${TEXT_MUTED}`}>{row.note}</span> : null}
+            <b className="ml-auto text-[20px] font-extrabold leading-none tabular-nums text-[color:var(--ink)]">
+              {row.value}
+            </b>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
-// ---- tomorrow: collapsed line + expandable per-shift detail ----
-function TomorrowPanel({ model, error, loading }) {
-  const [open, setOpen] = useState(false);
+// Photo by state: gone → sunk dark under the check; not in yet → faded; everyone else as is.
+const PHOTO_STATE_STYLE = {
+  done: { filter: "grayscale(0.6) brightness(0.45)" },
+  up: { opacity: 0.6 },
+};
+
+// ---- one person: ring + name + scheduled end ----
+function Tile({ tile, ring, onTakadaManualToggle }) {
+  const compact = ring === "compact";
+  const done = tile.state === "done";
+  const [failedPhotoUrl, setFailedPhotoUrl] = useState(null);
+  const showPhoto = Boolean(tile.photoUrl && tile.photoUrl !== failedPhotoUrl);
+  const nameClass = `block min-w-0 max-w-full truncate ${compact ? "text-[11.5px]" : "text-[12px]"} ${
+    tile.emphasized ? "text-neutral-900 dark:text-white" : TEXT_SOFT
+  }`;
 
   return (
-    <section className="flex flex-col gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/[0.09] px-3.5 py-2">
-      <div className="flex flex-wrap items-center gap-2.5">
-        <span className="text-[10px] font-semibold tracking-wide text-amber-600 dark:text-amber-400">明日予定</span>
-        {model.date ? (
-          <span className="text-[11px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
-            {formatShortDate(model.date)} ({weekdayJp(model.date)})
+    <div title={tile.tooltip} className={`flex min-w-0 flex-col items-center ${compact ? "gap-1" : "gap-[5px]"}`}>
+      <Ring ring={tile.ring}>
+        {showPhoto ? (
+          <img
+            src={tile.photoUrl}
+            alt=""
+            loading="lazy"
+            onError={() => setFailedPhotoUrl(tile.photoUrl)}
+            className="absolute rounded-full object-cover transition-[filter,opacity] duration-500 motion-reduce:transition-none"
+            style={{
+              top: tile.ring.stroke + 2,
+              left: tile.ring.stroke + 2,
+              width: tile.ring.size - 2 * tile.ring.stroke - 4,
+              height: tile.ring.size - 2 * tile.ring.stroke - 4,
+              ...PHOTO_STATE_STYLE[tile.state],
+            }}
+          />
+        ) : null}
+        {done ? (
+          // White over the darkened photo; with no photo behind it, the muted text colour.
+          <span
+            aria-hidden="true"
+            className={`absolute inset-0 grid place-items-center ${showPhoto ? "text-white/90" : TEXT_MUTED}`}
+          >
+            <CheckIcon size={Math.round(tile.ring.size * 0.34)} />
           </span>
         ) : null}
+      </Ring>
+
+      {tile.canManualToggle ? (
+        <button
+          type="button"
+          className={`${nameClass} cursor-pointer appearance-none rounded-sm border-0 bg-transparent p-0 transition-colors hover:text-amber-500 focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-amber-400`}
+          title="表示打刻を切り替え"
+          aria-label={`${tile.name}の表示打刻を切り替え`}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onTakadaManualToggle(tile);
+          }}
+        >
+          {tile.name}
+        </button>
+      ) : (
+        <span className={nameClass}>{tile.name}</span>
+      )}
+
+      {done ? (
+        <span
+          className={`whitespace-nowrap font-medium ${compact ? "text-[11.5px] leading-[13px]" : "text-[12px] leading-[14px]"} ${TEXT_SOFT}`}
+        >
+          退勤済
+        </span>
+      ) : tile.hasSlot ? (
+        <span
+          className={`whitespace-nowrap font-extrabold leading-none tabular-nums text-[color:var(--ink)] ${
+            compact ? "text-[13px]" : "text-[14px]"
+          }`}
+        >
+          {tile.endLabel}
+        </span>
+      ) : (
+        <span className={`whitespace-nowrap text-[10.5px] font-bold leading-[14px] ${TEXT_MUTED}`}>
+          {tile.endLabel}
+        </span>
+      )}
+      {tile.progressText || tile.status ? (
+        <span className="sr-only">{[tile.progressText, tile.status].filter(Boolean).join("　")}</span>
+      ) : null}
+    </div>
+  );
+}
+
+// ---- department panel ----
+// columns: a fixed column count while the panels sit side by side; null packs rings from the left.
+function DeptPanel({ group, ring, columns, showCalendar, onTakadaManualToggle }) {
+  const split = columns != null;
+  return (
+    <div
+      role="group"
+      aria-label={group.label}
+      className={`flex min-w-0 flex-col rounded-[22px] px-3.5 pb-3.5 pt-3 ${split ? "" : "flex-auto"} ${PANEL_SURFACE} ${PALETTE_SWITCH}`}
+      style={{
+        ...paletteStyle(group.palette),
+        // Padding + column gaps as the basis, the rest shared by column count:
+        // every column across the side-by-side panels ends up the same width.
+        ...(split ? { flex: `${columns} 1 ${28 + (columns - 1) * 6}px` } : null),
+      }}
+    >
+      <div className="mb-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 whitespace-nowrap">
+        <span className="text-[12px] font-bold">{group.label}</span>
+        <span className="text-[13px] font-extrabold leading-none tabular-nums text-[color:var(--ink)]">
+          {group.working}/{group.total}
+        </span>
+        <span className="ml-auto flex items-center gap-2">
+          {group.done > 0 ? (
+            <span className={`text-[11px] font-medium ${TEXT_SOFT}`}>退勤済 {group.done}名</span>
+          ) : null}
+          {showCalendar ? <RosterCalendarLink department={group.key} /> : null}
+        </span>
+      </div>
+      <div
+        className={`grid ${split ? "my-auto" : ""}`}
+        style={{
+          gridTemplateColumns: split
+            ? `repeat(${columns}, minmax(0, 1fr))`
+            : `repeat(auto-fill, minmax(${TILE_RINGS[ring].column}px, 1fr))`,
+          gap: ring === "compact" ? "12px 6px" : "14px 6px",
+        }}
+      >
+        {group.tiles.map((tile) => (
+          <Tile key={tile.id} tile={tile} ring={ring} onTakadaManualToggle={onTakadaManualToggle} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---- tomorrow: one line + expandable per-shift detail ----
+function TomorrowFooter({ model, error, loading }) {
+  const [open, setOpen] = useState(false);
+  const added = model.diff?.added ?? [];
+  const removed = model.diff?.removed ?? [];
+  const shownAdded = added.slice(0, MAX_ADDED_NAMES);
+  const day = formatDay(model.date);
+  const breakdown = [
+    ...model.groups.map((group) => `${group.label} ${group.count}`),
+    model.fteText ? `換算 ${model.fteText}人` : null,
+  ].filter(Boolean);
+
+  return (
+    <section
+      aria-label="明日の予定"
+      className="mt-4 flex flex-col gap-3 border-t border-black/10 pt-3.5 dark:border-white/15"
+    >
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <span className="whitespace-nowrap text-[13px] font-bold">明日{day ? ` ${day}` : ""}</span>
         {error ? (
-          <span className="text-[10px] text-theme-500 dark:text-theme-400">取得できませんでした</span>
+          <span className={`text-[12px] ${TEXT_MUTED}`}>取得できませんでした</span>
         ) : loading ? (
-          <span className="h-4 w-10 animate-pulse rounded bg-amber-200/40 dark:bg-amber-900/30" />
+          <span className="h-4 w-28 animate-pulse rounded bg-black/10 dark:bg-white/10" />
         ) : (
           <>
-            <span className="text-[12.5px] font-bold tabular-nums text-theme-800 dark:text-theme-100">
-              {model.count} 名
+            <span className="whitespace-nowrap">
+              <b className="text-[18px] font-extrabold tabular-nums">{model.count}</b>
+              <span className="text-[12px]">名</span>
             </span>
-            {model.groups.length > 0 ? (
-              <span className="text-[10.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
-                {model.groups.map((group) => `${group.label} ${group.count}`).join(" ・ ")}
-                {model.fteText ? ` ・ 換算 ${model.fteText}人` : ""}
+            {breakdown.length > 0 ? (
+              <span className={`whitespace-nowrap text-[12px] tabular-nums ${TEXT_SOFT}`}>{breakdown.join(" · ")}</span>
+            ) : null}
+            {added.length > 0 ? (
+              <span className="flex flex-wrap items-center gap-1.5" title="今日比：明日から加わる人">
+                <b className="text-[13px] font-extrabold tabular-nums text-emerald-700 dark:text-[#9DF2CC]">
+                  +{added.length}
+                </b>
+                {shownAdded.map((person) => (
+                  <span
+                    key={person.id}
+                    className="whitespace-nowrap rounded-[10px] bg-emerald-500/15 px-2 py-0.5 text-[12px] dark:bg-[rgba(111,227,176,0.16)]"
+                  >
+                    {person.name}
+                  </span>
+                ))}
+                {added.length > shownAdded.length ? (
+                  <span className={`whitespace-nowrap text-[12px] ${TEXT_SOFT}`}>
+                    ほか{added.length - shownAdded.length}名
+                  </span>
+                ) : null}
               </span>
             ) : null}
-            {model.diff && (model.diff.added > 0 || model.diff.removed > 0) ? (
-              <span className="text-[10.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
-                今日比 {/* green stays reserved for the "now" signal — schedule deltas use neutral emphasis */}
-                {model.diff.added > 0 ? (
-                  <span className="font-semibold text-theme-700 dark:text-theme-200">＋{model.diff.added}</span>
-                ) : null}
-                {model.diff.added > 0 && model.diff.removed > 0 ? " / " : ""}
-                {model.diff.removed > 0 ? <span>−{model.diff.removed}</span> : null}
+            {removed.length > 0 ? (
+              <span className="flex items-center gap-1.5" title="今日比：明日は休みの人">
+                <b className="text-[13px] font-extrabold tabular-nums">−{removed.length}</b>
+                <span className={`whitespace-nowrap text-[12px] ${TEXT_SOFT}`}>
+                  {removed[0].name}
+                  {removed.length > 1 ? ` ほか${removed.length - 1}名` : ""}
+                </span>
               </span>
             ) : null}
             {model.groups.length > 0 ? (
               <button
                 type="button"
+                aria-expanded={open}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  setOpen((v) => !v);
+                  setOpen((value) => !value);
                 }}
-                className="ml-auto inline-flex items-center gap-1 rounded-full border border-theme-300/50 px-2.5 py-0.5 text-[10px] font-semibold text-theme-600 transition-colors hover:bg-theme-200/40 dark:border-theme-600/50 dark:text-theme-300 dark:hover:bg-theme-700/40"
+                className="ml-auto inline-flex h-6 items-center rounded-full border border-black/10 px-2.5 text-[11px] font-medium text-neutral-700 transition-colors hover:bg-black/5 dark:border-white/15 dark:text-white/80 dark:hover:bg-white/10"
               >
                 {open ? "閉じる" : "詳細"}
               </button>
@@ -580,27 +592,20 @@ function TomorrowPanel({ model, error, loading }) {
       </div>
 
       {open && !error && model.groups.length > 0 ? (
-        <div className="grid gap-2.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))" }}>
+        <div className="grid gap-2.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}>
           {model.groups.map((group) => (
-            <div
-              key={group.key}
-              className="flex flex-col gap-1.5 rounded-lg border border-theme-300/40 bg-theme-100/70 px-3 py-2 dark:border-white/[0.08] dark:bg-white/[0.05]"
-            >
-              <span className="text-[10px] font-semibold text-theme-600 dark:text-theme-300">
-                {group.label} <span className="text-amber-600 dark:text-amber-400">{group.count}</span>
-                {group.fteText ? (
-                  <span className="text-theme-500 dark:text-theme-400"> ｜ 換算 {group.fteText}人</span>
-                ) : null}
+            <div key={group.key} className={`flex flex-col gap-1.5 rounded-2xl px-3.5 py-2.5 ${PANEL_SURFACE}`}>
+              <span className="text-[11.5px] font-bold">
+                {group.label} <span className="tabular-nums">{group.count}</span>
+                {group.fteText ? <span className={`font-medium ${TEXT_MUTED}`}> · 換算 {group.fteText}人</span> : null}
               </span>
               <div className="grid items-baseline gap-x-2.5 gap-y-1" style={{ gridTemplateColumns: "auto 1fr" }}>
                 {group.slots.map((slot) => (
                   <div key={slot.label} className="contents">
-                    <span className="rounded bg-theme-200/70 px-1.5 py-px text-center font-mono text-[9px] font-bold tabular-nums text-theme-600 dark:bg-white/10 dark:text-theme-300">
+                    <span className="rounded-md bg-black/5 px-1.5 py-px text-center text-[10px] font-bold tabular-nums text-neutral-700 dark:bg-white/10 dark:text-white/80">
                       {slot.label}
                     </span>
-                    <span className="text-[11.5px] font-medium text-theme-800 dark:text-theme-100">
-                      {slot.names.join(" ・ ")}
-                    </span>
+                    <span className="text-[12px] text-neutral-800 dark:text-white/90">{slot.names.join(" ・ ")}</span>
                   </div>
                 ))}
               </div>
@@ -613,30 +618,38 @@ function TomorrowPanel({ model, error, loading }) {
 }
 
 function LoadingSkeleton() {
+  const bone = "animate-pulse bg-black/10 dark:bg-white/10";
   return (
-    <div className="@container flex w-full flex-col gap-2.5 p-1">
-      <div className="flex items-center gap-2.5">
-        <div className="h-6 w-24 animate-pulse rounded bg-theme-300/40 dark:bg-theme-700/30" />
-        <div className="h-2 flex-1 animate-pulse rounded-full bg-theme-300/30 dark:bg-theme-700/25" />
+    <div className="@container flex w-full min-w-0 flex-col gap-3.5 px-2.5 pb-2.5 pt-1">
+      <div className="flex items-center gap-3">
+        <div className={`h-5 w-24 rounded ${bone}`} />
+        <div className={`ml-auto h-6 w-28 rounded-full ${bone}`} />
       </div>
-      <div className="grid gap-2.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))" }}>
-        {[0, 1].map((i) => (
-          <div
-            key={i}
-            className="flex flex-col gap-2 rounded-xl border border-theme-300/30 bg-theme-200/25 p-3 dark:border-white/10 dark:bg-white/[0.04]"
-          >
-            <div className="h-3 w-16 animate-pulse rounded bg-theme-300/40 dark:bg-theme-700/40" />
-            {[0, 1, 2, 3, 4].map((r) => (
-              <div key={r} className="h-2.5 w-full animate-pulse rounded bg-theme-300/25 dark:bg-theme-700/25" />
-            ))}
-          </div>
-        ))}
+      <div className="grid gap-[18px] @3xl:grid-cols-[268px_minmax(0,1fr)]">
+        <div className={`flex items-center justify-center rounded-[22px] p-6 ${SUMMARY_SURFACE}`}>
+          <div className="h-[188px] w-[188px] animate-pulse rounded-full border-[18px] border-black/10 dark:border-white/10" />
+        </div>
+        <div className="flex flex-col gap-2.5">
+          {[0, 1].map((panel) => (
+            <div key={panel} className={`flex flex-col gap-3 rounded-[22px] p-3.5 ${PANEL_SURFACE}`}>
+              <div className={`h-3 w-20 rounded ${bone}`} />
+              <div className="flex flex-wrap gap-3">
+                {[0, 1, 2, 3, 4].map((tile) => (
+                  <div
+                    key={tile}
+                    className="h-[70px] w-[70px] animate-pulse rounded-full border-[9px] border-black/10 dark:border-white/10"
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
-function buildTomorrowView(tomorrowModel, todayRosterIds, tomorrowSnapshot) {
+function buildTomorrowView(tomorrowModel, todaySnapshot, tomorrowSnapshot) {
   const groups = (tomorrowModel.groups || []).map((group) => {
     const slotMap = new Map();
     group.employees.forEach((employee) => {
@@ -647,8 +660,8 @@ function buildTomorrowView(tomorrowModel, todayRosterIds, tomorrowSnapshot) {
       slotMap.get(label).push(employee.employee_name);
     });
     const slots = [...slotMap.entries()]
-      .map(([label, names]) => ({ label, names, startH: parseShiftBounds(label)?.start ?? 0 }))
-      .sort((a, b) => a.startH - b.startH);
+      .map(([label, names]) => ({ label, names, start: parseShiftSlot(label)?.start ?? 0 }))
+      .sort((a, b) => a.start - b.start);
 
     return {
       key: group.key,
@@ -659,42 +672,29 @@ function buildTomorrowView(tomorrowModel, todayRosterIds, tomorrowSnapshot) {
     };
   });
 
-  let diff = null;
-  const tomorrowIds = tomorrowSnapshot?.employees?.map((employee) => String(employee.employee));
-  if (tomorrowIds && todayRosterIds && todayRosterIds.size > 0) {
-    const tomorrowSet = new Set(tomorrowIds);
-    let added = 0;
-    let removed = 0;
-    tomorrowSet.forEach((id) => {
-      if (!todayRosterIds.has(id)) {
-        added += 1;
-      }
-    });
-    todayRosterIds.forEach((id) => {
-      if (!tomorrowSet.has(id)) {
-        removed += 1;
-      }
-    });
-    diff = { added, removed };
-  }
-
-  const production = groups.find((group) => group.key === "Production");
+  // Only compare rosters when both days actually have one to compare.
+  const todayRoster = todaySnapshot?.employees || [];
+  const diff =
+    Array.isArray(todaySnapshot?.employees) && Array.isArray(tomorrowSnapshot?.employees)
+      ? diffRosters(todayRoster, tomorrowSnapshot.employees)
+      : null;
 
   return {
     date: tomorrowModel.date,
     count: tomorrowModel.count,
     groups,
     diff,
-    fteText: production?.fteText ?? null,
+    fteText: groups.find((group) => group.key === "Production")?.fteText ?? null,
   };
 }
 
 export default function Component({ service }) {
   const { widget } = service;
   const [refreshKey, setRefreshKey] = useState(0);
+  const [spin, setSpin] = useState(0);
   const [takadaManualStatus, setTakadaManualStatus] = useState(null);
   const now = useNow();
-  const nowH = now.getHours() + now.getMinutes() / 60;
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
   const refreshInterval = Math.max(1000, widget.refreshInterval || 3600000);
 
@@ -769,59 +769,74 @@ export default function Component({ service }) {
   );
   const tomorrowModel = useMemo(() => buildTomorrowScheduleModel(tomorrowSnapshot), [tomorrowSnapshot]);
 
-  const domain = useMemo(() => buildDomain(todayModel.groups.flatMap((group) => group.employees)), [todayModel]);
+  // Panel arrangement and ring size follow the width the grid actually gets.
+  const [gridRef, gridWidth] = useWidth();
+  const panelCounts = useMemo(
+    () => todayModel.groups.map((group) => group.employees.length).filter((count) => count > 0),
+    [todayModel],
+  );
+  const plan = useMemo(() => planLayout(gridWidth, panelCounts), [gridWidth, panelCounts]);
 
-  // Per-department rows + a running state tally for the summary bar.
   const view = useMemo(() => {
+    const photoBaseUrl = widget.photoBaseUrl || widget.scheduleUrl;
+    const actualPhotos = new Map(
+      actualEmployees
+        .filter((employee) => employee.employee && employee.image)
+        .map((employee) => [String(employee.employee), employee.image]),
+    );
     const groups = todayModel.groups.map((group) => {
-      const dept = deptStyle(group.key);
-      const rows = group.employees.map((employee) => buildRow(employee, dept, domain, nowH));
-      const working = rows.filter((row) => row.state === "working").length;
+      const tiles = group.employees.map((employee) => ({
+        ...buildTile(employee, nowMinutes, { ring: plan.ring }),
+        photoUrl:
+          resolvePhotoUrl(employee.image, photoBaseUrl) ||
+          resolvePhotoUrl(actualPhotos.get(String(employee.employee)), photoBaseUrl),
+        canManualToggle: isTakadaEmployee(employee),
+      }));
       return {
         key: group.key,
         label: group.label,
-        dept,
-        rows,
-        working,
-        total: group.totalCount ?? group.count ?? rows.length,
+        palette: paletteFor(group.key),
+        tiles,
+        working: tiles.filter((tile) => tile.active).length,
+        done: tiles.filter((tile) => tile.state === "done").length,
+        total: group.totalCount ?? group.count ?? tiles.length,
         fteText: group.key === "Production" ? formatScheduledFte(group.scheduledFte) : null,
       };
     });
 
-    const workingTotal = groups.reduce((sum, group) => sum + group.working, 0);
-    const notWorkingTotal = groups.reduce(
-      (sum, group) => sum + group.rows.filter((row) => row.state === "upcoming" || row.state === "missing").length,
-      0,
-    );
-    const doneTotal = groups.reduce((sum, group) => sum + group.rows.filter((row) => row.state === "done").length, 0);
+    const present = groups.reduce((sum, group) => sum + group.working, 0);
+    const total = groups.reduce((sum, group) => sum + group.total, 0);
+    const day = dayProgress(daySpan(todayModel.groups.flatMap((group) => group.employees)), nowMinutes);
 
-    const segments = [
-      ...groups
-        .filter((group) => group.working > 0)
-        .map((group) => ({
-          label: group.label,
-          n: group.working,
-          count: `${group.working}/${group.total}`,
-          color: group.dept.seg,
-        })),
-      ...(notWorkingTotal > 0
-        ? [{ label: "未出勤", n: notWorkingTotal, count: notWorkingTotal, color: NEUTRAL_SEG }]
-        : []),
-      ...(doneTotal > 0 ? [{ label: "退勤済", n: doneTotal, count: doneTotal, color: DONE_SEG }] : []),
+    const rings = summaryRings([
+      ...groups.map((group) => ({ key: group.key, progress: group.total > 0 ? group.working / group.total : 0 })),
+      { key: "day", progress: day },
+    ]).map((ring, index) => ({ ...ring, palette: groups[index]?.palette ?? DAY_PALETTE }));
+
+    const legend = [
+      ...groups.map((group) => ({
+        key: group.key,
+        label: group.label,
+        note: group.fteText ? `換算 ${group.fteText}` : null,
+        value: `${group.working}/${group.total}`,
+        palette: group.palette,
+      })),
+      { key: "day", label: "今日の経過", value: `${Math.round(day * 100)}%`, palette: DAY_PALETTE },
     ];
 
-    return { groups, workingTotal, segments };
-  }, [todayModel, domain, nowH]);
+    return { groups, present, total, rings, legend };
+  }, [todayModel, nowMinutes, plan.ring, widget.photoBaseUrl, widget.scheduleUrl, actualEmployees]);
 
-  const tomorrowView = useMemo(() => {
-    const todayRosterIds = new Set((todaySnapshot?.employees || []).map((employee) => String(employee.employee)));
-    return buildTomorrowView(tomorrowModel, todayRosterIds, tomorrowSnapshot);
-  }, [tomorrowModel, todaySnapshot, tomorrowSnapshot]);
+  const tomorrowView = useMemo(
+    () => buildTomorrowView(tomorrowModel, todaySnapshot, tomorrowSnapshot),
+    [tomorrowModel, todaySnapshot, tomorrowSnapshot],
+  );
 
   const handleRefresh = useCallback(
     (e) => {
       e.preventDefault();
       e.stopPropagation();
+      setSpin((value) => value + 360);
       setRefreshKey((prev) => prev + 1);
       mutateActual();
       if (widget.scheduleUrl) {
@@ -833,8 +848,8 @@ export default function Component({ service }) {
   );
 
   const handleTakadaManualToggle = useCallback(
-    async (row) => {
-      const nextStatus = getNextTakadaManualStatus(row.attendanceStatus, new Date(), todayModel.date || undefined);
+    async (tile) => {
+      const nextStatus = getNextTakadaManualStatus(tile.attendanceStatus, new Date(), todayModel.date || undefined);
 
       try {
         if (!nextStatus) {
@@ -874,112 +889,84 @@ export default function Component({ service }) {
     );
   }
 
-  const todayDate = formatShortDate(todayModel.date);
-  const nothingToShow = view.groups.length === 0 || view.groups.every((group) => group.rows.length === 0);
+  const today = formatDay(todayModel.date);
+  const nothingToShow = view.groups.every((group) => group.tiles.length === 0);
 
   return (
     <Container service={service}>
-      <div className="@container flex w-full min-w-0 flex-col gap-2.5">
-        {/* header + summary */}
-        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2 px-0.5">
-          <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-theme-300/40 bg-theme-200/40 text-theme-600 dark:border-white/10 dark:bg-white/[0.06] dark:text-theme-200">
-            <svg
-              className="h-3.5 w-3.5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={1.8}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="9" cy="8" r="3.2" />
-              <path d="M3.4 19.5c.7-3.2 2.8-4.8 5.6-4.8s4.9 1.6 5.6 4.8" />
-              <circle cx="16.5" cy="9" r="2.4" />
-              <path d="M16.8 14.6c2.2.2 3.6 1.6 4.1 4.2" />
-            </svg>
-          </span>
-          <span className="text-[13px] font-bold text-theme-900 dark:text-theme-50">今日出勤中</span>
-          {todayDate ? (
-            <span className="text-[11px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
-              {todayDate}
-              {todayModel.date ? ` (${weekdayJp(todayModel.date)})` : ""}
-            </span>
+      <div
+        className={`@container flex w-full min-w-0 flex-col px-2.5 pb-2.5 pt-1 text-neutral-900 dark:text-white/95 ${RING_BASE_VARS}`}
+      >
+        {/* header */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <span className="text-[15px] font-bold tracking-[0.04em]">今日出勤中</span>
+          {today ? (
+            <span className="text-[14px] font-extrabold tabular-nums text-neutral-600 dark:text-white/75">{today}</span>
           ) : null}
-
-          <SummaryBar
-            workingTotal={view.workingTotal}
-            scheduledTotal={todayModel.hasRoster ? todayModel.summary.scheduledCount : 0}
-            segments={view.segments}
-          />
-
-          <span className="ml-auto flex flex-wrap items-center justify-end gap-2">
-            {widget.rosterCalendar ? (
-              <>
-                <RosterCalendarLink department="Production" label="生産" title="生産シフトカレンダー（今月）" />
-                <RosterCalendarLink department="Office" label="オフィス" title="オフィスシフトカレンダー（今月）" />
-              </>
-            ) : null}
-            <span className="text-[12px] font-medium tabular-nums text-theme-700 dark:text-theme-200">
-              現在 {fmtClock(nowH)}
-            </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold tracking-wide text-emerald-600 dark:text-emerald-300">
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
-                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          <span className="ml-auto flex items-center gap-3">
+            <span className="text-[16px] font-extrabold tabular-nums">{formatClock(nowMinutes)}</span>
+            <span className="inline-flex h-6 items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 pl-2 pr-[9px] text-[11px] font-extrabold tracking-[0.08em] text-emerald-700 dark:border-[rgba(111,227,176,0.38)] dark:bg-[rgba(111,227,176,0.14)] dark:text-[#9DF2CC]">
+              <span className="relative flex h-[7px] w-[7px]">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75 motion-reduce:animate-none dark:bg-[#6FE3B0]" />
+                <span className="relative inline-flex h-[7px] w-[7px] rounded-full bg-emerald-500 dark:bg-[#6FE3B0]" />
               </span>
               LIVE
             </span>
             <button
               type="button"
               onClick={handleRefresh}
-              className="rounded-lg border border-theme-300/50 p-1.5 text-theme-600 transition-colors hover:bg-theme-200/40 hover:text-theme-900 dark:border-theme-600/50 dark:text-theme-300 dark:hover:bg-theme-700/40 dark:hover:text-theme-50"
+              className="grid h-[30px] w-[30px] place-items-center rounded-full border border-black/10 bg-black/5 text-neutral-700 transition-colors hover:bg-black/10 dark:border-white/15 dark:bg-white/[0.08] dark:text-white dark:hover:bg-white/15"
               title="更新"
               aria-label="更新"
             >
-              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
+              <RefreshIcon
+                className="h-[18px] w-[18px] transition-transform duration-700 ease-[cubic-bezier(0.3,0.7,0.2,1)] motion-reduce:transition-none"
+                style={{ transform: `rotate(${spin}deg)` }}
+              />
             </button>
           </span>
         </div>
 
         {widget.scheduleUrl && todayScheduleError ? (
-          <div className="px-1 text-[10px] text-theme-500 dark:text-theme-400">
+          <div className={`mt-2 text-[11px] ${TEXT_MUTED}`}>
             今日予定を取得できませんでした。現在出勤中のみ表示しています。
           </div>
         ) : null}
 
-        {/* timelines: side-by-side wide, single column narrow/portrait */}
         {nothingToShow ? (
-          <div className="py-3 text-center text-xs italic text-theme-500 dark:text-theme-400">
-            {todayModel.hasRoster ? "本日の予定はありません" : "現在、出勤者はいません"}
+          <div className="mt-3.5 flex flex-col items-center gap-2.5 py-4">
+            <span className={`text-[12px] ${TEXT_MUTED}`}>
+              {todayModel.hasRoster ? "本日の予定はありません" : "現在、出勤者はいません"}
+            </span>
+            {widget.rosterCalendar ? (
+              <span className="flex flex-wrap justify-center gap-2">
+                <RosterCalendarLink department="Office">オフィス</RosterCalendarLink>
+                <RosterCalendarLink department="Production">生産</RosterCalendarLink>
+              </span>
+            ) : null}
           </div>
         ) : (
-          <section className="grid gap-2.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))" }}>
-            {view.groups.map((group) => (
-              <DeptTimeline
-                key={group.key}
-                dept={group.dept}
-                label={group.label}
-                working={group.working}
-                scheduled={group.total}
-                fteText={group.fteText}
-                rows={group.rows}
-                domain={domain}
-                nowH={nowH}
-                onTakadaManualToggle={handleTakadaManualToggle}
-              />
-            ))}
-          </section>
+          <div ref={gridRef} className="mt-3.5 grid gap-[18px] @3xl:grid-cols-[268px_minmax(0,1fr)]">
+            <SummaryPanel rings={view.rings} present={view.present} total={view.total} legend={view.legend} />
+            <div className={`flex min-w-0 gap-2.5 ${plan.split ? "flex-row" : "flex-col"}`}>
+              {view.groups
+                .filter((group) => group.tiles.length > 0)
+                .map((group, index) => (
+                  <DeptPanel
+                    key={group.key}
+                    group={group}
+                    ring={plan.ring}
+                    columns={plan.split ? plan.columns[index] : null}
+                    showCalendar={Boolean(widget.rosterCalendar && CALENDAR_TITLES[group.key])}
+                    onTakadaManualToggle={handleTakadaManualToggle}
+                  />
+                ))}
+            </div>
+          </div>
         )}
 
-        {/* tomorrow */}
         {widget.scheduleUrl ? (
-          <TomorrowPanel
+          <TomorrowFooter
             model={tomorrowView}
             error={tomorrowScheduleError}
             loading={!tomorrowScheduleData && !tomorrowScheduleError}

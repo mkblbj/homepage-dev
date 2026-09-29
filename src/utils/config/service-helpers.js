@@ -15,6 +15,16 @@ import { parseVersionForUrl } from "utils/proxy/api-helpers";
 const logger = createLogger("service-helpers");
 const linuxdoFeedIdRegex = /^[A-Za-z0-9_-]+$/;
 
+function httpOrigin(value) {
+  if (typeof value !== "string") return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.origin : null;
+  } catch {
+    return null;
+  }
+}
+
 function parseServicesToGroups(services) {
   if (!services) {
     return [];
@@ -647,6 +657,8 @@ export function cleanServiceGroups(groups) {
         if (type === "uoattendance") {
           if (scheduleUrl) widget.scheduleUrl = scheduleUrl;
           if (refreshInterval) widget.refreshInterval = refreshInterval;
+          const photoBaseUrl = httpOrigin(widgetData.url) || httpOrigin(scheduleUrl);
+          if (photoBaseUrl) widget.photoBaseUrl = photoBaseUrl;
           // Destructured above but never assigned: the browser only learns
           // whether the calendar is configured, never the URL or token.
           if (rosterCalendarUrl && rosterCalendarToken) widget.rosterCalendar = true;

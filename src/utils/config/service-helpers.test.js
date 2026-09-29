@@ -446,6 +446,33 @@ describe("utils/config/service-helpers", () => {
     expect(JSON.stringify(widget)).not.toContain("SECRET");
   });
 
+  it("cleanServiceGroups exposes only the HRMS origin for attendance photos", async () => {
+    const { cleanServiceGroups } = await import("./service-helpers");
+    const rawGroups = [
+      {
+        name: "Core",
+        services: [
+          {
+            name: "Attendance",
+            weight: 100,
+            widgets: [
+              {
+                type: "uoattendance",
+                url: "https://user:secret@hr.example.com/api/method/attendance?key=SECRET",
+              },
+            ],
+          },
+        ],
+        groups: [],
+      },
+    ];
+
+    const widget = cleanServiceGroups(rawGroups)[0].services[0].widgets[0];
+    expect(widget.photoBaseUrl).toBe("https://hr.example.com");
+    expect(widget.url).toBeUndefined();
+    expect(JSON.stringify(widget)).not.toContain("SECRET");
+  });
+
   it("cleanServiceGroups omits the roster calendar flag when credentials are incomplete", async () => {
     const mod = await import("./service-helpers");
     const { cleanServiceGroups } = mod;
