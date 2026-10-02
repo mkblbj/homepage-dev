@@ -27,6 +27,8 @@ import useWidgetAPI from "utils/proxy/use-widget-api";
  *   右   部門パネル: 1 人 1 リング = 予定の班次に対する経過。下に予定の退勤時刻。
  *        どの部門も 7 人以下なら大きいリング、超えたら全部門そろって小さいリング。
  *        リングの中央は顔写真(名前・数字は置かない)。予定前の人は写真を淡く。
+ *        いるはずなのに打刻のない人(遅れ・欠勤)はリング右下に小さな「!」。
+ *        いない人(予定前・欠勤)は名前と時刻も控えめにする。
  *        退勤すると灰色の閉じたリングになり、写真を暗く沈めてチェックを重ねる。
  *        どの状態でも位置は動かない。
  *        進捗率・残り時間・実際の打刻時刻はホバーの title に入れる。
@@ -377,6 +379,36 @@ function SummaryPanel({ rings, present, total, legend }) {
   );
 }
 
+// Due but not punched in (late, or the whole shift missed): a small "!" on the ring's
+// lower-right edge. A notice rather than an alarm, so it stays small and off the face.
+// The halo is translucent so it parts the badge from whatever background lies behind it.
+function NoticeBadge({ ringSize }) {
+  const size = Math.max(14, Math.round(ringSize * 0.24));
+  // centred on the ring's outline at the 45° point
+  const inset = Math.round((ringSize * (1 - Math.SQRT1_2)) / 2 - size / 2);
+  const glyph = Math.round(size * 0.78);
+  return (
+    <span
+      aria-hidden="true"
+      className="absolute grid place-items-center rounded-full bg-[#E25A45] text-white shadow-[0_0_0_2px_rgba(255,255,255,0.65)] dark:bg-[#FF8E7E] dark:text-[#4A140C] dark:shadow-[0_0_0_2px_rgba(0,0,0,0.3)]"
+      style={{ width: size, height: size, right: inset, bottom: inset }}
+    >
+      <svg
+        width={glyph}
+        height={glyph}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={3.4}
+        strokeLinecap="round"
+      >
+        <path d="M12 5.5v8" />
+        <circle cx="12" cy="18.5" r="1.9" fill="currentColor" stroke="none" />
+      </svg>
+    </span>
+  );
+}
+
 // Photo by state: gone → sunk dark under the check; not in yet → faded; everyone else as is.
 const PHOTO_STATE_STYLE = {
   done: { filter: "grayscale(0.6) brightness(0.45)" },
@@ -387,6 +419,7 @@ const PHOTO_STATE_STYLE = {
 function Tile({ tile, ring, onTakadaManualToggle }) {
   const compact = ring === "compact";
   const done = tile.state === "done";
+  const flagged = tile.state === "late" || tile.state === "absent";
   const [failedPhotoUrl, setFailedPhotoUrl] = useState(null);
   const showPhoto = Boolean(tile.photoUrl && tile.photoUrl !== failedPhotoUrl);
   const nameClass = `block min-w-0 max-w-full truncate ${compact ? "text-[11.5px]" : "text-[12px]"} ${
@@ -421,6 +454,7 @@ function Tile({ tile, ring, onTakadaManualToggle }) {
             <CheckIcon size={Math.round(tile.ring.size * 0.34)} />
           </span>
         ) : null}
+        {flagged ? <NoticeBadge ringSize={tile.ring.size} /> : null}
       </Ring>
 
       {tile.canManualToggle ? (
@@ -448,9 +482,10 @@ function Tile({ tile, ring, onTakadaManualToggle }) {
           退勤済
         </span>
       ) : tile.hasSlot ? (
+        // The time steps back with the name for people who are not here (not due yet, or missed).
         <span
-          className={`whitespace-nowrap font-extrabold leading-none tabular-nums text-[color:var(--ink)] ${
-            compact ? "text-[13px]" : "text-[14px]"
+          className={`whitespace-nowrap leading-none tabular-nums ${compact ? "text-[13px]" : "text-[14px]"} ${
+            tile.emphasized ? "font-extrabold text-[color:var(--ink)]" : `font-semibold ${TEXT_MUTED}`
           }`}
         >
           {tile.endLabel}
