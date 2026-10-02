@@ -282,13 +282,20 @@ describe("widgets/uoattendance/component", () => {
 
     renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
 
-    // working, late, walk-in: nothing but the drawn ring itself
-    ["温 剛", "高田 健治", "予定外 太郎", "李 玲"].forEach((name) => {
+    // working, walk-in: nothing but the drawn ring itself
+    ["温 剛", "予定外 太郎", "李 玲"].forEach((name) => {
       const ring = ringOf(name);
       expect(ring).toHaveTextContent("");
       expect(ring.querySelector("svg")).toBeNull();
       [...ring.children].forEach((layer) => expect(layer).toHaveAttribute("aria-hidden", "true"));
     });
+
+    // late: only the small notice badge on the edge, the centre stays clear
+    const late = ringOf("高田 健治");
+    expect(late).toHaveTextContent("");
+    expect(late.querySelectorAll("svg")).toHaveLength(1);
+    expect(late.querySelector("svg path")).toHaveAttribute("d", "M12 5.5v8");
+    [...late.children].forEach((layer) => expect(layer).toHaveAttribute("aria-hidden", "true"));
 
     // off work: a check in the middle, still no text
     const done = ringOf("周 阔");
@@ -341,6 +348,68 @@ describe("widgets/uoattendance/component", () => {
       expect(img.style.filter).toBe("");
       expect(img.style.opacity).toBe("");
     });
+  });
+
+  it("marks people who are due but not punched in with a small notice badge", () => {
+    mockApi(liveData);
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+
+    const notice = (name) => ringOf(name).querySelector('svg path[d="M12 5.5v8"]');
+    // 高田 was due at 09:00 and has not punched in by 14:30
+    expect(notice("高田 健治")).not.toBeNull();
+    expect(notice("高田 健治").closest("span")).toHaveAttribute("aria-hidden", "true");
+    // here, gone home, or a walk-in: no badge
+    ["温 剛", "周 阔", "予定外 太郎", "李 玲"].forEach((name) => expect(notice(name)).toBeNull());
+  });
+
+  it("keeps the badge once a whole shift has been missed, and lets the time step back", () => {
+    vi.setSystemTime(new Date("2026-07-06T18:30:00"));
+    mockApi(liveData);
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+
+    // 高田's 09:00–18:00 shift is over with no punch
+    expect(getTile("高田 健治　09:00–18:00　欠勤")).toBeInTheDocument();
+    expect(ringOf("高田 健治").querySelector('svg path[d="M12 5.5v8"]')).not.toBeNull();
+    const end = within(ringOf("高田 健治").parentElement).getByText("18:00");
+    expect(end).not.toHaveClass("text-[color:var(--ink)]");
+    expect(end).toHaveClass("text-neutral-600", "dark:text-white/70");
+  });
+
+  it("dims the scheduled end of people not due yet, like their photo and name", () => {
+    const roster = {
+      ...todaySnapshot,
+      count: 5,
+      employees: [
+        ...todaySnapshot.employees,
+        {
+          employee: "88",
+          employee_name: "山本 健",
+          department_category: "Production",
+          shift_label: "15-22",
+          start_time: "15:00",
+          end_time: "22:00",
+          attendance_status: "not_checked_in",
+        },
+      ],
+      departments: { Office: { count: 2, employees: [] }, Production: { count: 3, employees: [] } },
+    };
+    mockApi({ ...liveData, today: { message: { today: roster } } });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+
+    const upcoming = within(ringOf("山本 健").parentElement).getByText("22:00");
+    expect(upcoming).not.toHaveClass("text-[color:var(--ink)]");
+    expect(upcoming).toHaveClass("text-neutral-600", "dark:text-white/70");
+    // not due yet is not a problem: no badge
+    expect(ringOf("山本 健").querySelector('svg path[d="M12 5.5v8"]')).toBeNull();
+
+    // working and late people keep the bold department colour
+    within(ringOf("温 剛").parentElement)
+      .getAllByText("18:00")
+      .forEach((time) => expect(time).toHaveClass("text-[color:var(--ink)]"));
+    expect(within(ringOf("高田 健治").parentElement).getByText("18:00")).toHaveClass("text-[color:var(--ink)]");
   });
 
   it("keeps the check readable on an empty centre when someone who left has no photo", () => {
