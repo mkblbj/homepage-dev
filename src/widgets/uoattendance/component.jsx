@@ -135,9 +135,10 @@ const PALETTE_SWITCH = [
 ].join(" ");
 
 // Department-independent ring colors: not-yet-started track, closed ring once off work,
-// late/absent track, and the head's shadow.
+// late/absent track, and the head's shadow. The first and third are drawn dashed, so
+// they run a little stronger than a solid track would need.
 const RING_BASE_VARS = [
-  "[--ring-idle:rgba(15,23,42,0.1)] dark:[--ring-idle:rgba(255,255,255,0.14)]",
+  "[--ring-idle:rgba(15,23,42,0.2)] dark:[--ring-idle:rgba(255,255,255,0.24)]",
   "[--ring-closed:rgba(15,23,42,0.2)] dark:[--ring-closed:rgba(255,255,255,0.26)]",
   "[--ring-alert:rgba(220,70,50,0.3)] dark:[--ring-alert:rgba(255,142,126,0.38)]",
   "[--ring-shadow:rgba(0,0,0,0.3)] dark:[--ring-shadow:rgba(0,0,0,0.5)]",
@@ -279,8 +280,16 @@ function CalendarIcon({ className }) {
 function Ring({ ring, children }) {
   const { size, stroke, glow } = ring;
   const mask = `radial-gradient(farthest-side, transparent calc(100% - ${stroke}px), #000 calc(100% - ${stroke - 0.5}px))`;
-  const band = (background) => (
-    <span aria-hidden="true" className="absolute inset-0 rounded-full" style={{ background, mask, WebkitMask: mask }} />
+  // The middle half of the band only, for the dashed outline of people not here yet.
+  const outer = stroke * 0.25;
+  const inner = stroke * 0.75;
+  const thinMask = `radial-gradient(farthest-side, transparent calc(100% - ${inner}px), #000 calc(100% - ${inner - 0.5}px), #000 calc(100% - ${outer + 0.5}px), transparent calc(100% - ${outer}px))`;
+  const band = (background, bandMask = mask) => (
+    <span
+      aria-hidden="true"
+      className="absolute inset-0 rounded-full"
+      style={{ background, mask: bandMask, WebkitMask: bandMask }}
+    />
   );
   const cap = (point, shadow) =>
     point ? (
@@ -300,7 +309,7 @@ function Ring({ ring, children }) {
 
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
-      {band(ring.track)}
+      {band(ring.track, ring.thinTrack ? thinMask : mask)}
       {ring.lap1 ? band(ring.lap1) : null}
       {cap(ring.startCap, false)}
       {ring.lap2 ? band(ring.lap2) : null}

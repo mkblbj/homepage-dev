@@ -225,13 +225,41 @@ test("tileRing stacks overtime as a second lap that never closes", () => {
   assert.match(tileRing("over", 5, 70, 9).lap2, /0\.97turn/);
 });
 
-test("tileRing uses the idle and alert tracks for people who have not arrived", () => {
-  assert.equal(tileRing("up", null, 70, 9).track, "var(--ring-idle)");
-  assert.equal(tileRing("late", null, 70, 9).track, "var(--ring-alert)");
-  assert.equal(tileRing("absent", null, 70, 9).track, "var(--ring-alert)");
-  // a sliver too thin to see draws nothing rather than two floating caps
-  assert.equal(tileRing("in", 0.001, 70, 9).endCap, null);
-  assert.equal(tileRing("in", -0.2, 70, 9).lap1, null);
+test("tileRing dashes the track of everyone who has not arrived", () => {
+  const dashes = (color) =>
+    `repeating-conic-gradient(from -0.0172turn, ${color} 0turn 0.0344turn, transparent 0.0344turn 0.0625turn)`;
+
+  assert.equal(tileRing("up", null, 70, 9).track, dashes("var(--ring-idle)"));
+  assert.equal(tileRing("late", null, 70, 9).track, dashes("var(--ring-alert)"));
+  assert.equal(tileRing("absent", null, 70, 9).track, dashes("var(--ring-alert)"));
+  // nobody there: a thin dashed outline, no start point, no arc
+  ["up", "late", "absent"].forEach((key) => {
+    const ring = tileRing(key, null, 70, 9);
+    assert.equal(ring.thinTrack, true);
+    assert.equal(ring.endCap, null);
+    assert.equal(ring.lap1, null);
+  });
+
+  // everyone who is (or was) here keeps a full, solid track
+  assert.equal(tileRing("in", 0.5, 70, 9).track, "var(--ring-track)");
+  assert.equal(tileRing("in", 0.5, 70, 9).thinTrack, false);
+  assert.equal(tileRing("over", 1.2, 70, 9).thinTrack, false);
+  assert.equal(tileRing("done", null, 70, 9).track, "var(--ring-closed)");
+  assert.equal(tileRing("done", null, 70, 9).thinTrack, false);
+});
+
+test("tileRing lights the start point as soon as someone punches in", () => {
+  const startDot = { left: 30.5, top: 0, color: "var(--ring-start)" };
+
+  // in early (before the shift), just started, and a walk-in with no shift at all
+  [-0.2, 0, 0.001, null].forEach((progress) => {
+    const ring = tileRing("in", progress, 70, 9);
+    assert.deepEqual(ring.endCap, startDot);
+    assert.equal(ring.startCap, null);
+    // no sliver of arc, just the dot
+    assert.equal(ring.lap1, null);
+    assert.equal(ring.track, "var(--ring-track)");
+  });
 });
 
 test("daySpan runs from the first scheduled start to the last scheduled end", () => {

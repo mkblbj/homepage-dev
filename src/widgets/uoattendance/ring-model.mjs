@@ -5,11 +5,15 @@
  * 定稿デザインの 6 状態へ写像し、進捗リングの幾何を組み立てる。
  *
  *   in      出勤中・予定終了前   リング = 班次の経過(予定開始 → 予定終了)
+ *                                弧がまだ無い(早出・打刻直後・予定外)ときも開始点を灯す
  *   over    出勤中・予定終了後   1 周目が満ちた上に 2 周目(残業分)を重ねる
  *   done    退勤済               閉じた灰色のリング(部門色を外して「もういない」を示す)
- *   up      未打刻・予定開始前   薄い下地だけ
- *   late    未打刻・予定開始後   赤みの下地(N分遅れ)
- *   absent  未打刻・予定終了後   赤みの下地(欠勤)
+ *   up      未打刻・予定開始前   点線の薄い下地
+ *   late    未打刻・予定開始後   点線の赤みの下地(N分遅れ)
+ *   absent  未打刻・予定終了後   点線の赤みの下地(欠勤)
+ *
+ * 実線 = その場にいる(いた)人、点線 = まだ来ていない人。色の濃淡に頼らず、
+ * 形だけで在・不在が分かるようにしている。
  *
  * 打刻は 1 人 1 件(出勤中なら IN、退勤済なら OUT)しか残らないので、進捗は
  * 打刻ではなく予定の時間帯で測る。予定の無い人(予定外の飛び込み・未設定)は
@@ -185,6 +189,18 @@ function arc(from, to, fraction) {
   return `conic-gradient(${from} 0turn, ${to} ${turn}turn, transparent ${turn}turn)`;
 }
 
+// The dashed track for people who are not here yet, drawn at half the stroke
+// (thinTrack) so it reads as a light outline rather than a ring. A fixed dash count
+// keeps the pattern in proportion on every ring size; one dash sits on twelve o'clock.
+const DASHES = 16;
+const DASH_SHARE = 0.55;
+
+function dashed(color) {
+  const period = 1 / DASHES;
+  const dash = Number((period * DASH_SHARE).toFixed(4));
+  return `repeating-conic-gradient(from ${-dash / 2}turn, ${color} 0turn ${dash}turn, transparent ${dash}turn ${period}turn)`;
+}
+
 /*
  * Layers, bottom to top: track → lap1 → startCap → lap2 → endCap.
  * lap1 is the shift so far (start → head); past 100% it closes into a full
@@ -192,19 +208,21 @@ function arc(from, to, fraction) {
  * second full turn so the two laps never read as one.
  */
 export function tileRing(key, progress, size, stroke) {
-  const base = { track: RING.track, lap1: null, lap2: null, startCap: null, endCap: null };
+  const base = { track: RING.track, thinTrack: false, lap1: null, lap2: null, startCap: null, endCap: null };
 
   if (key === "done") {
     return { ...base, track: RING.closed };
   }
   if (key === "up") {
-    return { ...base, track: RING.idle };
+    return { ...base, track: dashed(RING.idle), thinTrack: true };
   }
   if (key === "late" || key === "absent") {
-    return { ...base, track: RING.alert };
+    return { ...base, track: dashed(RING.alert), thinTrack: true };
   }
   if (progress == null || progress < MIN_ARC) {
-    return base;
+    // Punched in but no arc to draw yet (in early, just started, or a walk-in with no
+    // shift): light the start point anyway, so the ring already reads as running.
+    return { ...base, endCap: { ...capAt(0, size, stroke), color: RING.start } };
   }
   if (progress > 1) {
     const extra = clamp(progress - 1, 0.02, 0.97);
