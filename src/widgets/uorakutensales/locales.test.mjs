@@ -105,6 +105,11 @@ const REQUIRED_KEYS = [
   "slowingNote",
   "rankNew",
   "prevRankNone",
+  "styleGroup",
+  "styleAll",
+  "styleFolio",
+  "styleStandard",
+  "styleUnknown",
 ];
 
 function loadNamespace(locale) {

@@ -11,6 +11,8 @@ import {
   deviceTypes,
   monthlyDeviceSales,
   slowingDeviceSales,
+  styledDeviceSales,
+  styledSlowingDeviceSales,
 } from "./device-sales.fixtures.mjs";
 
 const SE_NAME = "iPhone SE（第2代） / iPhone SE（第3代）";
@@ -41,6 +43,17 @@ const models = (type) =>
     .map((el) => el.textContent);
 const click = (name, role = "button") => fireEvent.click(screen.getByRole(role, { name }));
 const shopSelect = () => screen.getByRole("combobox", { name: /uorakutensales\.shopLabel/ });
+const styleSwitch = (type) =>
+  within(screen.getByTestId(`device-column-${type}`)).queryByRole("group", { name: "uorakutensales.styleGroup" });
+const chips = (type) =>
+  within(styleSwitch(type))
+    .getAllByRole("button")
+    .map((b) => b.textContent);
+const pickStyle = (type, name) => fireEvent.click(within(styleSwitch(type)).getByRole("button", { name }));
+function renderStyled() {
+  const { daily, monthly } = styledDeviceSales();
+  return renderBoard(daily, monthly, { period: null });
+}
 
 describe("widgets/uorakutensales/device-sales-section", () => {
   it("opens on today's best sellers by units, all three categories at once", () => {
@@ -250,5 +263,99 @@ describe("widgets/uorakutensales/device-sales-section", () => {
     const second = render(board(undefined, monthlyDeviceSales()));
     second.rerender(board(dailyDeviceSales(), monthlyDeviceSales()));
     expect(pressed("uorakutensales.thisMonth")).toBe("true");
+  });
+  it("splits the case and set columns by style, each with its share, and leaves films alone", () => {
+    renderStyled();
+
+    expect(chips("case")).toEqual([
+      "uorakutensales.styleAll",
+      "uorakutensales.styleFolio58%",
+      "uorakutensales.styleStandard42%",
+    ]);
+    expect(chips("case_film_set")).toEqual([
+      "uorakutensales.styleAll",
+      "uorakutensales.styleFolio0%",
+      "uorakutensales.styleStandard100%",
+    ]);
+    expect(styleSwitch("film")).toBeNull();
+    // on a wide board the film column keeps the switch's slot, so the rows line up
+    expect(within(screen.getByTestId("device-column-film")).getByTestId("style-spacer")).toBeInTheDocument();
+  });
+
+  it("re-ranks a column by the chosen style, with that style's own total", () => {
+    renderStyled();
+
+    pickStyle("case", /styleStandard/);
+
+    expect(models("case")).toEqual(["Galaxy A25", "Google Pixel 10a", "iPhone 17 e"]);
+    expect(within(styleSwitch("case")).getByRole("button", { name: /styleStandard/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(column("case").getByText(`80${U}`)).toBeInTheDocument();
+    // the set column keeps its own choice
+    expect(models("case_film_set")).toEqual(["AQUOS wish4"]);
+  });
+
+  it("compares this month's ranks with last month's within the same style", () => {
+    renderStyled();
+
+    pickStyle("case", /styleFolio/);
+
+    expect(
+      column("case")
+        .getAllByTestId("device-move")
+        .map((el) => el.textContent),
+    ).toEqual(["↑1", "uorakutensales.rankNew", "↓2"]);
+  });
+
+  it("offers 不明 only while it holds units, and falls back to すべて once it is gone", () => {
+    renderStyled();
+    click("uorakutensales.lastMonth");
+
+    expect(chips("case")).toContain("uorakutensales.styleUnknown1%");
+    pickStyle("case", /styleUnknown/);
+    expect(models("case")).toEqual(["Galaxy A25"]);
+
+    click("uorakutensales.thisMonth");
+    expect(chips("case")).toEqual([
+      "uorakutensales.styleAll",
+      "uorakutensales.styleFolio58%",
+      "uorakutensales.styleStandard42%",
+    ]);
+    expect(within(styleSwitch("case")).getByRole("button", { name: "uorakutensales.styleAll" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(models("case")).toEqual(["Google Pixel 10a", "Galaxy A25", "iPhone 17 e"]);
+  });
+
+  it("reads a chosen shop's style board", () => {
+    renderStyled();
+
+    fireEvent.change(shopSelect(), { target: { value: "3911" } });
+    pickStyle("case", /styleFolio/);
+
+    expect(models("case")).toEqual(["Galaxy A25"]);
+    expect(column("case").getAllByText(`10${U}`).length).toBeGreaterThan(0);
+  });
+
+  it("keeps the style in 失速 and ranks that style's slowdown", () => {
+    const { daily, monthly } = styledSlowingDeviceSales();
+    renderBoard(daily, monthly, { period: null });
+    click("uorakutensales.viewSlowing");
+
+    pickStyle("case", /styleFolio/);
+    expect(models("case")).toEqual(["Galaxy A25", "arrows We3"]);
+
+    pickStyle("case", /styleStandard/);
+    expect(models("case")).toEqual(["arrows We3", "DIGNO BX3"]);
+  });
+
+  it("shows no style switch, and no empty slot, for a server without styles", () => {
+    renderBoard();
+
+    expect(screen.queryAllByRole("group", { name: "uorakutensales.styleGroup" })).toHaveLength(0);
+    expect(screen.queryAllByTestId("style-spacer")).toHaveLength(0);
   });
 });
