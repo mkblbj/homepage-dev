@@ -22,8 +22,11 @@ function t(key, opts) {
   return opts ? `${key} ${Object.values(opts).join("/")}` : key;
 }
 
-function renderBoard(daily = dailyDeviceSales(), monthly = monthlyDeviceSales()) {
-  return render(<DeviceSalesSection devices={buildDeviceSales(daily, monthly)} cardCls="" t={t} />);
+// the board opens on this month; most cases read today's fixture, so they start there
+function renderBoard(daily = dailyDeviceSales(), monthly = monthlyDeviceSales(), { period = "uorakutensales.periodToday" } = {}) {
+  const view = render(<DeviceSalesSection devices={buildDeviceSales(daily, monthly)} cardCls="" t={t} />);
+  if (period) fireEvent.click(screen.getByRole("button", { name: period }));
+  return view;
 }
 
 // jsdom loads no CSS, so every column is in the DOM; read each one on its own
@@ -225,15 +228,21 @@ describe("widgets/uorakutensales/device-sales-section", () => {
     expect(screen.queryAllByTestId("device-move")).toHaveLength(0);
   });
 
-  it("opens on today once the daily board lands, even when the month board arrived first", () => {
-    const { rerender } = render(
-      <DeviceSalesSection devices={buildDeviceSales(undefined, monthlyDeviceSales())} cardCls="" t={t} />,
-    );
-    expect(screen.getByRole("button", { name: "uorakutensales.thisMonth" })).toHaveAttribute("aria-pressed", "true");
+  it("opens on this month whichever board arrives first", () => {
+    const board = (daily, monthly) => <DeviceSalesSection devices={buildDeviceSales(daily, monthly)} cardCls="" t={t} />;
+    const pressed = (name) => screen.getByRole("button", { name }).getAttribute("aria-pressed");
 
-    rerender(<DeviceSalesSection devices={buildDeviceSales(dailyDeviceSales(), monthlyDeviceSales())} cardCls="" t={t} />);
+    // today landed first: show it rather than nothing, then move to the default
+    const first = render(board(dailyDeviceSales(), undefined));
+    expect(pressed("uorakutensales.periodToday")).toBe("true");
+    first.rerender(board(dailyDeviceSales(), monthlyDeviceSales()));
+    expect(pressed("uorakutensales.thisMonth")).toBe("true");
+    expect(models("case")).toEqual(["Google Pixel 10a", "Galaxy A25", "iPhone 17 e"]);
+    first.unmount();
 
-    expect(screen.getByRole("button", { name: "uorakutensales.periodToday" })).toHaveAttribute("aria-pressed", "true");
-    expect(models("case")).toEqual(["iPhone 17", "OPPO Reno13 A", SE_NAME]);
+    // the month board landed first: it stays there when today follows
+    const second = render(board(undefined, monthlyDeviceSales()));
+    second.rerender(board(dailyDeviceSales(), monthlyDeviceSales()));
+    expect(pressed("uorakutensales.thisMonth")).toBe("true");
   });
 });

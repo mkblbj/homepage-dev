@@ -16,8 +16,8 @@ import { useState } from "react";
 import {
   categoryMix,
   DEFAULT_DEVICE_METRIC,
+  DEFAULT_DEVICE_PERIOD,
   DEVICE_METRICS,
-  DEVICE_PERIODS,
   DEVICE_STEPS,
   DEVICE_TYPES,
   metricReady,
@@ -325,9 +325,9 @@ function SlowingColumn({ type, slowing, visible, step, onStep, expanded, onExpan
 }
 
 export default function DeviceSalesSection({ devices, cardCls, t }) {
-  // today by default, even when the month board lands first and today is
-  // not there yet: the fallback below covers the gap, the choice outlives it
-  const [period, setPeriod] = useState(DEVICE_PERIODS[0]);
+  // this month by default, whichever board lands first: until it is there the
+  // fallback below shows what is, and the board moves to it once it arrives
+  const [period, setPeriod] = useState(DEFAULT_DEVICE_PERIOD);
   const [view, setView] = useState(VIEWS[0]);
   const [metric, setMetric] = useState(DEFAULT_DEVICE_METRIC);
   const [shop, setShop] = useState(ALL);

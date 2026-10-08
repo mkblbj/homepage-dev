@@ -14,8 +14,12 @@
  * Missing stays missing: no board → null, money not filled in yet → null, never 0.
  */
 
-// tab order in the UI, default first
+// tab order in the UI
 export const DEVICE_PERIODS = Object.freeze(["today", "thisMonth", "lastMonth"]);
+// the board opens on the month: a day's handful of sales rarely tells one model
+// from the next, while the month (today included) ranks them clearly
+export const DEFAULT_DEVICE_PERIOD = "thisMonth";
+// category order in the UI, default first
 export const DEVICE_TYPES = Object.freeze(["case", "film", "case_film_set"]);
 // the API ranks by units, so units lead; the toggle re-ranks by the other two
 export const DEVICE_METRICS = Object.freeze(["units", "sales", "orders"]);
