@@ -29,4 +29,17 @@ describe("components/tab", () => {
     expect(setActiveTab).toHaveBeenCalledWith("my-tab");
     expect(window.location.hash).toBe("#my-tab");
   });
+
+  it("renders without writing to the console", () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    render(
+      <TabContext.Provider value={{ activeTab: "my-tab", setActiveTab: vi.fn() }}>
+        <Tab tab="My Tab" />
+      </TabContext.Provider>,
+    );
+
+    expect(log).not.toHaveBeenCalled();
+    log.mockRestore();
+  });
 });

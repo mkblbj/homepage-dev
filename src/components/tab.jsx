@@ -15,9 +15,6 @@ export default function Tab({ tab }) {
   const { activeTab, setActiveTab } = useContext(TabContext);
   const { badges } = useTabBadge() || {};
 
-  // Debug log
-  console.log("[Tab Badge Debug]", { tab, badges, badgeForTab: badges?.[tab] });
-
   const matchesTab = decodeURIComponent(activeTab) === slugify(tab);
   const badgeCount = badges?.[tab] || 0;
 
