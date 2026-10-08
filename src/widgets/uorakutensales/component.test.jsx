@@ -13,7 +13,7 @@ vi.mock("utils/proxy/use-widget-api", () => ({
 }));
 
 import Component from "./component";
-import { dailyDeviceSales, monthlyDeviceSales } from "./device-sales.fixtures.mjs";
+import { dailyDeviceSales, marketDeviceModels, monthlyDeviceSales } from "./device-sales.fixtures.mjs";
 
 const service = {
   widget: { type: "uorakutensales", refreshInterval: 60000 },
@@ -182,5 +182,26 @@ describe("widgets/uorakutensales/component", () => {
     expect(screen.queryByText("uorakutensales.deviceSales")).not.toBeInTheDocument();
     // the rest of the widget is untouched
     expect(screen.getByText("uorakutensales.title")).toBeInTheDocument();
+  });
+  it("offers the 市場 view only when the server has the market reference", () => {
+    const notFound = { error: { message: "Rakuten sales service error", data: { error: "Not Found" } } };
+    let payload = { devices: dailyDeviceSales(), devicesMonthly: monthlyDeviceSales(), market: marketDeviceModels() };
+    useWidgetAPI.mockImplementation((_widget, endpoint) => {
+      if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
+      return { data: payload[endpoint], error: undefined, mutate: vi.fn() };
+    });
+
+    const { rerender } = renderWithProviders(<Component service={service} />, {
+      settings: { hideErrors: false },
+    });
+    expect(screen.getByRole("button", { name: "uorakutensales.viewMarket" })).toBeInTheDocument();
+
+    payload = { ...payload, market: notFound };
+    rerender(
+      <SettingsContext.Provider value={{ settings: { hideErrors: false }, setSettings: () => {} }}>
+        <Component service={service} />
+      </SettingsContext.Provider>,
+    );
+    expect(screen.queryByRole("button", { name: "uorakutensales.viewMarket" })).not.toBeInTheDocument();
   });
 });

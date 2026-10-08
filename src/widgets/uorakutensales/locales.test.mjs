@@ -110,6 +110,27 @@ const REQUIRED_KEYS = [
   "styleFolio",
   "styleStandard",
   "styleUnknown",
+  "viewMarket",
+  "marketTitle",
+  "marketReference",
+  "marketRecorded",
+  "marketStale",
+  "marketWeights",
+  "marketScore",
+  "marketRakuten",
+  "marketYahooSearch",
+  "marketYahooProducts",
+  "marketOwnRank",
+  "marketOwnValue",
+  "marketOwnRow",
+  "flagNone",
+  "flagWeak",
+  "flagStrong",
+  "flagNoneNote",
+  "flagWeakNote",
+  "flagStrongNote",
+  "marketNotReady",
+  "marketNote",
 ];
 
 function loadNamespace(locale) {
@@ -160,5 +181,19 @@ test("device board placeholders are preserved across locales", () => {
     assert.match(ns.slowingEligible, /\{\{count\}\}/, `${locale}.slowingEligible needs {{count}}`);
     assert.match(ns.prevRank, /\{\{rank\}\}/, `${locale}.prevRank needs {{rank}}`);
     assert.match(ns.slowingNote, /\{\{min\}\}/, `${locale}.slowingNote needs {{min}}`);
+  }
+});
+
+test("市場 placeholders are preserved across locales", () => {
+  for (const locale of LOCALES) {
+    const ns = loadNamespace(locale);
+    assert.match(ns.marketRecorded, /\{\{recorded\}\}.*\{\{expected\}\}/, `${locale}.marketRecorded`);
+    for (const name of ["rakuten", "yahooSearch", "yahooProducts"]) {
+      assert.match(ns.marketWeights, new RegExp(`\\{\\{${name}\\}\\}`), `${locale}.marketWeights needs {{${name}}}`);
+    }
+    assert.match(ns.marketOwnValue, /\{\{metric\}\}/, `${locale}.marketOwnValue`);
+    assert.match(ns.marketOwnRow, /\{\{rank\}\}.*\{\{value\}\}/, `${locale}.marketOwnRow`);
+    assert.match(ns.flagWeakNote, /\{\{top\}\}.*\{\{from\}\}/, `${locale}.flagWeakNote`);
+    assert.match(ns.flagStrongNote, /\{\{to\}\}/, `${locale}.flagStrongNote`);
   }
 });
