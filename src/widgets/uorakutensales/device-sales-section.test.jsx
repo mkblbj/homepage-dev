@@ -3,7 +3,13 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { COMPAT_LONG, dailyDeviceSales, deviceTypes, monthlyDeviceSales } from "./device-sales.fixtures.mjs";
+import {
+  COMPAT_LONG,
+  dailyDeviceSales,
+  deviceTypes,
+  monthlyDeviceSales,
+  slowingDeviceSales,
+} from "./device-sales.fixtures.mjs";
 import { buildDeviceSales } from "./device-sales-model.mjs";
 import DeviceSalesSection from "./device-sales-section";
 
@@ -170,5 +176,32 @@ describe("widgets/uorakutensales/device-sales-section", () => {
     expect(models("case")).toHaveLength(12);
     fireEvent.click(column("case").getByRole("button", { name: "uorakutensales.showLess" }));
     expect(models("case")).toHaveLength(10);
+  });
+
+  it("switches to 失速 on this month and ranks models by the pace they lost", () => {
+    const { daily, monthly } = slowingDeviceSales();
+    renderBoard(daily, monthly);
+
+    click("uorakutensales.viewSlowing");
+
+    expect(screen.getByRole("button", { name: "uorakutensales.thisMonth" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "uorakutensales.periodToday" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "uorakutensales.lastMonth" })).toBeDisabled();
+    expect(models("case")).toEqual(["arrows We3", "Galaxy A25", "DIGNO BX3"]);
+    expect(
+      within(column("case").getAllByTestId("device-row")[0]).getByText(`−7.0${U}uorakutensales.perDay`),
+    ).toBeInTheDocument();
+  });
+
+  it("says why 失速 cannot compare yet", () => {
+    const { daily, monthly } = slowingDeviceSales();
+    daily.sourceDateJST = "2026-10-01";
+    monthly.currentMonth.endDate = "2026-10-01";
+    renderBoard(daily, monthly);
+
+    click("uorakutensales.viewSlowing");
+
+    expect(screen.getByText("uorakutensales.slowingMonthStart")).toBeInTheDocument();
+    expect(screen.queryAllByTestId("device-row")).toHaveLength(0);
   });
 });

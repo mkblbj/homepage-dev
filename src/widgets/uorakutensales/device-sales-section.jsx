@@ -1,11 +1,15 @@
 /*
  * 機種別販売 — the device-model board of the uorakutensales widget
- * (Claude Design canvas "A+ 決定案").
+ * (Claude Design canvas "A+ 決定案" and "A+ 失速ビュー").
  *
  * Wide (the board at 64rem or more): the 3カテゴリ合計 strip, then ケース /
  * フィルム / ケース+フィルム side by side. Narrower, the strip's legend turns
  * into the category tabs and one category shows at a time. The board follows
  * its own width (@container/devices), not the window's.
+ *
+ * Three ways to read it: 売れ筋 (most first), 少ない順 (the same ranking from
+ * the bottom) and 失速 (this month's daily pace against last month's — this
+ * month only).
  */
 import { useState } from "react";
 
@@ -18,12 +22,23 @@ import {
   metricReady,
   rankDeviceBoard,
 } from "./device-sales-model.mjs";
-import { DeviceRow, ListHeader, metricText, MUTED, NS, press } from "./device-sales-row";
+import {
+  changeText,
+  DeviceRow,
+  ListHeader,
+  metricText,
+  MUTED,
+  NS,
+  paceText,
+  press,
+  SlowingRow,
+} from "./device-sales-row";
+import { buildSlowing, SLOWING_MIN_UNITS, slowingTotals, slowingWindow } from "./device-slowing-model.mjs";
 import { mdLabel, timeFromJST, weekdayJp } from "./sales-model.mjs";
 
 const ALL = "__all__";
-const VIEWS = ["best", "least"];
-const VIEW_LABEL = { best: "viewBest", least: "viewLeast" };
+const VIEWS = ["best", "least", "slowing"];
+const VIEW_LABEL = { best: "viewBest", least: "viewLeast", slowing: "viewSlowing" };
 const PERIOD_LABEL = { today: "periodToday", thisMonth: "thisMonth", lastMonth: "lastMonth" };
 const METRIC_LABEL = { units: "sortUnits", sales: "sortSales", orders: "sortOrders" };
 const TYPE_LABEL = { case: "typeCase", film: "typeFilm", case_film_set: "typeSet" };
@@ -31,6 +46,11 @@ const TYPE_LABEL = { case: "typeCase", film: "typeFilm", case_film_set: "typeSet
 const TYPE_SHORT = { case: "typeCase", film: "typeFilm", case_film_set: "typeSetShort" };
 // blue / orange / indigo differ in lightness as well as hue
 const TYPE_COLOR = { case: "#60A5FA", film: "#FDBA74", case_film_set: "#A5B4FC" };
+const SLOWING_REASON = {
+  monthStart: "slowingMonthStart",
+  lastMonthPending: "slowingLastMonthPending",
+  updating: "slowingUpdating",
+};
 
 const GROUP =
   "flex max-w-full flex-wrap gap-0.5 rounded-lg border border-theme-300/60 bg-theme-100/50 p-0.5 dark:border-theme-600/60 dark:bg-theme-900/30";
@@ -45,6 +65,7 @@ const TAB_OFF = "border-theme-300/60 text-theme-800 dark:border-theme-600/60 dar
 const MORE =
   "rounded-lg border border-theme-300/60 py-3 text-[12px] font-semibold text-theme-600 transition-colors hover:bg-theme-200/50 @xl/devices:py-1.5 @xl/devices:text-[11px] dark:border-theme-600/60 dark:text-theme-300 dark:hover:bg-theme-700/50";
 const EMPTY = "py-4 text-center text-[11px] text-theme-500 dark:text-theme-400";
+const LOSS = "font-extrabold text-rose-600 dark:text-rose-300";
 
 function Dot({ color }) {
   return <span aria-hidden="true" className="block h-2 w-2 shrink-0 rounded-sm" style={{ backgroundColor: color }} />;
@@ -85,7 +106,9 @@ function boardMeta(board, t) {
     .join(" · ");
 }
 
-function SummaryStrip({ totals, types, metric, tab, onTab, t }) {
+// pace: the 失速 line under the total; notes: per-category text that replaces
+// the legend's shares (the 失速 view shows each category's change there)
+function SummaryStrip({ totals, types, metric, tab, onTab, t, pace = null, notes = null }) {
   const mix = categoryMix(types, metric);
   const others = DEVICE_METRICS.filter((m) => m !== metric);
   // a share means something only when the bar is cut by the metric on screen
@@ -105,6 +128,13 @@ function SummaryStrip({ totals, types, metric, tab, onTab, t }) {
             {others.map((m) => metricText(m, totals?.[m], t)).join(" · ")}
           </span>
         </span>
+        {pace ? (
+          <span className="text-[12px] font-semibold tabular-nums text-theme-700 dark:text-theme-200">
+            {t(`${NS}.slowingPace`, { pace: paceText(pace.metric, pace.pace, t), prev: paceText(pace.metric, pace.prevPace, t) })}
+            {" · "}
+            <span className={LOSS}>{changeText(pace.changePct)}</span>
+          </span>
+        ) : null}
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <span aria-hidden="true" className="flex h-2.5 gap-0.5 overflow-hidden rounded-full bg-theme-300/30 dark:bg-white/10">
@@ -122,9 +152,13 @@ function SummaryStrip({ totals, types, metric, tab, onTab, t }) {
             <span key={part.key} className="flex items-center gap-1.5">
               <Dot color={TYPE_COLOR[part.key]} />
               <span className="font-semibold text-theme-700 dark:text-theme-200">{t(`${NS}.${TYPE_LABEL[part.key]}`)}</span>
-              <span className="font-extrabold tabular-nums text-theme-900 dark:text-theme-50">
-                {shareOf(part) != null ? `${shareOf(part).toFixed(1)}%` : metricText(metric, types[part.key][metric], t)}
-              </span>
+              {notes ? (
+                <span className={`tabular-nums ${LOSS}`}>{notes[part.key]}</span>
+              ) : (
+                <span className="font-extrabold tabular-nums text-theme-900 dark:text-theme-50">
+                  {shareOf(part) != null ? `${shareOf(part).toFixed(1)}%` : metricText(metric, types[part.key][metric], t)}
+                </span>
+              )}
             </span>
           ))}
         </span>
@@ -146,8 +180,9 @@ function SummaryStrip({ totals, types, metric, tab, onTab, t }) {
                   {t(`${NS}.${TYPE_SHORT[part.key]}`)}
                 </span>
                 <span className="text-[11px] font-semibold tabular-nums opacity-80">
-                  {metricText(metric, types[part.key][metric], t)}
-                  {shareOf(part) != null ? ` · ${Math.round(shareOf(part))}%` : ""}
+                  {notes
+                    ? notes[part.key]
+                    : `${metricText(metric, types[part.key][metric], t)}${shareOf(part) != null ? ` · ${Math.round(shareOf(part))}%` : ""}`}
                 </span>
               </button>
             );
@@ -158,24 +193,60 @@ function SummaryStrip({ totals, types, metric, tab, onTab, t }) {
   );
 }
 
-function CategoryColumn({ type, board, metric, order, visible, step, onStep, expanded, onExpand, t }) {
-  const ranked = rankDeviceBoard(board, metric, order);
-  const shown = ranked.slice(0, DEVICE_STEPS[step]);
-  // how many more the NEXT step would reveal (0 when this column has no more rows)
+function MoreLess({ step, nextStep, nextCount, onStep, t }) {
+  if (!(nextCount > 0 || step > 0)) return null;
+  return (
+    <div className="flex gap-2">
+      {nextCount > 0 ? (
+        <button type="button" onClick={press(() => onStep(nextStep))} className={`flex-1 ${MORE}`}>
+          {t(`${NS}.showMore`, { count: nextCount })}
+        </button>
+      ) : null}
+      {step > 0 ? (
+        <button type="button" onClick={press(() => onStep(0))} className={`px-3 ${MORE}`}>
+          {t(`${NS}.showLess`)}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+// the rows a reveal step shows, and what the next step would add
+function reveal(rows, step) {
+  const shown = rows.slice(0, DEVICE_STEPS[step]);
   const nextStep = step + 1 < DEVICE_STEPS.length ? step + 1 : null;
-  const nextCount = nextStep === null ? 0 : Math.min(DEVICE_STEPS[nextStep], ranked.length) - shown.length;
-  // one key per column: a combination can sell as a case and as a film
-  const keyOf = (row) => `${type}:${row.fullModel}`;
+  const nextCount = nextStep === null ? 0 : Math.min(DEVICE_STEPS[nextStep], rows.length) - shown.length;
+  return { shown, nextStep, nextCount };
+}
+
+function ColumnFrame({ type, visible, children }) {
   return (
     <div
       data-testid={`device-column-${type}`}
       className={`${visible ? "flex" : "hidden"} min-w-0 flex-col gap-2 p-3 @5xl/devices:flex ${PANEL}`}
     >
+      {children}
+    </div>
+  );
+}
+
+function ColumnName({ type, t }) {
+  return (
+    <span className="hidden items-center gap-2 @5xl/devices:flex">
+      <Dot color={TYPE_COLOR[type]} />
+      <span className="text-[13px] font-extrabold text-theme-900 dark:text-theme-50">{t(`${NS}.${TYPE_LABEL[type]}`)}</span>
+    </span>
+  );
+}
+
+function CategoryColumn({ type, board, metric, order, visible, step, onStep, expanded, onExpand, t }) {
+  const { shown, nextStep, nextCount } = reveal(rankDeviceBoard(board, metric, order), step);
+  // one key per column: a combination can sell as a case and as a film
+  const keyOf = (row) => `${type}:${row.fullModel}`;
+  return (
+    <ColumnFrame type={type} visible={visible}>
       <div className="flex min-w-0 items-center gap-2 px-0.5">
-        <span className="hidden items-center gap-2 @5xl/devices:flex">
-          <Dot color={TYPE_COLOR[type]} />
-          <span className="text-[13px] font-extrabold text-theme-900 dark:text-theme-50">{t(`${NS}.${TYPE_LABEL[type]}`)}</span>
-        </span>
+        <ColumnName type={type} t={t} />
         <span className={`min-w-0 truncate text-[10.5px] ${MUTED}`}>{boardMeta(board, t)}</span>
         <span className="ml-auto hidden text-[15px] font-extrabold tabular-nums text-theme-900 @5xl/devices:inline dark:text-theme-50">
           {metricText(metric, board[metric], t)}
@@ -200,21 +271,51 @@ function CategoryColumn({ type, board, metric, order, visible, step, onStep, exp
           </ol>
         </div>
       )}
-      {nextCount > 0 || step > 0 ? (
-        <div className="flex gap-2">
-          {nextCount > 0 ? (
-            <button type="button" onClick={press(() => onStep(nextStep))} className={`flex-1 ${MORE}`}>
-              {t(`${NS}.showMore`, { count: nextCount })}
-            </button>
-          ) : null}
-          {step > 0 ? (
-            <button type="button" onClick={press(() => onStep(0))} className={`px-3 ${MORE}`}>
-              {t(`${NS}.showLess`)}
-            </button>
-          ) : null}
+      <MoreLess step={step} nextStep={nextStep} nextCount={nextCount} onStep={onStep} t={t} />
+    </ColumnFrame>
+  );
+}
+
+function SlowingColumn({ type, slowing, visible, step, onStep, expanded, onExpand, t }) {
+  const { shown, nextStep, nextCount } = reveal(slowing?.rows ?? [], step);
+  const keyOf = (row) => `${type}:${row.fullModel}`;
+  return (
+    <ColumnFrame type={type} visible={visible}>
+      {slowing ? (
+        <div className="flex min-w-0 flex-col gap-0.5 px-0.5">
+          <div className="flex items-center gap-2">
+            <ColumnName type={type} t={t} />
+            <span className="ml-auto text-[14px] font-extrabold tabular-nums text-theme-900 dark:text-theme-50">
+              {paceText(slowing.metric, slowing.pace, t)}
+            </span>
+          </div>
+          <div className={`flex flex-wrap items-center gap-x-2 text-[10.5px] ${MUTED}`}>
+            <span className="min-w-0">{t(`${NS}.slowingEligible`, { min: SLOWING_MIN_UNITS, count: slowing.eligible })}</span>
+            <span className="ml-auto tabular-nums">
+              {t(`${NS}.lastMonth`)} {paceText(slowing.metric, slowing.prevPace, t)} ·{" "}
+              <span className={LOSS}>{changeText(slowing.changePct)}</span>
+            </span>
+          </div>
         </div>
       ) : null}
-    </div>
+      {shown.length === 0 ? (
+        <span className={EMPTY}>{t(`${NS}.noData`)}</span>
+      ) : (
+        <ol className="@container/list flex flex-col gap-0.5">
+          {shown.map((row) => (
+            <SlowingRow
+              key={row.fullModel}
+              row={row}
+              metric={slowing.metric}
+              expanded={expanded === keyOf(row)}
+              onToggle={() => onExpand(expanded === keyOf(row) ? null : keyOf(row))}
+              t={t}
+            />
+          ))}
+        </ol>
+      )}
+      <MoreLess step={step} nextStep={nextStep} nextCount={nextCount} onStep={onStep} t={t} />
+    </ColumnFrame>
   );
 }
 
@@ -230,8 +331,10 @@ export default function DeviceSalesSection({ devices, cardCls, t }) {
   // the combination row whose model list is open
   const [expanded, setExpanded] = useState(null);
 
-  // a period can vanish across refreshes → fall back to the first one left
-  const activeKey = devices.periods[period] ? period : devices.available[0];
+  const slowingOn = view === "slowing";
+  // 失速 lives on this month; a period can also vanish across refreshes
+  const wanted = slowingOn ? "thisMonth" : period;
+  const activeKey = devices.periods[wanted] ? wanted : devices.available[0];
   const current = devices.periods[activeKey];
   // a chosen shop can lack a board in another period or after a refresh → 全店
   const shopEntry = shop === ALL ? null : current.shops.find((s) => s.name === shop);
@@ -244,12 +347,28 @@ export default function DeviceSalesSection({ devices, cardCls, t }) {
   const moneyPending = Boolean(types) && (!metricOk("sales") || !metricOk("orders"));
   const order = view === "least" ? "asc" : "desc";
 
+  const scopeShop = shopEntry ? shop : null;
+  const span = slowingOn ? slowingWindow(devices) : null;
+  // the month board fell away under a running 失速 view: say so, never guess
+  const slowingReason = slowingOn ? (activeKey === "thisMonth" ? span.reason : "updating") : null;
+  const slowing =
+    slowingOn && !slowingReason
+      ? Object.fromEntries(DEVICE_TYPES.map((type) => [type, buildSlowing(devices, { shop: scopeShop, type, metric: activeMetric })]))
+      : null;
+  const pace = slowing ? slowingTotals(devices, { shop: scopeShop, metric: activeMetric }) : null;
+  const notes = slowing
+    ? Object.fromEntries(DEVICE_TYPES.map((type) => [type, changeText(slowing[type]?.changePct ?? null)]))
+    : null;
+
   // whatever changes what the board shows starts every column short again
   const choose = (setter) => (value) => {
     setter(value);
     setSteps({});
     setExpanded(null);
   };
+  const lockedPeriod = (key) => slowingOn && key !== "thisMonth";
+  const stepOf = (type) => steps[type] ?? 0;
+  const setStepOf = (type) => (step) => setSteps((prev) => ({ ...prev, [type]: step }));
 
   return (
     <section className={`@container/devices flex flex-col gap-3.5 p-4 ${cardCls}`}>
@@ -286,12 +405,15 @@ export default function DeviceSalesSection({ devices, cardCls, t }) {
             options={VIEWS.map((key) => [key, t(`${NS}.${VIEW_LABEL[key]}`)])}
             active={view}
             onPick={choose(setView)}
+            disabled={(key) => key === "slowing" && !devices.periods.thisMonth}
           />
           <Segmented
             label={t(`${NS}.periodGroup`)}
             options={devices.available.map((key) => [key, t(`${NS}.${PERIOD_LABEL[key]}`)])}
             active={activeKey}
             onPick={choose(setPeriod)}
+            disabled={lockedPeriod}
+            titleOf={(key) => (lockedPeriod(key) ? t(`${NS}.slowingOnlyThisMonth`) : undefined)}
           />
           <Segmented
             label={t(`${NS}.metricGroup`)}
@@ -326,31 +448,57 @@ export default function DeviceSalesSection({ devices, cardCls, t }) {
         </div>
       </div>
 
-      {types ? (
+      {slowingReason ? (
+        <span className={EMPTY}>{t(`${NS}.${SLOWING_REASON[slowingReason]}`)}</span>
+      ) : types ? (
         <>
-          <SummaryStrip totals={totals} types={types} metric={activeMetric} tab={tab} onTab={choose(setTab)} t={t} />
+          <SummaryStrip
+            totals={totals}
+            types={types}
+            metric={activeMetric}
+            tab={tab}
+            onTab={choose(setTab)}
+            t={t}
+            pace={pace}
+            notes={notes}
+          />
           <div className="grid grid-cols-1 gap-3 @5xl/devices:grid-cols-3">
-            {DEVICE_TYPES.map((type) => (
-              <CategoryColumn
-                key={type}
-                type={type}
-                board={types[type]}
-                metric={activeMetric}
-                order={order}
-                visible={tab === type}
-                step={steps[type] ?? 0}
-                onStep={(step) => setSteps((prev) => ({ ...prev, [type]: step }))}
-                expanded={expanded}
-                onExpand={setExpanded}
-                t={t}
-              />
-            ))}
+            {DEVICE_TYPES.map((type) =>
+              slowing ? (
+                <SlowingColumn
+                  key={type}
+                  type={type}
+                  slowing={slowing[type]}
+                  visible={tab === type}
+                  step={stepOf(type)}
+                  onStep={setStepOf(type)}
+                  expanded={expanded}
+                  onExpand={setExpanded}
+                  t={t}
+                />
+              ) : (
+                <CategoryColumn
+                  key={type}
+                  type={type}
+                  board={types[type]}
+                  metric={activeMetric}
+                  order={order}
+                  visible={tab === type}
+                  step={stepOf(type)}
+                  onStep={setStepOf(type)}
+                  expanded={expanded}
+                  onExpand={setExpanded}
+                  t={t}
+                />
+              ),
+            )}
           </div>
         </>
       ) : (
         <span className={EMPTY}>{t(`${NS}.deviceNotReady`)}</span>
       )}
 
+      {slowing ? <p className={`text-[10.5px] leading-relaxed ${MUTED}`}>{t(`${NS}.slowingNote`, { min: SLOWING_MIN_UNITS })}</p> : null}
       <p className={`text-[10.5px] leading-relaxed ${MUTED}`}>{t(`${NS}.deviceNote`)}</p>
     </section>
   );

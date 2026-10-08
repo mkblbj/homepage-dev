@@ -1509,7 +1509,17 @@
         "staleShops": "{{count}} 家店更新延迟",
         "deviceNotReady": "数据准备中",
         "deviceMetricsPending": "销售额、订单数准备中",
-        "deviceNote": "按下单日统计，排除取消（含未付款）。销售额为含税商品金额（不含运费、未扣优惠券），订单数已去重，与上方乐天销售额口径不同。"
+        "deviceNote": "按下单日统计，排除取消（含未付款）。销售额为含税商品金额（不含运费、未扣优惠券），订单数已去重，与上方乐天销售额口径不同。",
+        "viewSlowing": "失速",
+        "slowingOnlyThisMonth": "失速仅限本月（与上月对比）",
+        "slowingMonthStart": "月初，暂时无法比较",
+        "slowingLastMonthPending": "上月数据准备中，暂时无法比较",
+        "slowingUpdating": "更新中，下次读取后显示",
+        "slowingPace": "日均 {{pace}} · 上月 {{prev}}",
+        "slowingEligible": "上月 {{min}} 个以上的 {{count}} 款",
+        "slowingLossTitle": "每天减少",
+        "prevRank": "上月第 {{rank}} 名",
+        "slowingNote": "日均按本月已结束的天数（不含今天）与上月全月对比：只看上月卖出 {{min}} 个以上的机型，按每天减少量从大到小排列。"
     },
     "uoshippingdashboard": {
         "allPlatforms": "全部",

@@ -1496,7 +1496,17 @@
         "staleShops": "更新遅延 {{count}}店舗",
         "deviceNotReady": "集計準備中",
         "deviceMetricsPending": "売上・件数は準備中",
-        "deviceNote": "注文日ベース・キャンセル除外（未入金を含む）。売上は税込の商品金額（送料・クーポン控除前）、件数は重複なしの注文数で、上の楽天売上とは集計基準が異なります。"
+        "deviceNote": "注文日ベース・キャンセル除外（未入金を含む）。売上は税込の商品金額（送料・クーポン控除前）、件数は重複なしの注文数で、上の楽天売上とは集計基準が異なります。",
+        "viewSlowing": "失速",
+        "slowingOnlyThisMonth": "失速は今月のみ（先月と比較）",
+        "slowingMonthStart": "月初のため、まだ比較できません",
+        "slowingLastMonthPending": "先月のデータ準備中のため、まだ比較できません",
+        "slowingUpdating": "更新中です。次回の読み込みで表示されます",
+        "slowingPace": "1日平均 {{pace}} · 先月 {{prev}}",
+        "slowingEligible": "先月{{min}}個以上の{{count}}機種",
+        "slowingLossTitle": "1日あたりの減少",
+        "prevRank": "先月{{rank}}位",
+        "slowingNote": "1日平均は今月の完了日（今日の途中分は除く）と先月全体で比較しています。先月{{min}}個以上売れた機種のうち、1日あたりの減少が大きい順です。"
     },
     "uoshippingdashboard": {
         "allPlatforms": "全部",

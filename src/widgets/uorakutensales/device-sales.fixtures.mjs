@@ -212,3 +212,32 @@ export function monthlyDeviceSales() {
     },
   };
 }
+
+// One month whose three payloads agree — today is inside this month and the
+// month board already holds today's sales — for the 失速 view. Only the company
+// case boards move; films and sets stay empty on every side.
+export function slowingDeviceSales() {
+  const daily = dailyDeviceSales();
+  const monthly = monthlyDeviceSales();
+  daily.types = deviceTypes([
+    ["Galaxy A25", 6, 7200, 6],
+    ["arrows We3", 2, 2400, 2],
+    ["Rising", 2, 2400, 2],
+  ]);
+  monthly.currentMonth.types = deviceTypes([
+    ["Galaxy A25", 60, 72000, 58],
+    ["Rising", 32, 38400, 30],
+    ["arrows We3", 20, 24000, 19],
+  ]);
+  monthly.previousMonth.types = deviceTypes([
+    ["Galaxy A25", 420, 504000, 400],
+    ["arrows We3", 300, 360000, 290],
+    ["Rising", 90, 108000, 88],
+    ["DIGNO BX3", 60, 72000, 58],
+    ["Tiny", 20, 24000, 20],
+  ]);
+  daily.totals = totalsOf(daily.types);
+  monthly.currentMonth.totals = totalsOf(monthly.currentMonth.types);
+  monthly.previousMonth.totals = totalsOf(monthly.previousMonth.types);
+  return { daily, monthly };
+}

@@ -93,6 +93,16 @@ const REQUIRED_KEYS = [
   "deviceNotReady",
   "deviceMetricsPending",
   "deviceNote",
+  "viewSlowing",
+  "slowingOnlyThisMonth",
+  "slowingMonthStart",
+  "slowingLastMonthPending",
+  "slowingUpdating",
+  "slowingPace",
+  "slowingEligible",
+  "slowingLossTitle",
+  "prevRank",
+  "slowingNote",
 ];
 
 function loadNamespace(locale) {
@@ -134,5 +144,10 @@ test("device board placeholders are preserved across locales", () => {
     assert.match(ns.shopCoverage, /\{\{covered\}\}.*\{\{total\}\}/, `${locale}.shopCoverage needs {{covered}} then {{total}}`);
     assert.match(ns.missingShops, /\{\{names\}\}/, `${locale}.missingShops needs {{names}}`);
     assert.match(ns.staleShops, /\{\{count\}\}/, `${locale}.staleShops needs {{count}}`);
+    assert.match(ns.slowingPace, /\{\{pace\}\}.*\{\{prev\}\}/, `${locale}.slowingPace needs {{pace}} then {{prev}}`);
+    assert.match(ns.slowingEligible, /\{\{min\}\}/, `${locale}.slowingEligible needs {{min}}`);
+    assert.match(ns.slowingEligible, /\{\{count\}\}/, `${locale}.slowingEligible needs {{count}}`);
+    assert.match(ns.prevRank, /\{\{rank\}\}/, `${locale}.prevRank needs {{rank}}`);
+    assert.match(ns.slowingNote, /\{\{min\}\}/, `${locale}.slowingNote needs {{min}}`);
   }
 });

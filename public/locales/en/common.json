@@ -1496,7 +1496,17 @@
         "staleShops": "{{count}} shops delayed",
         "deviceNotReady": "Not ready yet",
         "deviceMetricsPending": "Sales and orders still loading",
-        "deviceNote": "By order date, cancellations excluded (unpaid included). Sales are tax-inclusive item amounts before shipping and coupons; orders are distinct. Not comparable with the Rakuten sales figures above."
+        "deviceNote": "By order date, cancellations excluded (unpaid included). Sales are tax-inclusive item amounts before shipping and coupons; orders are distinct. Not comparable with the Rakuten sales figures above.",
+        "viewSlowing": "Slowing",
+        "slowingOnlyThisMonth": "Slowing compares this month with last month",
+        "slowingMonthStart": "Too early in the month to compare",
+        "slowingLastMonthPending": "Last month is not ready to compare yet",
+        "slowingUpdating": "Updating — shows on the next refresh",
+        "slowingPace": "Per day {{pace}} · last month {{prev}}",
+        "slowingEligible": "{{count}} models with {{min}}+ last month",
+        "slowingLossTitle": "Lost per day",
+        "prevRank": "#{{rank}} last month",
+        "slowingNote": "Per-day averages compare this month's finished days (not today) with all of last month: models that sold {{min}}+ last month, biggest daily drop first."
     },
     "uoshippingdashboard": {
         "allPlatforms": "All",

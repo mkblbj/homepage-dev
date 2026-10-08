@@ -158,3 +158,44 @@ export function DeviceRow({ row, metric, expanded, onToggle, t }) {
     </li>
   );
 }
+
+// a metric per day: pieces and orders keep one decimal, yen rounds to whole
+export function paceText(metric, value, t) {
+  if (value == null) return "—";
+  const perDay = t(`${NS}.perDay`);
+  if (metric === "sales") return `¥${fmt(t, Math.round(value))}${perDay}`;
+  const unit = metric === "orders" ? t(`${NS}.ordersUnit`) : t(`${NS}.unitsShort`);
+  return `${value.toFixed(1)}${unit}${perDay}`;
+}
+
+// signed percentage with a real minus sign
+export function changeText(pct) {
+  if (pct == null) return "—";
+  return `${pct >= 0 ? "+" : "−"}${Math.abs(pct).toFixed(1)}%`;
+}
+
+export function SlowingRow({ row, metric, expanded, onToggle, t }) {
+  return (
+    <li data-testid="device-row" className="relative grid grid-cols-[22px_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 rounded-lg px-2 py-1.5">
+      <span className={`row-span-2 text-center text-[12px] font-extrabold tabular-nums ${MUTED}`}>{row.rank}</span>
+      <ModelName row={row} expanded={expanded} onToggle={onToggle} t={t} />
+      <span
+        title={t(`${NS}.slowingLossTitle`)}
+        className="text-right text-[13px] font-extrabold tabular-nums text-rose-600 dark:text-rose-300"
+      >
+        −{paceText(metric, row.loss, t)}
+      </span>
+      <span className={`col-span-2 flex min-w-0 items-center gap-2 text-[10.5px] tabular-nums ${MUTED}`}>
+        {/* the track is last month's pace; the fill is how much of it is left */}
+        <span aria-hidden="true" className="relative block h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-theme-300/50 dark:bg-white/15">
+          <span className="absolute inset-y-0 left-0 rounded-full bg-[#2E7DF6]" style={{ width: `${row.ratio}%` }} />
+        </span>
+        <span className="min-w-0">
+          {paceText(metric, row.prevPace, t)} → {paceText(metric, row.pace, t)} · {changeText(row.changePct)} ·{" "}
+          {t(`${NS}.prevRank`, { rank: row.prevRank })}
+        </span>
+      </span>
+      {expanded && row.models.length >= 3 ? <ModelList row={row} /> : null}
+    </li>
+  );
+}

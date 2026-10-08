@@ -160,6 +160,9 @@ export function buildDeviceSales(daily, monthly) {
     periods,
     // tabs that exist (ready or still landing), in UI order
     available: DEVICE_PERIODS.filter((key) => periods[key]),
+    // the cache build each payload came from; equal stamps mean one build, so
+    // today's board can be subtracted from this month's (the 失速 view does)
+    builds: { daily: text(day?.generatedAtJST), monthly: text(month?.generatedAtJST) },
   };
 }
 
