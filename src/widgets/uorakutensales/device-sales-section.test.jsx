@@ -224,4 +224,16 @@ describe("widgets/uorakutensales/device-sales-section", () => {
     fireEvent.change(shopSelect(), { target: { value: "松武" } });
     expect(screen.queryAllByTestId("device-move")).toHaveLength(0);
   });
+
+  it("opens on today once the daily board lands, even when the month board arrived first", () => {
+    const { rerender } = render(
+      <DeviceSalesSection devices={buildDeviceSales(undefined, monthlyDeviceSales())} cardCls="" t={t} />,
+    );
+    expect(screen.getByRole("button", { name: "uorakutensales.thisMonth" })).toHaveAttribute("aria-pressed", "true");
+
+    rerender(<DeviceSalesSection devices={buildDeviceSales(dailyDeviceSales(), monthlyDeviceSales())} cardCls="" t={t} />);
+
+    expect(screen.getByRole("button", { name: "uorakutensales.periodToday" })).toHaveAttribute("aria-pressed", "true");
+    expect(models("case")).toEqual(["iPhone 17", "OPPO Reno13 A", SE_NAME]);
+  });
 });
