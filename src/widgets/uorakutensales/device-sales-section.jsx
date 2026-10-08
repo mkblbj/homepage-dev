@@ -34,14 +34,16 @@ const TYPE_COLOR = { case: "#60A5FA", film: "#FDBA74", case_film_set: "#A5B4FC" 
 
 const GROUP =
   "flex max-w-full flex-wrap gap-0.5 rounded-lg border border-theme-300/60 bg-theme-100/50 p-0.5 dark:border-theme-600/60 dark:bg-theme-900/30";
-const SEGMENT = "whitespace-nowrap rounded-md px-3 py-1.5 text-[11.5px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40";
+// phone-sized (about 40px) until the board is 36rem wide
+const SEGMENT =
+  "whitespace-nowrap rounded-md px-3 py-3 text-[12px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40 @xl/devices:py-1.5 @xl/devices:text-[11.5px]";
 const ON = "bg-theme-700 text-white dark:bg-theme-100 dark:text-theme-900";
 const OFF = "text-theme-600 hover:bg-theme-200/60 dark:text-theme-300 dark:hover:bg-theme-700/60";
 const PANEL = "rounded-xl border border-theme-300/30 bg-theme-100/40 dark:border-white/[0.06] dark:bg-theme-900/25";
 const TAB_ON = "border-theme-700 bg-theme-700 text-white dark:border-theme-100 dark:bg-theme-100 dark:text-theme-900";
 const TAB_OFF = "border-theme-300/60 text-theme-800 dark:border-theme-600/60 dark:text-theme-100";
 const MORE =
-  "rounded-lg border border-theme-300/60 py-1.5 text-[11px] font-semibold text-theme-600 transition-colors hover:bg-theme-200/50 dark:border-theme-600/60 dark:text-theme-300 dark:hover:bg-theme-700/50";
+  "rounded-lg border border-theme-300/60 py-3 text-[12px] font-semibold text-theme-600 transition-colors hover:bg-theme-200/50 @xl/devices:py-1.5 @xl/devices:text-[11px] dark:border-theme-600/60 dark:text-theme-300 dark:hover:bg-theme-700/50";
 const EMPTY = "py-4 text-center text-[11px] text-theme-500 dark:text-theme-400";
 
 function Dot({ color }) {
@@ -305,7 +307,7 @@ export default function DeviceSalesSection({ devices, cardCls, t }) {
                 value={selectedShop}
                 onClick={(e) => e.stopPropagation()}
                 onChange={(e) => choose(setShop)(e.target.value)}
-                className="rounded-lg border border-theme-300/60 bg-theme-50 py-1.5 pl-2.5 pr-8 text-[11.5px] font-bold text-theme-900 dark:border-theme-600/60 dark:bg-theme-800 dark:text-theme-50"
+                className="rounded-lg border border-theme-300/60 bg-theme-50 py-2.5 pl-2.5 pr-8 text-[12px] font-bold text-theme-900 @xl/devices:py-1.5 @xl/devices:text-[11.5px] dark:border-theme-600/60 dark:bg-theme-800 dark:text-theme-50"
               >
                 <option value={ALL}>{t(`${NS}.allShops`)}</option>
                 {current.shops.map((s) => (
