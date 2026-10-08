@@ -20,6 +20,9 @@ test("buildSalesProxyRequest maps every allowed endpoint to its read-only path",
     ranking: "/api/item-rankings",
     peaks: "/api/history/peaks",
     monthly: "/api/sales/monthly",
+    // full device boards — no limit/date, the widget ranks and pages them itself
+    devices: "/api/device-sales",
+    devicesMonthly: "/api/device-sales/monthly",
   };
 
   for (const [endpoint, path] of Object.entries(cases)) {
@@ -48,7 +51,7 @@ test("buildSalesProxyRequest falls back to the default base url", () => {
 
 test("buildSalesProxyRequest rejects forbidden and unknown endpoints", () => {
   // The dashboard must never reach the forbidden refresh/query endpoints.
-  for (const endpoint of ["query", "refresh", "current", "admin", "other"]) {
+  for (const endpoint of ["query", "refresh", "current", "admin", "other", "devicesRefresh", "device-sales"]) {
     assert.throws(
       () => buildSalesProxyRequest({ endpoint }),
       /Unsupported Rakuten sales endpoint/,

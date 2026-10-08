@@ -13,6 +13,9 @@ const ENDPOINT_PATHS = {
   ranking: "/api/item-rankings",
   peaks: "/api/history/peaks",
   monthly: "/api/sales/monthly",
+  // full device boards (no limit/date): the widget ranks, filters and pages them
+  devices: "/api/device-sales",
+  devicesMonthly: "/api/device-sales/monthly",
 };
 
 export function normalizeSalesServiceUrl(baseUrl = DEFAULT_SALES_SERVICE_URL) {
