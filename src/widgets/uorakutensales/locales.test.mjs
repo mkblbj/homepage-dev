@@ -67,6 +67,32 @@ const REQUIRED_KEYS = [
   "lastMonthPending",
   "noActivity",
   "monthShops",
+  "deviceSales",
+  "periodToday",
+  "viewGroup",
+  "periodGroup",
+  "metricGroup",
+  "viewBest",
+  "viewLeast",
+  "deviceTotal",
+  "typeCase",
+  "typeFilm",
+  "typeSet",
+  "typeSetShort",
+  "modelHeader",
+  "compatBadge",
+  "moreModels",
+  "perOrderTitle",
+  "modelCount",
+  "singleModelShare",
+  "unresolvedUnits",
+  "shopLabel",
+  "shopCoverage",
+  "missingShops",
+  "staleShops",
+  "deviceNotReady",
+  "deviceMetricsPending",
+  "deviceNote",
 ];
 
 function loadNamespace(locale) {
@@ -94,5 +120,19 @@ test("interpolation placeholders are preserved across locales", () => {
     assert.match(ns.vsSevenDayAvg, /\{\{avg\}\}/, `${locale}.vsSevenDayAvg needs {{avg}}`);
     assert.match(ns.monthProgress, /\{\{pct\}\}/, `${locale}.monthProgress needs {{pct}}`);
     assert.match(ns.monthCompleted, /\{\{count\}\}/, `${locale}.monthCompleted needs {{count}}`);
+  }
+});
+
+test("device board placeholders are preserved across locales", () => {
+  for (const locale of LOCALES) {
+    const ns = loadNamespace(locale);
+    assert.match(ns.moreModels, /\{\{count\}\}/, `${locale}.moreModels needs {{count}}`);
+    assert.match(ns.perOrderTitle, /\{\{value\}\}/, `${locale}.perOrderTitle needs {{value}}`);
+    assert.match(ns.modelCount, /\{\{count\}\}/, `${locale}.modelCount needs {{count}}`);
+    assert.match(ns.singleModelShare, /\{\{pct\}\}/, `${locale}.singleModelShare needs {{pct}}`);
+    assert.match(ns.unresolvedUnits, /\{\{count\}\}/, `${locale}.unresolvedUnits needs {{count}}`);
+    assert.match(ns.shopCoverage, /\{\{covered\}\}.*\{\{total\}\}/, `${locale}.shopCoverage needs {{covered}} then {{total}}`);
+    assert.match(ns.missingShops, /\{\{names\}\}/, `${locale}.missingShops needs {{names}}`);
+    assert.match(ns.staleShops, /\{\{count\}\}/, `${locale}.staleShops needs {{count}}`);
   }
 });
