@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { slowingDeviceSales } from "./device-sales.fixtures.mjs";
 import { buildDeviceSales } from "./device-sales-model.mjs";
+import { slowingDeviceSales } from "./device-sales.fixtures.mjs";
 import { buildSlowing, SLOWING_MIN_UNITS, slowingTotals, slowingWindow } from "./device-slowing-model.mjs";
 
 function devicesFrom(bend = () => {}) {

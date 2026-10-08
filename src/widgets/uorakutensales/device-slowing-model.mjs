@@ -107,7 +107,15 @@ export function buildSlowing(devices, { shop = null, type, metric }) {
 
   const pace = paceOf(nowBoard[m], todayBoard[m], completedDays);
   const prevPace = (beforeBoard[m] ?? 0) / lastMonthDays;
-  return { metric: m, completedDays, eligible: eligible.length, pace, prevPace, changePct: changeOf(pace, prevPace), rows };
+  return {
+    metric: m,
+    completedDays,
+    eligible: eligible.length,
+    pace,
+    prevPace,
+    changePct: changeOf(pace, prevPace),
+    rows,
+  };
 }
 
 // The 3カテゴリ合計 pace for a scope, over the same finished days.

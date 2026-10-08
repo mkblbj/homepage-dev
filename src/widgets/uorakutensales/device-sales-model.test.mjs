@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { COMPAT_LONG, COMPAT_SE, dailyDeviceSales, monthlyDeviceSales } from "./device-sales.fixtures.mjs";
 import {
   buildDeviceSales,
   categoryMix,
@@ -12,6 +11,7 @@ import {
   rankDeviceBoard,
   rankMoves,
 } from "./device-sales-model.mjs";
+import { COMPAT_LONG, COMPAT_SE, dailyDeviceSales, monthlyDeviceSales } from "./device-sales.fixtures.mjs";
 
 const SE_NAME = "iPhone SE（第2代） / iPhone SE（第3代）";
 
@@ -159,7 +159,10 @@ test("money still being backfilled stays null and leaves only units ready", () =
 
 test("displayModelName drops only the combination tag", () => {
   assert.equal(displayModelName(COMPAT_SE, "compatibility"), SE_NAME);
-  assert.equal(displayModelName("Galaxy S23 / Galaxy S23 Ultra（多機種）", "compatibility"), "Galaxy S23 / Galaxy S23 Ultra");
+  assert.equal(
+    displayModelName("Galaxy S23 / Galaxy S23 Ultra（多機種）", "compatibility"),
+    "Galaxy S23 / Galaxy S23 Ultra",
+  );
   assert.equal(displayModelName("iPhone SE（第3代）", "single"), "iPhone SE（第3代）");
   // a name that is nothing but the tag is never blanked
   assert.equal(displayModelName("（多机型）", "compatibility"), "（多机型）");

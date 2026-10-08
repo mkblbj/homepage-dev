@@ -74,7 +74,10 @@ test("buildModel derives realtime totals, AOV and freshness timestamp", () => {
 
 test("buildModel sorts rows by today's sales and merges 7-day context", () => {
   const model = buildModel(sales, history);
-  assert.deepEqual(model.rows.map((r) => r.name), ["3911", "0406", "allcase"]);
+  assert.deepEqual(
+    model.rows.map((r) => r.name),
+    ["3911", "0406", "allcase"],
+  );
 
   const top = model.rows[0];
   assert.equal(top.rtSales, 20000);
@@ -84,7 +87,10 @@ test("buildModel sorts rows by today's sales and merges 7-day context", () => {
   assert.equal(top.h7Orders, 40);
   assert.equal(top.cvr, 2.1);
   // per-shop daily is now enriched with date/md/wd/orders for the hover mini chart
-  assert.deepEqual(top.daily.map((d) => d.sales), [10000, 20000, 30000]);
+  assert.deepEqual(
+    top.daily.map((d) => d.sales),
+    [10000, 20000, 30000],
+  );
   assert.equal(top.daily[0].md, "6/30");
   assert.equal(top.daily[0].orders, 6);
   assert.equal(top.daily[0].wd, "火"); // 2026-06-30 is a Tuesday
@@ -130,8 +136,14 @@ test("buildModel merges shop logos by shopName, null when absent", () => {
 test("buildModel aggregates daily totals across shops for the trend chart", () => {
   const model = buildModel(sales, history);
   assert.equal(model.nDays, 3);
-  assert.deepEqual(model.days.map((d) => d.sales), [15000, 30000, 45000]);
-  assert.deepEqual(model.days.map((d) => d.md), ["6/30", "7/1", "7/2"]);
+  assert.deepEqual(
+    model.days.map((d) => d.sales),
+    [15000, 30000, 45000],
+  );
+  assert.deepEqual(
+    model.days.map((d) => d.md),
+    ["6/30", "7/1", "7/2"],
+  );
   assert.equal(model.maxDaily, 45000);
   assert.equal(model.avg, 90000 / 3);
   assert.equal(model.avgOrders, 60 / 3); // per-day average orders
@@ -151,9 +163,17 @@ test("buildModel keeps per-shop daily CVR and derives the all-shop one", () => {
     totals: { salesYen: 0, orderCount: 0, conversionRate: 0 },
     shops: [
       // 100 orders at 5% → 2000 visits
-      { shopName: "3911", totals: {}, daily: [{ date: "2026-07-26", salesYen: 1000, orderCount: 100, conversionRate: 5 }] },
+      {
+        shopName: "3911",
+        totals: {},
+        daily: [{ date: "2026-07-26", salesYen: 1000, orderCount: 100, conversionRate: 5 }],
+      },
       // 20 orders at 2% → 1000 visits
-      { shopName: "0406", totals: {}, daily: [{ date: "2026-07-26", salesYen: 500, orderCount: 20, conversionRate: 2 }] },
+      {
+        shopName: "0406",
+        totals: {},
+        daily: [{ date: "2026-07-26", salesYen: 500, orderCount: 20, conversionRate: 2 }],
+      },
     ],
   };
   const model = buildModel({ totals: {}, shops: [{ shopName: "3911" }, { shopName: "0406" }] }, withCvr);
@@ -282,8 +302,26 @@ const salesItems = [
 
 // the orderCount board ranks the same catalogue differently
 const orderItems = [
-  { rank: 1, itemManagementNumber: "hot-seller", salesYen: 3450, unitsSold: 4, orderCount: 4, averageUnitPriceYen: 863, shopCount: 1, shopBreakdown: [{ shopName: "松武" }] },
-  { rank: 2, itemManagementNumber: "18crb01-libero5g", salesYen: 8600, unitsSold: 12, orderCount: 1, averageUnitPriceYen: 717, shopCount: 1, shopBreakdown: [{ shopName: "0406" }] },
+  {
+    rank: 1,
+    itemManagementNumber: "hot-seller",
+    salesYen: 3450,
+    unitsSold: 4,
+    orderCount: 4,
+    averageUnitPriceYen: 863,
+    shopCount: 1,
+    shopBreakdown: [{ shopName: "松武" }],
+  },
+  {
+    rank: 2,
+    itemManagementNumber: "18crb01-libero5g",
+    salesYen: 8600,
+    unitsSold: 12,
+    orderCount: 1,
+    averageUnitPriceYen: 717,
+    shopCount: 1,
+    shopBreakdown: [{ shopName: "0406" }],
+  },
 ];
 
 const rankingPayload = {
@@ -295,7 +333,24 @@ const rankingPayload = {
   lastError: null,
   rankings: {
     sales: dimBlock(salesItems, [
-      { shopName: "3911", itemCount: 100, ok: true, stale: false, items: [{ rank: 1, itemManagementNumber: "a-1", salesYen: 4620, unitsSold: 2, orderCount: 1, averageUnitPriceYen: 2310, shopCount: 1, shopBreakdown: [{ shopName: "3911" }] }] },
+      {
+        shopName: "3911",
+        itemCount: 100,
+        ok: true,
+        stale: false,
+        items: [
+          {
+            rank: 1,
+            itemManagementNumber: "a-1",
+            salesYen: 4620,
+            unitsSold: 2,
+            orderCount: 1,
+            averageUnitPriceYen: 2310,
+            shopCount: 1,
+            shopBreakdown: [{ shopName: "3911" }],
+          },
+        ],
+      },
       { shopName: "allcase", itemCount: 1, ok: true, stale: true, items: [] },
     ]),
     units: dimBlock(salesItems),
@@ -323,10 +378,16 @@ test("buildRanking keeps each dimension's own ordering", () => {
   const r = buildRanking(rankingPayload);
   // the sales board leads with the biggest yen figure...
   assert.equal(r.dims.sales.overall[0].mno, "18crb01-libero5g");
-  assert.deepEqual(r.dims.sales.overall.map((i) => i.salesYen), [8600, 4000]);
+  assert.deepEqual(
+    r.dims.sales.overall.map((i) => i.salesYen),
+    [8600, 4000],
+  );
   // ...while the orderCount board leads with the item most people bought
   assert.equal(r.dims.orderCount.overall[0].mno, "hot-seller");
-  assert.deepEqual(r.dims.orderCount.overall.map((i) => i.orderCount), [4, 1]);
+  assert.deepEqual(
+    r.dims.orderCount.overall.map((i) => i.orderCount),
+    [4, 1],
+  );
 });
 
 test("buildRanking normalizes item fields and drops unused bulk", () => {
@@ -351,7 +412,10 @@ test("buildRanking falls back for a blank management number and missing url", ()
 
 test("buildRanking exposes per-shop boards including empty ones", () => {
   const sales = buildRanking(rankingPayload).dims.sales;
-  assert.deepEqual(sales.shops.map((s) => s.shopName), ["3911", "allcase"]);
+  assert.deepEqual(
+    sales.shops.map((s) => s.shopName),
+    ["3911", "allcase"],
+  );
   assert.equal(sales.shops[0].items[0].mno, "a-1");
   assert.equal(sales.shops[0].itemCount, 100);
   assert.equal(sales.shops[1].items.length, 0); // empty board → section shows noData
@@ -365,7 +429,11 @@ test("buildRanking skips a dimension the payload omits", () => {
 });
 
 test("buildRanking caps each board at 100 items", () => {
-  const many = Array.from({ length: 140 }, (_, i) => ({ rank: i + 1, itemManagementNumber: "m" + i, salesYen: 1000 - i }));
+  const many = Array.from({ length: 140 }, (_, i) => ({
+    rank: i + 1,
+    itemManagementNumber: "m" + i,
+    salesYen: 1000 - i,
+  }));
   const r = buildRanking({ rankings: { sales: dimBlock(many, [{ shopName: "3911", items: many }]) } });
   assert.equal(r.dims.sales.overall.length, RANKING_MAX_COUNT);
   assert.equal(r.dims.sales.shops[0].items.length, RANKING_MAX_COUNT);
@@ -425,7 +493,10 @@ test("buildPeaks decorates company records and drops zero contributors", () => {
   assert.equal(sales.wd, "水"); // 2025-10-15 is a Wednesday
   assert.equal(sales.year, 2025);
   // allcase contributed nothing that day → excluded from the stacked bar
-  assert.deepEqual(sales.contributions.map((c) => c.shopName), ["3911", "0406"]);
+  assert.deepEqual(
+    sales.contributions.map((c) => c.shopName),
+    ["3911", "0406"],
+  );
   assert.equal(Number(sales.contributions[0].pct.toFixed(1)), 57.7);
 });
 
@@ -454,11 +525,20 @@ test("buildShopColors covers a full shop set without repeating a hue", () => {
 });
 
 test("buildModel surfaces unitsSold at every level", () => {
-  const s = { totals: { salesYen: 300, orderCount: 3, unitsSold: 9 }, shops: [{ shopName: "3911", salesYen: 300, orderCount: 3, unitsSold: 9 }] };
+  const s = {
+    totals: { salesYen: 300, orderCount: 3, unitsSold: 9 },
+    shops: [{ shopName: "3911", salesYen: 300, orderCount: 3, unitsSold: 9 }],
+  };
   const h = {
     range: { dates: ["2026-08-31"] },
     totals: { salesYen: 1000, orderCount: 10, unitsSold: 25 },
-    shops: [{ shopName: "3911", totals: { salesYen: 1000, orderCount: 10, unitsSold: 25 }, daily: [{ date: "2026-08-31", salesYen: 1000, orderCount: 10, unitsSold: 25 }] }],
+    shops: [
+      {
+        shopName: "3911",
+        totals: { salesYen: 1000, orderCount: 10, unitsSold: 25 },
+        daily: [{ date: "2026-08-31", salesYen: 1000, orderCount: 10, unitsSold: 25 }],
+      },
+    ],
   };
   const m = buildModel(s, h);
   assert.equal(m.rtUnits, 9); // today's company total
@@ -515,7 +595,10 @@ test("buildModel exposes units-per-order at company and shop level", () => {
 });
 
 test("buildModel reports zero units-per-order rather than dividing by zero", () => {
-  const m = buildModel({ totals: { orderCount: 0, unitsSold: 0 }, shops: [{ shopName: "kurumu", orderCount: 0, unitsSold: 0 }] }, null);
+  const m = buildModel(
+    { totals: { orderCount: 0, unitsSold: 0 }, shops: [{ shopName: "kurumu", orderCount: 0, unitsSold: 0 }] },
+    null,
+  );
   assert.equal(m.rtUnitsPerOrder, 0);
   assert.equal(m.rows[0].rtUnitsPerOrder, 0); // component hides the ×N badge
 });
@@ -531,7 +614,9 @@ test("buildPeaks marks a zero peak as no record at all", () => {
         { rank: 2, shopName: "kurumu", salesYen: 0, date: "2026-08-31" },
       ],
     },
-    companyRecords: { sales: { salesYen: 500, date: "2026-08-20", shopContributions: [{ shopName: "3911", salesYen: 500 }] } },
+    companyRecords: {
+      sales: { salesYen: 500, date: "2026-08-20", shopContributions: [{ shopName: "3911", salesYen: 500 }] },
+    },
   };
   const r = buildPeaks(payload);
   assert.equal(r.shopBests.sales[0].noRecord, false);
@@ -561,7 +646,14 @@ test("buildPeaks handles the trimmed zero-record shape (date null, no tiedDates)
       ],
     },
     companyRecords: {
-      units: { unitsSold: 2267, date: "2026-03-05", shopContributions: [{ shopName: "松武", unitsSold: 1374 }, { shopName: "kurumu", unitsSold: 0 }] },
+      units: {
+        unitsSold: 2267,
+        date: "2026-03-05",
+        shopContributions: [
+          { shopName: "松武", unitsSold: 1374 },
+          { shopName: "kurumu", unitsSold: 0 },
+        ],
+      },
     },
   };
   const r = buildPeaks(payload);
@@ -572,7 +664,10 @@ test("buildPeaks handles the trimmed zero-record shape (date null, no tiedDates)
   assert.equal(zero.year, null);
   assert.equal(zero.onRecordDay, false); // must not match the company record day
   // a shop that sold nothing that day stays out of the stacked contribution bar
-  assert.deepEqual(r.records.units.contributions.map((c) => c.shopName), ["松武"]);
+  assert.deepEqual(
+    r.records.units.contributions.map((c) => c.shopName),
+    ["松武"],
+  );
 });
 
 test("buildPeaks never treats a dateless company record as a legendary day", () => {
@@ -835,7 +930,10 @@ test("buildMonthly gives each shop its own pace against its own last month", () 
 
 test("buildMonthly orders shops by this month's sales and names them all", () => {
   const m = buildMonthly(monthlyPayload, monthlyToday);
-  assert.deepEqual(m.shops.map((s) => s.name), ["3911", "松武", "kurumu"]);
+  assert.deepEqual(
+    m.shops.map((s) => s.name),
+    ["3911", "松武", "kurumu"],
+  );
   assert.deepEqual(m.shopNames, ["3911", "松武", "kurumu"]);
 });
 

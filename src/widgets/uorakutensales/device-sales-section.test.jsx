@@ -3,6 +3,8 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { buildDeviceSales } from "./device-sales-model.mjs";
+import DeviceSalesSection from "./device-sales-section";
 import {
   COMPAT_LONG,
   dailyDeviceSales,
@@ -10,8 +12,6 @@ import {
   monthlyDeviceSales,
   slowingDeviceSales,
 } from "./device-sales.fixtures.mjs";
-import { buildDeviceSales } from "./device-sales-model.mjs";
-import DeviceSalesSection from "./device-sales-section";
 
 const SE_NAME = "iPhone SE（第2代） / iPhone SE（第3代）";
 const U = "uorakutensales.unitsShort";
@@ -23,7 +23,11 @@ function t(key, opts) {
 }
 
 // the board opens on this month; most cases read today's fixture, so they start there
-function renderBoard(daily = dailyDeviceSales(), monthly = monthlyDeviceSales(), { period = "uorakutensales.periodToday" } = {}) {
+function renderBoard(
+  daily = dailyDeviceSales(),
+  monthly = monthlyDeviceSales(),
+  { period = "uorakutensales.periodToday" } = {},
+) {
   const view = render(<DeviceSalesSection devices={buildDeviceSales(daily, monthly)} cardCls="" t={t} />);
   if (period) fireEvent.click(screen.getByRole("button", { name: period }));
   return view;
@@ -229,7 +233,9 @@ describe("widgets/uorakutensales/device-sales-section", () => {
   });
 
   it("opens on this month whichever board arrives first", () => {
-    const board = (daily, monthly) => <DeviceSalesSection devices={buildDeviceSales(daily, monthly)} cardCls="" t={t} />;
+    const board = (daily, monthly) => (
+      <DeviceSalesSection devices={buildDeviceSales(daily, monthly)} cardCls="" t={t} />
+    );
     const pressed = (name) => screen.getByRole("button", { name }).getAttribute("aria-pressed");
 
     // today landed first: show it rather than nothing, then move to the default

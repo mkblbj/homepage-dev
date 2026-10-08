@@ -4,7 +4,17 @@ import { expectWidgetConfigShape } from "test-utils/widget-config";
 
 import widget from "./widget";
 
-const READ_ONLY = ["sales", "history", "campaigns", "logos", "ranking", "peaks", "monthly", "devices", "devicesMonthly"];
+const READ_ONLY = [
+  "sales",
+  "history",
+  "campaigns",
+  "logos",
+  "ranking",
+  "peaks",
+  "monthly",
+  "devices",
+  "devicesMonthly",
+];
 
 describe("uorakutensales widget config", () => {
   it("allows every read-only snapshot, including the device boards", () => {

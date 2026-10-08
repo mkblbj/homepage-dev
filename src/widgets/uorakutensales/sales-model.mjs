@@ -280,7 +280,13 @@ export function buildModel(sales, history, logos) {
     };
   });
   const maxDaily = Math.max(1, ...dailyTotals.map((d) => d.sales));
-  const heroChart = spark(dailyTotals.map((d) => d.sales), 100, 40, true, true);
+  const heroChart = spark(
+    dailyTotals.map((d) => d.sales),
+    100,
+    40,
+    true,
+    true,
+  );
   // geometry (% of the box) for the hover crosshair/dot; x uses segment centers so
   // the chart, hover zones and axis labels all line up (equal-width flex tracks).
   const days = dailyTotals.map((d, i) => ({
@@ -362,12 +368,21 @@ const METRIC_KEY = { sales: "salesYen", units: "unitsSold", orders: "orderCount"
 // from the union of every shop they will draw (today's rows + the record board),
 // otherwise two boards with different shop sets would disagree on colours.
 const SHOP_PALETTE = Object.freeze([
-  "#E0A878", "#7FB2E8", "#8FD0B0", "#C39BE0", "#E8B26A", "#E295B4", "#9AA6B8", "#B0C97E",
+  "#E0A878",
+  "#7FB2E8",
+  "#8FD0B0",
+  "#C39BE0",
+  "#E8B26A",
+  "#E295B4",
+  "#9AA6B8",
+  "#B0C97E",
 ]);
 export const FALLBACK_SHOP_COLOR = "#9AA6B8";
 
 export function buildShopColors(shopNames) {
-  const unique = [...new Set((shopNames || []).map(normalizeText).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ja"));
+  const unique = [...new Set((shopNames || []).map(normalizeText).filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b, "ja"),
+  );
   const colors = {};
   unique.forEach((name, i) => {
     colors[name] = SHOP_PALETTE[i % SHOP_PALETTE.length];
@@ -471,7 +486,9 @@ export const DEFAULT_MONTH_DIM = MONTH_DIMS[0];
 // "2026-09" → 30. Day 0 of the next month is the last day of this one; computed
 // in UTC so it never shifts with the runtime's timezone.
 function daysInMonth(monthStr) {
-  const [y, m] = String(monthStr || "").split("-").map(Number);
+  const [y, m] = String(monthStr || "")
+    .split("-")
+    .map(Number);
   if (!y || !m || m < 1 || m > 12) return 0;
   return new Date(Date.UTC(y, m, 0)).getUTCDate();
 }
@@ -568,13 +585,9 @@ export function buildMonthly(monthly, sales) {
   // a live day we cannot measure leaves the finished-day span unknowable: report
   // no pace rather than one inflated by spreading a partial day over whole ones
   const paceDays = hasLiveDay && !today ? 0 : completedDays;
-  const todayByShop = new Map(
-    sameSnapshot ? (sales?.shops || []).map((s) => [s.shopName, metricsOf(s)]) : [],
-  );
+  const todayByShop = new Map(sameSnapshot ? (sales?.shops || []).map((s) => [s.shopName, metricsOf(s)]) : []);
 
-  const prevByShop = new Map(
-    prevTotals ? (prev.shops || []).map((s) => [s.shopName, metricsOf(s)]) : [],
-  );
+  const prevByShop = new Map(prevTotals ? (prev.shops || []).map((s) => [s.shopName, metricsOf(s)]) : []);
 
   const shops = (cur.shops || [])
     .map((s) => {

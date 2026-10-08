@@ -101,9 +101,15 @@ function FreshnessPill({ freshness, t }) {
   const label =
     state === "live" ? t(`${NS}.statusLive`) : state === "delayed" ? t(`${NS}.statusDelayed`) : t(`${NS}.statusStale`);
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10.5px] font-bold ${STATUS_TONE[state]}`}>
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10.5px] font-bold ${STATUS_TONE[state]}`}
+    >
       <span className="relative flex h-1.5 w-1.5">
-        {state === "live" ? <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${STATUS_DOT.live}`} /> : null}
+        {state === "live" ? (
+          <span
+            className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${STATUS_DOT.live}`}
+          />
+        ) : null}
         <span className={`relative inline-flex h-1.5 w-1.5 rounded-full ${STATUS_DOT[state]}`} />
       </span>
       {label}
@@ -117,7 +123,16 @@ function ShopIcon() {
       className="inline-flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px] border"
       style={{ color: ACCENT, backgroundColor: "rgba(198,54,43,.12)", borderColor: "rgba(198,54,43,.3)" }}
     >
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.9}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <path d="M3 9.5 5 4h14l2 5.5" />
         <path d="M4 9.5h16v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5Z" />
         <path d="M9 13h6" />
@@ -147,9 +162,17 @@ function ShopLogo({ name, url, size = 16 }) {
     <span
       aria-hidden="true"
       className="inline-flex shrink-0 items-center justify-center rounded-[5px] font-bold"
-      style={{ width: size, height: size, fontSize: size * 0.58, color: ACCENT, backgroundColor: "rgba(198,54,43,.14)" }}
+      style={{
+        width: size,
+        height: size,
+        fontSize: size * 0.58,
+        color: ACCENT,
+        backgroundColor: "rgba(198,54,43,.14)",
+      }}
     >
-      {String(name || "?").trim().charAt(0) || "?"}
+      {String(name || "?")
+        .trim()
+        .charAt(0) || "?"}
     </span>
   );
 }
@@ -163,7 +186,16 @@ function RefreshButton({ onRefresh, t }) {
       aria-label={t(`${NS}.refresh`)}
       className="inline-flex h-[30px] w-[30px] items-center justify-center rounded-[10px] border border-theme-300/60 text-theme-600 transition-colors hover:bg-theme-200/50 hover:text-theme-900 dark:border-theme-600/60 dark:text-theme-300 dark:hover:bg-theme-700/50 dark:hover:text-theme-50"
     >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <path d="M20 12a8 8 0 1 1-2.35-5.65" />
         <path d="M20 3v4h-4" />
       </svg>
@@ -190,7 +222,16 @@ function ChartModeToggle({ mode, onChange, t }) {
           : "text-theme-500 hover:bg-theme-200/70 dark:text-theme-400 dark:hover:bg-theme-700/60"
       }`}
     >
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        width="12"
+        height="12"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2.2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         {children}
       </svg>
     </button>
@@ -253,12 +294,22 @@ function ShopMiniChart({ points, mode, cvr = 0, t, height = 32 }) {
             <span
               key={p.date ?? i}
               className="block flex-1 rounded-[2px] transition-opacity"
-              style={{ height: `${Math.max(10, (p.sales / barMax) * 100)}%`, backgroundColor: DOT, opacity: on ? (i === hover ? 1 : 0.3) : 0.7 }}
+              style={{
+                height: `${Math.max(10, (p.sales / barMax) * 100)}%`,
+                backgroundColor: DOT,
+                opacity: on ? (i === hover ? 1 : 0.3) : 0.7,
+              }}
             />
           ))}
         </div>
       ) : (
-        <svg viewBox={`0 0 100 ${height}`} preserveAspectRatio="none" width="100%" height="100%" className="block overflow-visible">
+        <svg
+          viewBox={`0 0 100 ${height}`}
+          preserveAspectRatio="none"
+          width="100%"
+          height="100%"
+          className="block overflow-visible"
+        >
           <path d={area} fill="url(#uors-area)" />
           <path
             d={line}
@@ -274,7 +325,10 @@ function ShopMiniChart({ points, mode, cvr = 0, t, height = 32 }) {
       )}
 
       {/* daily-average line */}
-      <span className="pointer-events-none absolute inset-x-0 z-[2] border-t border-dashed" style={{ top: `${avgTopPct}%`, borderColor: "rgba(198,54,43,.55)" }} />
+      <span
+        className="pointer-events-none absolute inset-x-0 z-[2] border-t border-dashed"
+        style={{ top: `${avgTopPct}%`, borderColor: "rgba(198,54,43,.55)" }}
+      />
 
       {/* hover zones (per day) */}
       <div className="absolute inset-0 z-[3] flex" onMouseLeave={() => setHover(null)}>
@@ -354,11 +408,17 @@ function DailyChart({ model, mode, onModeChange, t }) {
     <div className="flex min-w-0 flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
         <span className="min-w-0 truncate text-[10.5px] font-bold tracking-wide text-theme-600 dark:text-theme-300">
-          {t(`${NS}.dailyTrend`)} <span className="text-[9px] font-medium text-theme-500 dark:text-theme-400">· {t(`${NS}.excludesToday`)}</span>
+          {t(`${NS}.dailyTrend`)}{" "}
+          <span className="text-[9px] font-medium text-theme-500 dark:text-theme-400">
+            · {t(`${NS}.excludesToday`)}
+          </span>
         </span>
         <span className="flex shrink-0 items-center gap-2">
           <span className="text-[9.5px] font-medium text-theme-600 dark:text-theme-300">
-            <span className="mr-1 inline-block w-3 border-t-[1.5px] border-dashed align-middle" style={{ borderColor: ACCENT }} />
+            <span
+              className="mr-1 inline-block w-3 border-t-[1.5px] border-dashed align-middle"
+              style={{ borderColor: ACCENT }}
+            />
             {t(`${NS}.avgLabel`)}
           </span>
           {/* drives both this chart and the per-shop mini charts */}
@@ -366,7 +426,10 @@ function DailyChart({ model, mode, onModeChange, t }) {
         </span>
       </div>
       <div className="relative h-[112px]">
-        <div className="pointer-events-none absolute inset-x-0 z-[3] border-t-[1.5px] border-dashed" style={{ top: `${avgTopPct}%`, borderColor: "rgba(198,54,43,.7)" }} />
+        <div
+          className="pointer-events-none absolute inset-x-0 z-[3] border-t-[1.5px] border-dashed"
+          style={{ top: `${avgTopPct}%`, borderColor: "rgba(198,54,43,.7)" }}
+        />
         {/* ⌀ average tag on the line — same affordance as the per-shop mini charts */}
         <span
           className="absolute right-0 z-[9] flex -translate-y-1/2 cursor-help items-center rounded-[3px] bg-slate-900/75 px-1.5 text-[8px] font-bold leading-[1.5] tabular-nums text-white/90"
@@ -406,7 +469,13 @@ function DailyChart({ model, mode, onModeChange, t }) {
             ))}
           </div>
         ) : (
-          <svg viewBox="0 0 100 40" preserveAspectRatio="none" width="100%" height="100%" className="absolute inset-0 block overflow-visible">
+          <svg
+            viewBox="0 0 100 40"
+            preserveAspectRatio="none"
+            width="100%"
+            height="100%"
+            className="absolute inset-0 block overflow-visible"
+          >
             <path d={model.heroChart.area} fill="url(#uors-area)" />
             <path
               d={model.heroChart.line}
@@ -430,12 +499,20 @@ function DailyChart({ model, mode, onModeChange, t }) {
 
         {on ? (
           <>
-            <div className="pointer-events-none absolute inset-y-0 z-[6] w-px" style={{ left: `${hd.xPct}%`, backgroundColor: "rgba(198,54,43,.45)" }} />
+            <div
+              className="pointer-events-none absolute inset-y-0 z-[6] w-px"
+              style={{ left: `${hd.xPct}%`, backgroundColor: "rgba(198,54,43,.45)" }}
+            />
             <div
               className={`pointer-events-none absolute z-[7] h-[9px] w-[9px] -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white ${
                 mode === "bar" ? "hidden" : ""
               }`}
-              style={{ left: `${hd.xPct}%`, top: `${hd.yPct}%`, backgroundColor: ACCENT, boxShadow: "0 0 0 1px rgba(198,54,43,.4)" }}
+              style={{
+                left: `${hd.xPct}%`,
+                top: `${hd.yPct}%`,
+                backgroundColor: ACCENT,
+                boxShadow: "0 0 0 1px rgba(198,54,43,.4)",
+              }}
             />
             <div
               className="pointer-events-none absolute top-[3px] z-[8] whitespace-nowrap rounded-[7px] bg-slate-900 px-2.5 py-1 shadow-lg"
@@ -457,7 +534,10 @@ function DailyChart({ model, mode, onModeChange, t }) {
       </div>
       <div className="flex">
         {model.days.map((d) => (
-          <span key={d.date} className="flex-1 text-center text-[9px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
+          <span
+            key={d.date}
+            className="flex-1 text-center text-[9px] font-medium tabular-nums text-theme-600 dark:text-theme-300"
+          >
             {d.md}
           </span>
         ))}
@@ -537,7 +617,13 @@ function ItemThumb({ item, size, preview = "below" }) {
   }, []);
 
   if (!item.imageUrl || failed) {
-    return <span aria-hidden="true" className="block shrink-0 rounded-[7px] bg-theme-300/40 dark:bg-white/10" style={{ width: size, height: size }} />;
+    return (
+      <span
+        aria-hidden="true"
+        className="block shrink-0 rounded-[7px] bg-theme-300/40 dark:bg-white/10"
+        style={{ width: size, height: size }}
+      />
+    );
   }
 
   return (
@@ -564,7 +650,12 @@ function ItemThumb({ item, size, preview = "below" }) {
             PREVIEW_ALIGN[align]
           } ${preview === "above" ? "bottom-full mb-2" : "top-full mt-2"}`}
         >
-          <img src={item.imageUrl} alt="" loading="lazy" className="block h-[170px] w-[170px] max-w-none object-contain" />
+          <img
+            src={item.imageUrl}
+            alt=""
+            loading="lazy"
+            className="block h-[170px] w-[170px] max-w-none object-contain"
+          />
         </span>
       ) : null}
     </span>
@@ -585,7 +676,13 @@ function ShopBadge({ name }) {
 function ItemLink({ item, className, children }) {
   if (!item.url) return <div className={className}>{children}</div>;
   return (
-    <a href={item.url} target="_blank" rel="noopener noreferrer" className={className} onClick={(e) => e.stopPropagation()}>
+    <a
+      href={item.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={className}
+      onClick={(e) => e.stopPropagation()}
+    >
       {children}
     </a>
   );
@@ -615,7 +712,9 @@ function PodiumCard({ item, showShop, dim, t }) {
       item={item}
       className={`relative flex min-w-0 items-center gap-3 rounded-xl border p-3 transition-colors hover:brightness-110 ${m.card}`}
     >
-      <span className={`absolute right-2.5 top-2 font-extrabold leading-none tabular-nums ${m.crown}`}>{item.rank}</span>
+      <span className={`absolute right-2.5 top-2 font-extrabold leading-none tabular-nums ${m.crown}`}>
+        {item.rank}
+      </span>
       <ItemThumb item={item} size={m.img} preview="below" />
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         <span className={`flex min-w-0 items-center pr-4 font-bold ${m.mno}`}>
@@ -638,7 +737,9 @@ function RankRow({ item, showShop, dim, t }) {
       item={item}
       className="flex items-center gap-2.5 rounded-lg border border-theme-300/25 bg-theme-100/40 p-1.5 transition-colors hover:bg-theme-200/50 dark:border-white/[0.06] dark:bg-white/[0.02] dark:hover:bg-white/[0.06]"
     >
-      <span className="w-[18px] shrink-0 text-center text-[11.5px] font-extrabold tabular-nums text-theme-500 dark:text-theme-400">{item.rank}</span>
+      <span className="w-[18px] shrink-0 text-center text-[11.5px] font-extrabold tabular-nums text-theme-500 dark:text-theme-400">
+        {item.rank}
+      </span>
       <ItemThumb item={item} size={40} preview="above" />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="flex min-w-0 items-center">
@@ -649,7 +750,9 @@ function RankRow({ item, showShop, dim, t }) {
           {secondaryMetrics(item, dim, t).join(" · ")}
         </span>
       </span>
-      <span className={`shrink-0 text-[12.5px] font-bold tabular-nums ${ACCENT_TEXT}`}>{primaryMetric(item, dim, t)}</span>
+      <span className={`shrink-0 text-[12.5px] font-bold tabular-nums ${ACCENT_TEXT}`}>
+        {primaryMetric(item, dim, t)}
+      </span>
     </ItemLink>
   );
 }
@@ -670,7 +773,7 @@ function RankingSection({ ranking, cardCls, t }) {
   // a shop chip can outlive its data across refreshes → fall back to the overall board
   const selectedShop = active ? shop : "__all__";
   const isAll = selectedShop === "__all__";
-  const items = isAll ? board.overall : active?.items ?? [];
+  const items = isAll ? board.overall : (active?.items ?? []);
   const shown = items.slice(0, RANKING_STEPS[step]);
   // how many more the NEXT step would reveal (0 when this board has no more rows)
   const nextStep = step + 1 < RANKING_STEPS.length ? step + 1 : null;
@@ -794,7 +897,6 @@ function RankingSection({ ranking, cardCls, t }) {
   );
 }
 
-
 // ---- all-time records (GET /api/history/peaks) ----
 
 // Record cards read as a trophy case, so they carry their own warm accents
@@ -914,7 +1016,9 @@ function PeaksSection({ peaks, shopColors, cardCls, t }) {
             record={peaks.records[d]}
             shopColors={shopColors}
             sinceYear={
-              d === "units" && peaks.coverage.unitsStartYear && peaks.coverage.unitsStartYear !== peaks.coverage.startYear
+              d === "units" &&
+              peaks.coverage.unitsStartYear &&
+              peaks.coverage.unitsStartYear !== peaks.coverage.startYear
                 ? peaks.coverage.unitsStartYear
                 : null
             }
@@ -925,7 +1029,9 @@ function PeaksSection({ peaks, shopColors, cardCls, t }) {
         {bests.length ? (
           <div className="flex min-w-0 flex-col gap-1.5 @lg:col-span-3">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="text-[10.5px] font-bold tracking-wide text-theme-600 dark:text-theme-300">{t(`${NS}.shopBest`)}</span>
+              <span className="text-[10.5px] font-bold tracking-wide text-theme-600 dark:text-theme-300">
+                {t(`${NS}.shopBest`)}
+              </span>
               {/* the chips double as the stacked bars' legend, so their colours match */}
               <div className="ml-auto flex shrink-0 gap-0.5 rounded-md border border-theme-300/60 bg-theme-100/50 p-0.5 dark:border-theme-600/60 dark:bg-theme-900/30">
                 {peaks.available.filter((d) => peaks.shopBests[d]).map(dimChip)}
@@ -937,17 +1043,26 @@ function PeaksSection({ peaks, shopColors, cardCls, t }) {
                   key={b.shopName}
                   className="inline-flex min-w-0 items-center gap-1 rounded-full border border-theme-300/70 bg-theme-100/60 px-1.5 py-0.5 text-[10px] tabular-nums dark:border-white/[0.18] dark:bg-white/[0.06]"
                 >
-                  <span className="block h-[7px] w-[7px] shrink-0 rounded-sm" style={{ backgroundColor: shopColors[b.shopName] ?? FALLBACK_SHOP_COLOR }} />
+                  <span
+                    className="block h-[7px] w-[7px] shrink-0 rounded-sm"
+                    style={{ backgroundColor: shopColors[b.shopName] ?? FALLBACK_SHOP_COLOR }}
+                  />
                   <span className="truncate font-semibold text-theme-800 dark:text-theme-100">{b.shopName}</span>
                   {b.noRecord ? (
-                    <span className="text-[9.5px] font-medium text-theme-500 dark:text-theme-400">{t(`${NS}.noRecord`)}</span>
+                    <span className="text-[9.5px] font-medium text-theme-500 dark:text-theme-400">
+                      {t(`${NS}.noRecord`)}
+                    </span>
                   ) : (
                     <>
-                      <span className="font-bold text-theme-900 dark:text-theme-50">{peakValueText(activeDim, b.value, t)}</span>
+                      <span className="font-bold text-theme-900 dark:text-theme-50">
+                        {peakValueText(activeDim, b.value, t)}
+                      </span>
                       <span className="hidden text-[9.5px] font-semibold text-theme-700 @md:inline dark:text-theme-200">
                         {b.year}.{b.md}
                       </span>
-                      {b.onRecordDay ? <span className="text-[9px] leading-none text-amber-600 dark:text-amber-300">★</span> : null}
+                      {b.onRecordDay ? (
+                        <span className="text-[9px] leading-none text-amber-600 dark:text-amber-300">★</span>
+                      ) : null}
                     </>
                   )}
                 </span>
@@ -982,7 +1097,9 @@ function Delta({ value, className = "" }) {
   if (value == null) return <span className={`tabular-nums text-theme-500 dark:text-theme-400 ${className}`}>—</span>;
   const up = value >= 0;
   return (
-    <span className={`tabular-nums ${up ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"} ${className}`}>
+    <span
+      className={`tabular-nums ${up ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"} ${className}`}
+    >
       {up ? "+" : "−"}
       {Math.abs(value).toFixed(1)}%
     </span>
@@ -997,7 +1114,10 @@ function PaceBar({ fillPct, markerPct, color, height = 8 }) {
   const fill = Math.max(0, Math.min(100, fillPct ?? 0));
   const marker = Math.max(0, Math.min(100, markerPct ?? 0));
   return (
-    <span className="relative block w-full overflow-hidden rounded-full bg-theme-300/45 dark:bg-white/10" style={{ height }}>
+    <span
+      className="relative block w-full overflow-hidden rounded-full bg-theme-300/45 dark:bg-white/10"
+      style={{ height }}
+    >
       <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${fill}%`, backgroundColor: color }} />
       <span
         className="absolute inset-y-0 w-[2px] rounded-full bg-theme-800/70 dark:bg-white/85"
@@ -1066,8 +1186,16 @@ function MonthShopRow({ shop, dim, markerPct, logoUrl, color, t }) {
             {m.previous != null ? (
               <span className="ml-auto shrink-0 text-right">
                 {t(`${NS}.lastMonth`)}{" "}
-                <span className="font-bold text-theme-800 dark:text-theme-100">{monthValueText(dim, m.previous, t)}</span>
-                <OtherMetrics metrics={shop.metrics} dim={dim} field="previous" t={t} className="before:content-['_·_']" />
+                <span className="font-bold text-theme-800 dark:text-theme-100">
+                  {monthValueText(dim, m.previous, t)}
+                </span>
+                <OtherMetrics
+                  metrics={shop.metrics}
+                  dim={dim}
+                  field="previous"
+                  t={t}
+                  className="before:content-['_·_']"
+                />
               </span>
             ) : null}
           </span>
@@ -1134,7 +1262,9 @@ function MonthlySection({ monthly, logoByName, shopColors, cardCls, t }) {
               <span className={`text-[9.5px] font-extrabold uppercase tracking-[0.1em] ${tone.label}`}>
                 {t(`${NS}.thisMonth`)}
               </span>
-              <span className="text-[10px] font-semibold tabular-nums text-theme-700 dark:text-theme-200">{cur.month}</span>
+              <span className="text-[10px] font-semibold tabular-nums text-theme-700 dark:text-theme-200">
+                {cur.month}
+              </span>
               <span className="ml-auto text-[9.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
                 {t(`${NS}.monthCompleted`, { count: cur.completedDays })}
                 {cur.hasLiveDay ? ` ${t(`${NS}.plusToday`)}` : ""}
@@ -1177,7 +1307,9 @@ function MonthlySection({ monthly, logoByName, shopColors, cardCls, t }) {
                   </span>
                   <span className="text-[13px] font-bold tabular-nums text-theme-900 dark:text-theme-50">
                     {monthValueText(dim, m.pace, t)}
-                    <span className="text-[9px] font-medium text-theme-600 dark:text-theme-300">{t(`${NS}.perDay`)}</span>
+                    <span className="text-[9px] font-medium text-theme-600 dark:text-theme-300">
+                      {t(`${NS}.perDay`)}
+                    </span>
                   </span>
                 </span>
                 {m.prevPace != null ? (
@@ -1187,13 +1319,17 @@ function MonthlySection({ monthly, logoByName, shopColors, cardCls, t }) {
                     </span>
                     <span className="text-[13px] font-bold tabular-nums text-theme-700 dark:text-theme-200">
                       {monthValueText(dim, m.prevPace, t)}
-                      <span className="text-[9px] font-medium text-theme-600 dark:text-theme-300">{t(`${NS}.perDay`)}</span>
+                      <span className="text-[9px] font-medium text-theme-600 dark:text-theme-300">
+                        {t(`${NS}.perDay`)}
+                      </span>
                     </span>
                   </span>
                 ) : null}
                 {m.paceDeltaPct != null ? (
                   <span className="flex min-w-0 flex-col items-end gap-0.5">
-                    <span className="truncate text-[9px] font-bold text-theme-600 dark:text-theme-300">{t(`${NS}.vsLastMonth`)}</span>
+                    <span className="truncate text-[9px] font-bold text-theme-600 dark:text-theme-300">
+                      {t(`${NS}.vsLastMonth`)}
+                    </span>
                     <Delta value={m.paceDeltaPct} className="text-[15px] font-extrabold" />
                   </span>
                 ) : null}
@@ -1210,7 +1346,9 @@ function MonthlySection({ monthly, logoByName, shopColors, cardCls, t }) {
                 <span className="text-[10px] font-semibold tabular-nums text-theme-700 dark:text-theme-200">
                   {monthly.previous.month}
                 </span>
-                <span className="text-[9px] font-medium text-theme-500 dark:text-theme-400">{t(`${NS}.monthBaseline`)}</span>
+                <span className="text-[9px] font-medium text-theme-500 dark:text-theme-400">
+                  {t(`${NS}.monthBaseline`)}
+                </span>
                 <span className="ml-auto flex items-baseline gap-x-2">
                   <span className="text-[14px] font-bold tabular-nums text-theme-900 dark:text-theme-50">
                     {monthValueText(dim, m.previous, t)}
@@ -1357,8 +1495,12 @@ export default function Component({ service }) {
           </div>
           <div className="flex shrink-0 items-center gap-2.5">
             <span className="flex flex-col items-end leading-tight">
-              <span className="text-[9px] font-bold tracking-[0.14em] text-theme-600 dark:text-theme-300">{t(`${NS}.updatedAt`)}</span>
-              <span className="text-[12px] font-semibold tabular-nums text-theme-800 dark:text-theme-100">{model.generatedAtJST || "-"}</span>
+              <span className="text-[9px] font-bold tracking-[0.14em] text-theme-600 dark:text-theme-300">
+                {t(`${NS}.updatedAt`)}
+              </span>
+              <span className="text-[12px] font-semibold tabular-nums text-theme-800 dark:text-theme-100">
+                {model.generatedAtJST || "-"}
+              </span>
             </span>
             <FreshnessPill freshness={freshness} t={t} />
             <RefreshButton onRefresh={handleRefresh} t={t} />
@@ -1371,7 +1513,9 @@ export default function Component({ service }) {
         <section className={`grid grid-cols-1 @4xl:grid-cols-[minmax(360px,1fr)_1.7fr] ${cardCls}`}>
           <div className="flex min-w-0 flex-col gap-2.5 border-b border-theme-300/30 p-5 @4xl:border-b-0 @4xl:border-r dark:border-white/10">
             <span className="flex items-center gap-1.5">
-              <span className="text-[11px] font-bold tracking-wide text-theme-600 dark:text-theme-300">{t(`${NS}.todaySales`)}</span>
+              <span className="text-[11px] font-bold tracking-wide text-theme-600 dark:text-theme-300">
+                {t(`${NS}.todaySales`)}
+              </span>
               <span className="inline-flex items-center gap-1 text-[9.5px] font-extrabold tracking-wide text-emerald-600 dark:text-emerald-300">
                 <span className="h-[5px] w-[5px] rounded-full bg-emerald-500" />
                 {t(`${NS}.statusLive`)}
@@ -1379,16 +1523,22 @@ export default function Component({ service }) {
             </span>
             <span className="flex items-baseline gap-1">
               <span className="text-[19px] font-bold text-theme-600 dark:text-theme-300">¥</span>
-              <span className="text-[54px] font-extrabold leading-[0.85] tracking-tight tabular-nums text-theme-900 dark:text-theme-50">{fmt(t, model.rtTotal)}</span>
+              <span className="text-[54px] font-extrabold leading-[0.85] tracking-tight tabular-nums text-theme-900 dark:text-theme-50">
+                {fmt(t, model.rtTotal)}
+              </span>
             </span>
             <span className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
               <span className="text-[22px] font-extrabold leading-none tabular-nums text-theme-800 dark:text-theme-100">
                 {fmt(t, model.rtOrders)}
-                <span className="ml-0.5 text-[12px] font-semibold text-theme-600 dark:text-theme-300">{t(`${NS}.ordersUnit`)}</span>
+                <span className="ml-0.5 text-[12px] font-semibold text-theme-600 dark:text-theme-300">
+                  {t(`${NS}.ordersUnit`)}
+                </span>
               </span>
               <span className="text-[15px] font-bold leading-none tabular-nums text-theme-700 dark:text-theme-200">
                 {fmt(t, model.rtUnits)}
-                <span className="ml-0.5 text-[10px] font-semibold text-theme-600 dark:text-theme-300">{t(`${NS}.unitsShort`)}</span>
+                <span className="ml-0.5 text-[10px] font-semibold text-theme-600 dark:text-theme-300">
+                  {t(`${NS}.unitsShort`)}
+                </span>
               </span>
               <span className="text-[12.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
                 {t(`${NS}.aov`)} ¥{fmt(t, model.aov)} · {t(`${NS}.unitsPerOrder`)} ×{model.rtUnitsPerOrder.toFixed(2)}
@@ -1414,23 +1564,35 @@ export default function Component({ service }) {
             ) : null}
             <div className="mt-1.5 flex flex-col gap-1.5">
               <div className="flex items-baseline justify-between gap-2">
-                <span className="text-[11px] font-medium text-theme-600 dark:text-theme-300">{t(`${NS}.vsSevenDayAvg`, { avg: fmt(t, Math.round(model.avg)) })}</span>
+                <span className="text-[11px] font-medium text-theme-600 dark:text-theme-300">
+                  {t(`${NS}.vsSevenDayAvg`, { avg: fmt(t, Math.round(model.avg)) })}
+                </span>
                 <span className={`text-[13px] font-bold tabular-nums ${ACCENT_TEXT}`}>
                   {model.avg > 0 ? Math.round((model.rtTotal / model.avg) * 100) : 0}%
                 </span>
               </div>
               <span className="block h-2 overflow-hidden rounded-full bg-theme-300/40 dark:bg-white/10">
-                <span className="block h-full rounded-full" style={{ width: `${model.avg > 0 ? Math.min(100, (model.rtTotal / model.avg) * 100) : 0}%`, backgroundColor: ACCENT }} />
+                <span
+                  className="block h-full rounded-full"
+                  style={{
+                    width: `${model.avg > 0 ? Math.min(100, (model.rtTotal / model.avg) * 100) : 0}%`,
+                    backgroundColor: ACCENT,
+                  }}
+                />
               </span>
             </div>
             {/* 7-day context summary — totals + per-day averages fill the hero's spare height */}
             {model.hasHistory ? (
               <div className="mt-auto flex flex-col gap-1.5 border-t border-theme-300/30 pt-3 dark:border-white/10">
-                <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-theme-600 dark:text-theme-300">{t(`${NS}.sevenDay`)}</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-theme-600 dark:text-theme-300">
+                  {t(`${NS}.sevenDay`)}
+                </span>
                 <div className="grid grid-cols-[max-content_1fr] items-baseline gap-x-3 gap-y-1">
                   <span className="text-[10px] font-medium text-theme-500 dark:text-theme-400">{t(`${NS}.total`)}</span>
                   <span className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
-                    <span className="text-[13px] font-bold tabular-nums text-theme-800 dark:text-theme-100">¥{fmt(t, model.grandTotal)}</span>
+                    <span className="text-[13px] font-bold tabular-nums text-theme-800 dark:text-theme-100">
+                      ¥{fmt(t, model.grandTotal)}
+                    </span>
                     <span className="text-[11.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
                       {fmt(t, model.grandOrders)}
                       {t(`${NS}.ordersUnit`)}
@@ -1443,11 +1605,15 @@ export default function Component({ service }) {
                       ×{model.unitsPerOrder.toFixed(2)}
                     </span>
                   </span>
-                  <span className="text-[10px] font-medium text-theme-500 dark:text-theme-400">{t(`${NS}.avgLabel`)}</span>
+                  <span className="text-[10px] font-medium text-theme-500 dark:text-theme-400">
+                    {t(`${NS}.avgLabel`)}
+                  </span>
                   <span className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
                     <span className="text-[13px] font-bold tabular-nums text-theme-800 dark:text-theme-100">
                       ¥{fmt(t, Math.round(model.avg))}
-                      <span className="text-[10px] font-medium text-theme-500 dark:text-theme-400">{t(`${NS}.perDay`)}</span>
+                      <span className="text-[10px] font-medium text-theme-500 dark:text-theme-400">
+                        {t(`${NS}.perDay`)}
+                      </span>
                     </span>
                     <span className="text-[11.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
                       {fmt(t, Math.round(model.avgOrders))}
@@ -1459,7 +1625,9 @@ export default function Component({ service }) {
                       {t(`${NS}.unitsShort`)}
                       {t(`${NS}.perDay`)}
                     </span>
-                    <span className="text-[11.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">CVR {model.grandCvr.toFixed(2)}%</span>
+                    <span className="text-[11.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
+                      CVR {model.grandCvr.toFixed(2)}%
+                    </span>
                   </span>
                 </div>
               </div>
@@ -1469,7 +1637,9 @@ export default function Component({ service }) {
           {/* today shop breakdown — bullet column trails right (today share vs 7-day share) */}
           <div className="flex min-w-0 flex-col gap-2.5 p-4">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] font-bold text-theme-700 dark:text-theme-200">{t(`${NS}.shopBreakdownLive`)}</span>
+              <span className="text-[11px] font-bold text-theme-700 dark:text-theme-200">
+                {t(`${NS}.shopBreakdownLive`)}
+              </span>
               {model.hasHistory ? (
                 <span className="flex items-center gap-1 text-[9px] font-medium text-theme-500 dark:text-theme-400">
                   <span className="inline-block h-2.5 w-0.5 rounded-full bg-theme-700 dark:bg-theme-50" />
@@ -1483,68 +1653,77 @@ export default function Component({ service }) {
                   readable DOWN each column; row-major would interleave it */}
               <div className="grid grid-cols-1 gap-x-7 gap-y-2 @2xl/shops:grid-cols-none @2xl/shops:grid-flow-col @2xl/shops:grid-rows-4 @2xl/shops:auto-cols-fr">
                 {model.rows.map((r) => {
-                const overIndex = r.rtShare >= r.h7Share;
-                return (
-                  <div key={r.name} className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto_auto] @5xl/shops:grid-cols-[minmax(0,120px)_100px_44px_minmax(0,52px)_44px_minmax(56px,1fr)] items-center gap-x-2 gap-y-1">
-                    <span className="flex min-w-0 items-center gap-1.5">
-                      <ShopLogo name={r.name} url={r.logoUrl} size={16} />
-                      <span
-                        aria-hidden="true"
-                        className="block h-[9px] w-[3px] shrink-0 rounded-full"
-                        style={{ backgroundColor: shopColors[r.name] ?? FALLBACK_SHOP_COLOR }}
-                      />
-                      <span className="truncate text-[12.5px] font-semibold text-theme-900 dark:text-theme-50">{r.name}</span>
-                    </span>
-                    <span className={`text-right text-[13px] font-bold tabular-nums ${r.rtSales > 0 ? ACCENT_TEXT : "text-theme-400 dark:text-theme-500"}`}>
-                      {r.rtSales > 0 ? `¥${fmt(t, r.rtSales)}` : "¥0"}
-                    </span>
-                    <span className="text-right text-[11px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
-                      {fmt(t, r.rtOrders)}
-                      {t(`${NS}.ordersUnit`)}
-                    </span>
-                    <span className="flex min-w-0 flex-col items-end leading-tight">
-                      <span className="truncate text-[11px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
-                        {fmt(t, r.rtUnits)}
-                        {t(`${NS}.unitsShort`)}
-                      </span>
-                      {/* pieces per order — a high ratio marks wholesale-style buying */}
-                      {r.rtUnitsPerOrder > 0 ? (
+                  const overIndex = r.rtShare >= r.h7Share;
+                  return (
+                    <div
+                      key={r.name}
+                      className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto_auto] @5xl/shops:grid-cols-[minmax(0,120px)_100px_44px_minmax(0,52px)_44px_minmax(56px,1fr)] items-center gap-x-2 gap-y-1"
+                    >
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <ShopLogo name={r.name} url={r.logoUrl} size={16} />
                         <span
-                          className={`text-[9px] tabular-nums ${
-                            r.rtUnitsPerOrder >= 2 ? "font-bold text-amber-600 dark:text-amber-300" : "text-theme-500 dark:text-theme-400"
-                          }`}
-                          title={t(`${NS}.unitsPerOrder`)}
-                        >
-                          ×{r.rtUnitsPerOrder.toFixed(2)}
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className="col-start-4 row-start-2 text-right text-[10.5px] font-medium tabular-nums text-theme-500 @5xl/shops:col-start-5 @5xl/shops:row-start-1 dark:text-theme-400">
-                      {r.rtShare.toFixed(1)}%
-                    </span>
-                    {/* bullet: fill = today share, tick = this shop's 7-day share; red when today ≥ normal */}
-                    <span className="relative col-span-3 row-start-2 block h-2 self-center rounded-full bg-theme-300/40 @5xl/shops:col-span-1 @5xl/shops:col-start-6 @5xl/shops:row-start-1 dark:bg-white/10">
-                      <span
-                        className="absolute inset-y-0 left-0 rounded-full"
-                        style={{
-                          width: `${Math.min(100, (r.rtShare / model.shareScale) * 100)}%`,
-                          backgroundColor: shopColors[r.name] ?? FALLBACK_SHOP_COLOR,
-                          // above its own 7-day norm reads solid; below it dims.
-                          // The tick still marks the baseline, so the comparison
-                          // stays readable from the geometry alone.
-                          opacity: overIndex ? 1 : 0.42,
-                        }}
-                      />
-                      {r.h7Share > 0 ? (
-                        <span
-                          className="absolute top-1/2 h-3.5 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-theme-700 dark:bg-theme-50"
-                          style={{ left: `${Math.min(100, (r.h7Share / model.shareScale) * 100)}%` }}
+                          aria-hidden="true"
+                          className="block h-[9px] w-[3px] shrink-0 rounded-full"
+                          style={{ backgroundColor: shopColors[r.name] ?? FALLBACK_SHOP_COLOR }}
                         />
-                      ) : null}
-                    </span>
-                  </div>
-                );
-              })}
+                        <span className="truncate text-[12.5px] font-semibold text-theme-900 dark:text-theme-50">
+                          {r.name}
+                        </span>
+                      </span>
+                      <span
+                        className={`text-right text-[13px] font-bold tabular-nums ${r.rtSales > 0 ? ACCENT_TEXT : "text-theme-400 dark:text-theme-500"}`}
+                      >
+                        {r.rtSales > 0 ? `¥${fmt(t, r.rtSales)}` : "¥0"}
+                      </span>
+                      <span className="text-right text-[11px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
+                        {fmt(t, r.rtOrders)}
+                        {t(`${NS}.ordersUnit`)}
+                      </span>
+                      <span className="flex min-w-0 flex-col items-end leading-tight">
+                        <span className="truncate text-[11px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
+                          {fmt(t, r.rtUnits)}
+                          {t(`${NS}.unitsShort`)}
+                        </span>
+                        {/* pieces per order — a high ratio marks wholesale-style buying */}
+                        {r.rtUnitsPerOrder > 0 ? (
+                          <span
+                            className={`text-[9px] tabular-nums ${
+                              r.rtUnitsPerOrder >= 2
+                                ? "font-bold text-amber-600 dark:text-amber-300"
+                                : "text-theme-500 dark:text-theme-400"
+                            }`}
+                            title={t(`${NS}.unitsPerOrder`)}
+                          >
+                            ×{r.rtUnitsPerOrder.toFixed(2)}
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="col-start-4 row-start-2 text-right text-[10.5px] font-medium tabular-nums text-theme-500 @5xl/shops:col-start-5 @5xl/shops:row-start-1 dark:text-theme-400">
+                        {r.rtShare.toFixed(1)}%
+                      </span>
+                      {/* bullet: fill = today share, tick = this shop's 7-day share; red when today ≥ normal */}
+                      <span className="relative col-span-3 row-start-2 block h-2 self-center rounded-full bg-theme-300/40 @5xl/shops:col-span-1 @5xl/shops:col-start-6 @5xl/shops:row-start-1 dark:bg-white/10">
+                        <span
+                          className="absolute inset-y-0 left-0 rounded-full"
+                          style={{
+                            width: `${Math.min(100, (r.rtShare / model.shareScale) * 100)}%`,
+                            backgroundColor: shopColors[r.name] ?? FALLBACK_SHOP_COLOR,
+                            // above its own 7-day norm reads solid; below it dims.
+                            // The tick still marks the baseline, so the comparison
+                            // stays readable from the geometry alone.
+                            opacity: overIndex ? 1 : 0.42,
+                          }}
+                        />
+                        {r.h7Share > 0 ? (
+                          <span
+                            className="absolute top-1/2 h-3.5 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-theme-700 dark:bg-theme-50"
+                            style={{ left: `${Math.min(100, (r.h7Share / model.shareScale) * 100)}%` }}
+                          />
+                        ) : null}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
               {/* one child of the same two-column grid lands in the first column
                   and resolves the same tracks, so the totals keep lining up under
@@ -1552,7 +1731,9 @@ export default function Component({ service }) {
               <div className="mt-auto grid grid-cols-1 gap-x-7 border-t border-theme-300/60 pt-2 @2xl/shops:grid-cols-2 dark:border-white/15">
                 <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto_auto] @5xl/shops:grid-cols-[minmax(0,120px)_100px_44px_minmax(0,52px)_44px_minmax(56px,1fr)] items-center gap-x-2">
                   <span className="text-[12px] font-bold text-theme-900 dark:text-theme-50">{t(`${NS}.total`)}</span>
-                  <span className={`text-right text-[13px] font-extrabold tabular-nums ${ACCENT_TEXT}`}>¥{fmt(t, model.rtTotal)}</span>
+                  <span className={`text-right text-[13px] font-extrabold tabular-nums ${ACCENT_TEXT}`}>
+                    ¥{fmt(t, model.rtTotal)}
+                  </span>
                   <span className="text-right text-[11px] font-bold tabular-nums text-theme-700 dark:text-theme-200">
                     {fmt(t, model.rtOrders)}
                     {t(`${NS}.ordersUnit`)}
@@ -1579,11 +1760,17 @@ export default function Component({ service }) {
             </div>
             <div className="flex min-w-0 flex-col gap-2.5">
               <span className="min-w-0 truncate text-[10.5px] font-bold tracking-wide text-theme-600 dark:text-theme-300">
-                {t(`${NS}.shopTrend`)} <span className="text-[9px] font-medium text-theme-500 dark:text-theme-400">· {t(`${NS}.excludesToday`)}</span>
+                {t(`${NS}.shopTrend`)}{" "}
+                <span className="text-[9px] font-medium text-theme-500 dark:text-theme-400">
+                  · {t(`${NS}.excludesToday`)}
+                </span>
               </span>
               <div className="grid grid-cols-[repeat(auto-fit,minmax(104px,1fr))] gap-2.5">
                 {model.rows.map((r) => (
-                  <div key={r.name} className="relative flex min-w-0 flex-col rounded-xl border border-theme-300/30 bg-theme-100/60 p-2.5 dark:border-white/[0.06] dark:bg-white/[0.03]">
+                  <div
+                    key={r.name}
+                    className="relative flex min-w-0 flex-col rounded-xl border border-theme-300/30 bg-theme-100/60 p-2.5 dark:border-white/[0.06] dark:bg-white/[0.03]"
+                  >
                     {/* corner-bleed logo watermark — clipped by its OWN layer so the mini-chart
                         hover tooltip can still escape the (unclipped) card */}
                     {r.logoUrl ? (
@@ -1598,11 +1785,17 @@ export default function Component({ service }) {
                       </span>
                     ) : null}
                     <div className="relative flex min-w-0 flex-col gap-1.5">
-                      <span className="truncate text-[11px] font-semibold text-theme-900 dark:text-theme-50">{r.name}</span>
+                      <span className="truncate text-[11px] font-semibold text-theme-900 dark:text-theme-50">
+                        {r.name}
+                      </span>
                       <span className="flex items-baseline gap-0.5">
                         <span className="text-[9px] font-bold text-theme-600 dark:text-theme-300">¥</span>
-                        <span className="text-[15px] font-bold leading-none tabular-nums text-theme-900 dark:text-theme-50">{man(r.h7Total)}</span>
-                        <span className="text-[9px] font-medium text-theme-600 dark:text-theme-300">{t(`${NS}.manUnit`)}</span>
+                        <span className="text-[15px] font-bold leading-none tabular-nums text-theme-900 dark:text-theme-50">
+                          {man(r.h7Total)}
+                        </span>
+                        <span className="text-[9px] font-medium text-theme-600 dark:text-theme-300">
+                          {t(`${NS}.manUnit`)}
+                        </span>
                       </span>
                       <ShopMiniChart points={r.daily} mode={chartMode} cvr={r.cvr} t={t} />
                       <span className="border-t border-theme-300/30 pt-1.5 text-[9px] font-medium tabular-nums text-theme-600 dark:border-white/10 dark:text-theme-300">
