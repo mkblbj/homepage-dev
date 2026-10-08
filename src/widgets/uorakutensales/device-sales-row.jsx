@@ -1,11 +1,12 @@
 /*
- * Row-level pieces of the 機種別販売 board: number text, the list header and
- * one model row. A row lays itself out by the width of its own list
+ * Shared pieces of the 機種別販売 board: number text, the list header, model
+ * rows, and the panel, empty-state and reveal-step helpers every list uses.
+ * A row lays itself out by the width of its own list
  * (@container/list): from 20rem up, one line with 個数 / 売上 / 件数 in fixed
  * columns (the active one lit); below that, two lines — the name with the
  * active value, then the other two.
  */
-import { BULK_PER_ORDER, DEVICE_METRICS } from "./device-sales-model.mjs";
+import { BULK_PER_ORDER, DEVICE_METRICS, DEVICE_STEPS } from "./device-sales-model.mjs";
 
 export const NS = "uorakutensales";
 export const MUTED = "text-theme-600 dark:text-[#B4BFCE]";
@@ -18,7 +19,7 @@ const RANK_TONE = {
   3: "text-orange-600 dark:text-orange-400",
 };
 // the widget's 楽天 red, lifted in dark mode so small figures stay readable
-const VALUE_TONE = "text-[#C6362B] dark:text-[#F6A39A]";
+export const VALUE_TONE = "text-[#C6362B] dark:text-[#F6A39A]";
 // one-line layout: rank · model · 個数 · 売上 · 件数
 const WIDE_COLS = "@xs/list:grid-cols-[20px_minmax(0,1fr)_48px_72px_40px]";
 
@@ -41,6 +42,38 @@ export function press(handler) {
     e.stopPropagation();
     handler();
   };
+}
+
+export const PANEL =
+  "rounded-xl border border-theme-300/30 bg-theme-100/40 dark:border-white/[0.06] dark:bg-theme-900/25";
+export const EMPTY = "py-4 text-center text-[11px] text-theme-500 dark:text-theme-400";
+const MORE =
+  "rounded-lg border border-theme-300/60 py-3 text-[12px] font-semibold text-theme-600 transition-colors hover:bg-theme-200/50 @xl/devices:py-1.5 @xl/devices:text-[11px] dark:border-theme-600/60 dark:text-theme-300 dark:hover:bg-theme-700/50";
+
+// the rows a reveal step shows, and what the next step would add
+export function reveal(rows, step) {
+  const shown = rows.slice(0, DEVICE_STEPS[step]);
+  const nextStep = step + 1 < DEVICE_STEPS.length ? step + 1 : null;
+  const nextCount = nextStep === null ? 0 : Math.min(DEVICE_STEPS[nextStep], rows.length) - shown.length;
+  return { shown, nextStep, nextCount };
+}
+
+export function MoreLess({ step, nextStep, nextCount, onStep, t }) {
+  if (!(nextCount > 0 || step > 0)) return null;
+  return (
+    <div className="flex gap-2">
+      {nextCount > 0 ? (
+        <button type="button" onClick={press(() => onStep(nextStep))} className={`flex-1 ${MORE}`}>
+          {t(`${NS}.showMore`, { count: nextCount })}
+        </button>
+      ) : null}
+      {step > 0 ? (
+        <button type="button" onClick={press(() => onStep(0))} className={`px-3 ${MORE}`}>
+          {t(`${NS}.showLess`)}
+        </button>
+      ) : null}
+    </div>
+  );
 }
 
 export function ListHeader({ metric, order, t }) {

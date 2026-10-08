@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { buildDeviceSales } from "./device-sales-model.mjs";
-import { slowingDeviceSales } from "./device-sales.fixtures.mjs";
+import { slowingDeviceSales, styledSlowingDeviceSales } from "./device-sales.fixtures.mjs";
 import { buildSlowing, SLOWING_MIN_UNITS, slowingTotals, slowingWindow } from "./device-slowing-model.mjs";
 
 function devicesFrom(bend = () => {}) {
@@ -98,4 +98,43 @@ test("the 3カテゴリ合計 pace uses the same finished days", () => {
   assert.equal(totals.pace, 17);
   assert.equal(Math.round(totals.prevPace * 100) / 100, 29.67);
   assert.equal(Math.round(totals.changePct * 10) / 10, -42.7);
+});
+
+test("slowing reads the chosen case style's boards on all three sides", () => {
+  const { daily, monthly } = styledSlowingDeviceSales();
+  const devices = buildDeviceSales(daily, monthly);
+
+  const folio = buildSlowing(devices, { type: "case", metric: "units", style: "folio" });
+  assert.equal(folio.eligible, 2);
+  assert.deepEqual(
+    folio.rows.map((r) => [r.model, Math.round(r.loss * 10) / 10]),
+    [
+      ["Galaxy A25", 5.5],
+      ["arrows We3", 1.3],
+    ],
+  );
+  // (30 + 14) this month minus (3 + 2) today, over 6 finished days
+  assert.equal(folio.pace, 6.5);
+
+  const standard = buildSlowing(devices, { type: "case", metric: "units", style: "standard" });
+  assert.deepEqual(
+    standard.rows.map((r) => [r.model, Math.round(r.loss * 10) / 10]),
+    [
+      ["arrows We3", 5.7],
+      ["DIGNO BX3", 2],
+    ],
+  );
+
+  // すべて is the whole category, as before
+  assert.deepEqual(
+    buildSlowing(devices, { type: "case", metric: "units", style: "all" }).rows.map((r) => r.model),
+    ["arrows We3", "Galaxy A25", "DIGNO BX3"],
+  );
+});
+
+test("slowing has no list for a style a period cannot split", () => {
+  const { daily, monthly } = styledSlowingDeviceSales();
+  delete daily.types.case.styles;
+
+  assert.equal(buildSlowing(buildDeviceSales(daily, monthly), { type: "case", metric: "units", style: "folio" }), null);
 });

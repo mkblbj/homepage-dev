@@ -60,9 +60,10 @@ function changeOf(pace, prevPace) {
   return prevPace > 0 ? (pace / prevPace - 1) * 100 : null;
 }
 
-// One category's slowing list for a scope. Null when the window is closed or
-// the scope has no board in one of the three periods.
-export function buildSlowing(devices, { shop = null, type, metric }) {
+// One category's slowing list for a scope: the whole category ("all"), or one
+// case style read from the style boards on all three sides. Null when the
+// window is closed or the scope has no such board in one of the three periods.
+export function buildSlowing(devices, { shop = null, type, metric, style = "all" }) {
   const span = slowingWindow(devices);
   if (span.reason) return null;
   const today = scopeOf(devices.periods.today, shop);
@@ -70,9 +71,12 @@ export function buildSlowing(devices, { shop = null, type, metric }) {
   const before = scopeOf(devices.periods.lastMonth, shop);
   if (!today || !now || !before) return null;
 
-  const todayBoard = today.types[type];
-  const nowBoard = now.types[type];
-  const beforeBoard = before.types[type];
+  // a style one side cannot split gives no list rather than mixing in the whole category
+  const pick = (board) => (style === "all" ? board : (board?.styles?.[style] ?? null));
+  const todayBoard = pick(today.types[type]);
+  const nowBoard = pick(now.types[type]);
+  const beforeBoard = pick(before.types[type]);
+  if (!todayBoard || !nowBoard || !beforeBoard) return null;
   // money compares only when all three boards have it; units always do
   const m = [todayBoard, nowBoard, beforeBoard].every((board) => metricReady(board, metric)) ? metric : "units";
   const { completedDays, lastMonthDays } = span;

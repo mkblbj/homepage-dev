@@ -28,6 +28,9 @@ export const DEFAULT_DEVICE_METRIC = DEVICE_METRICS[0];
 export const DEVICE_STEPS = Object.freeze([10, 30, Infinity]);
 // this many pieces per order reads as a bulk buy (the shop rows use the same bar)
 export const BULK_PER_ORDER = 2;
+// case styles in UI order — 手帳型, 普通, 不明 (style not confirmed); cases and
+// case+film sets carry them, films do not
+export const CASE_STYLES = Object.freeze(["folio", "standard", "unknown"]);
 
 // the server tags combination rows with a Chinese "（多机型）" (a Japanese
 // "（多機種）" is accepted too); the board draws its own localized badge from
@@ -96,7 +99,16 @@ function normalizeBoard(block) {
     unresolvedUnits: measured(block?.unresolvedUnits) ?? 0,
     // already ranked by the API (units desc, ties by model name)
     rows: (Array.isArray(block?.ranks) ? block.ranks : []).map(normalizeRow).filter((r) => r.fullModel),
+    // the 手帳型 / 普通 / 不明 boards, each with its own distinct orders
+    styles: normalizeStyles(block?.styles),
+    // the share of units whose case style is confirmed — not the model coverage
+    styleCoverage: measured(block?.styleCoveragePercent),
   };
+}
+
+function normalizeStyles(styles) {
+  if (!styles || typeof styles !== "object") return null;
+  return Object.fromEntries(CASE_STYLES.map((key) => [key, normalizeBoard(styles[key])]));
 }
 
 // null in, null out: a shop or period without boards was not read — it did not sell nothing
@@ -223,6 +235,28 @@ export function categoryMix(types, metric) {
     metric: by,
     parts: values.map((v) => ({ ...v, share: total > 0 && v.value != null ? (v.value / total) * 100 : null })),
   };
+}
+
+// The board a column shows for a case style: すべて ("all"), or a board without
+// styles (films, an older server), is the board itself.
+export function styleBoard(board, style) {
+  if (!board || style === "all" || !board.styles) return board;
+  return board.styles[style] ?? board;
+}
+
+// The style switch: each style's slice of the metric on screen. Units and yen
+// add up across styles; distinct orders do not (one order can hold a folio and
+// a back case), so 件数 keeps the units split. 不明 joins only while it holds
+// units. Null for a board that is not split.
+export function styleMix(board, metric) {
+  if (!board?.styles) return null;
+  const by = metric === "orders" ? "units" : metric;
+  const keys = CASE_STYLES.filter((key) => key !== "unknown" || (board.styles.unknown.units ?? 0) > 0);
+  const total = keys.reduce((sum, key) => sum + (board.styles[key][by] ?? 0), 0);
+  return keys.map((key) => {
+    const value = board.styles[key][by];
+    return { key, value, share: total > 0 && value != null ? (value / total) * 100 : null };
+  });
 }
 
 // 今月 vs 先月: where each of this month's rows stood last month, ranked by the

@@ -13,34 +13,40 @@
  */
 import { useState } from "react";
 
+import MarketView from "./device-market-section";
 import {
   categoryMix,
   DEFAULT_DEVICE_METRIC,
   DEFAULT_DEVICE_PERIOD,
   DEVICE_METRICS,
-  DEVICE_STEPS,
   DEVICE_TYPES,
   metricReady,
   rankDeviceBoard,
   rankMoves,
+  styleBoard,
+  styleMix,
 } from "./device-sales-model.mjs";
 import {
   changeText,
   DeviceRow,
+  EMPTY,
   ListHeader,
   metricText,
+  MoreLess,
   MUTED,
   NS,
   paceText,
+  PANEL,
   press,
+  reveal,
   SlowingRow,
 } from "./device-sales-row";
 import { buildSlowing, SLOWING_MIN_UNITS, slowingTotals, slowingWindow } from "./device-slowing-model.mjs";
 import { mdLabel, timeFromJST, weekdayJp } from "./sales-model.mjs";
 
 const ALL = "__all__";
-const VIEWS = ["best", "least", "slowing"];
-const VIEW_LABEL = { best: "viewBest", least: "viewLeast", slowing: "viewSlowing" };
+const VIEWS = ["best", "least", "slowing", "market"];
+const VIEW_LABEL = { best: "viewBest", least: "viewLeast", slowing: "viewSlowing", market: "viewMarket" };
 const PERIOD_LABEL = { today: "periodToday", thisMonth: "thisMonth", lastMonth: "lastMonth" };
 const METRIC_LABEL = { units: "sortUnits", sales: "sortSales", orders: "sortOrders" };
 const TYPE_LABEL = { case: "typeCase", film: "typeFilm", case_film_set: "typeSet" };
@@ -54,20 +60,22 @@ const SLOWING_REASON = {
   updating: "slowingUpdating",
 };
 
-const GROUP =
-  "flex max-w-full flex-wrap gap-0.5 rounded-lg border border-theme-300/60 bg-theme-100/50 p-0.5 dark:border-theme-600/60 dark:bg-theme-900/30";
+// the frame of a segmented control, without its display
+const GROUP_FRAME =
+  "max-w-full flex-wrap gap-0.5 rounded-lg border border-theme-300/60 bg-theme-100/50 p-0.5 dark:border-theme-600/60 dark:bg-theme-900/30";
+const GROUP = `flex ${GROUP_FRAME}`;
 // phone-sized (about 40px) until the board is 36rem wide
 const SEGMENT =
   "whitespace-nowrap rounded-md px-3 py-3 text-[12px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40 @xl/devices:py-1.5 @xl/devices:text-[11.5px]";
 const ON = "bg-theme-700 text-white dark:bg-theme-100 dark:text-theme-900";
 const OFF = "text-theme-600 hover:bg-theme-200/60 dark:text-theme-300 dark:hover:bg-theme-700/60";
-const PANEL = "rounded-xl border border-theme-300/30 bg-theme-100/40 dark:border-white/[0.06] dark:bg-theme-900/25";
 const TAB_ON = "border-theme-700 bg-theme-700 text-white dark:border-theme-100 dark:bg-theme-100 dark:text-theme-900";
 const TAB_OFF = "border-theme-300/60 text-theme-800 dark:border-theme-600/60 dark:text-theme-100";
-const MORE =
-  "rounded-lg border border-theme-300/60 py-3 text-[12px] font-semibold text-theme-600 transition-colors hover:bg-theme-200/50 @xl/devices:py-1.5 @xl/devices:text-[11px] dark:border-theme-600/60 dark:text-theme-300 dark:hover:bg-theme-700/50";
-const EMPTY = "py-4 text-center text-[11px] text-theme-500 dark:text-theme-400";
 const LOSS = "font-extrabold text-rose-600 dark:text-rose-300";
+const STYLE_LABEL = { folio: "styleFolio", standard: "styleStandard", unknown: "styleUnknown" };
+// the style switch sits inside a column: a size below the header controls
+const STYLE_SEGMENT =
+  "whitespace-nowrap rounded-md px-2.5 py-2 text-[11.5px] font-bold transition-colors @xl/devices:py-1 @xl/devices:text-[11px]";
 
 function Dot({ color }) {
   return <span aria-hidden="true" className="block h-2 w-2 shrink-0 rounded-sm" style={{ backgroundColor: color }} />;
@@ -87,6 +95,46 @@ function Segmented({ label, options, active, onPick, disabled = () => false, tit
           className={`${SEGMENT} ${active === key ? ON : OFF}`}
         >
           {text}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// 手帳型 / 普通 (/ 不明) inside a case or set column, each with its share. A
+// column whose board is not split (films) shows nothing — or, with `spacer`,
+// an invisible stand-in on a wide board so side-by-side rows still line up.
+function StyleSwitch({ board, metric, style, onStyle, spacer, t }) {
+  const mix = styleMix(board, metric);
+  if (!mix) {
+    return spacer ? (
+      <div
+        aria-hidden="true"
+        data-testid="style-spacer"
+        className={`invisible hidden self-start @5xl/devices:flex ${GROUP_FRAME}`}
+      >
+        <span className={STYLE_SEGMENT}>&nbsp;</span>
+      </div>
+    ) : null;
+  }
+  const options = [
+    ["all", t(`${NS}.styleAll`), null],
+    ...mix.map((part) => [part.key, t(`${NS}.${STYLE_LABEL[part.key]}`), part.share]),
+  ];
+  return (
+    <div role="group" aria-label={t(`${NS}.styleGroup`)} className={`self-start ${GROUP}`}>
+      {options.map(([key, label, share]) => (
+        <button
+          key={key}
+          type="button"
+          aria-pressed={style === key}
+          onClick={press(() => onStyle(key))}
+          className={`${STYLE_SEGMENT} ${style === key ? ON : OFF}`}
+        >
+          {label}
+          {share != null ? (
+            <span className="ml-1 font-semibold tabular-nums opacity-70">{Math.round(share)}%</span>
+          ) : null}
         </button>
       ))}
     </div>
@@ -207,32 +255,6 @@ function SummaryStrip({ totals, types, metric, tab, onTab, t, pace = null, notes
   );
 }
 
-function MoreLess({ step, nextStep, nextCount, onStep, t }) {
-  if (!(nextCount > 0 || step > 0)) return null;
-  return (
-    <div className="flex gap-2">
-      {nextCount > 0 ? (
-        <button type="button" onClick={press(() => onStep(nextStep))} className={`flex-1 ${MORE}`}>
-          {t(`${NS}.showMore`, { count: nextCount })}
-        </button>
-      ) : null}
-      {step > 0 ? (
-        <button type="button" onClick={press(() => onStep(0))} className={`px-3 ${MORE}`}>
-          {t(`${NS}.showLess`)}
-        </button>
-      ) : null}
-    </div>
-  );
-}
-
-// the rows a reveal step shows, and what the next step would add
-function reveal(rows, step) {
-  const shown = rows.slice(0, DEVICE_STEPS[step]);
-  const nextStep = step + 1 < DEVICE_STEPS.length ? step + 1 : null;
-  const nextCount = nextStep === null ? 0 : Math.min(DEVICE_STEPS[nextStep], rows.length) - shown.length;
-  return { shown, nextStep, nextCount };
-}
-
 function ColumnFrame({ type, visible, children }) {
   return (
     <div
@@ -267,21 +289,29 @@ function CategoryColumn({
   onExpand,
   t,
   previousBoard = null,
+  style = "all",
+  onStyle = () => {},
+  spacer = false,
 }) {
-  const { shown, nextStep, nextCount } = reveal(rankDeviceBoard(board, metric, order), step);
+  // the chosen case style's rows, total and meta; last month's marks compare
+  // within the same style, or not at all
+  const scoped = styleBoard(board, style);
+  const previousScoped = style === "all" ? previousBoard : (previousBoard?.styles?.[style] ?? null);
+  const { shown, nextStep, nextCount } = reveal(rankDeviceBoard(scoped, metric, order), step);
   // 今月 best sellers only: where each row stood last month, same metric and scope
-  const moves = previousBoard ? rankMoves(shown, previousBoard, metric) : [];
+  const moves = previousScoped ? rankMoves(shown, previousScoped, metric) : [];
   // one key per column: a combination can sell as a case and as a film
   const keyOf = (row) => `${type}:${row.fullModel}`;
   return (
     <ColumnFrame type={type} visible={visible}>
       <div className="flex min-w-0 items-center gap-2 px-0.5">
         <ColumnName type={type} t={t} />
-        <span className={`min-w-0 truncate text-[10.5px] ${MUTED}`}>{boardMeta(board, t)}</span>
+        <span className={`min-w-0 truncate text-[10.5px] ${MUTED}`}>{boardMeta(scoped, t)}</span>
         <span className="ml-auto hidden text-[15px] font-extrabold tabular-nums text-theme-900 @5xl/devices:inline dark:text-theme-50">
-          {metricText(metric, board[metric], t)}
+          {metricText(metric, scoped[metric], t)}
         </span>
       </div>
+      <StyleSwitch board={board} metric={metric} style={style} onStyle={onStyle} spacer={spacer} t={t} />
       {shown.length === 0 ? (
         <span className={EMPTY}>{t(`${NS}.noData`)}</span>
       ) : (
@@ -307,7 +337,21 @@ function CategoryColumn({
   );
 }
 
-function SlowingColumn({ type, slowing, visible, step, onStep, expanded, onExpand, t }) {
+function SlowingColumn({
+  type,
+  slowing,
+  board,
+  metric,
+  visible,
+  step,
+  onStep,
+  expanded,
+  onExpand,
+  t,
+  style = "all",
+  onStyle = () => {},
+  spacer = false,
+}) {
   const { shown, nextStep, nextCount } = reveal(slowing?.rows ?? [], step);
   const keyOf = (row) => `${type}:${row.fullModel}`;
   return (
@@ -331,6 +375,7 @@ function SlowingColumn({ type, slowing, visible, step, onStep, expanded, onExpan
           </div>
         </div>
       ) : null}
+      <StyleSwitch board={board} metric={metric} style={style} onStyle={onStyle} spacer={spacer} t={t} />
       {shown.length === 0 ? (
         <span className={EMPTY}>{t(`${NS}.noData`)}</span>
       ) : (
@@ -352,7 +397,7 @@ function SlowingColumn({ type, slowing, visible, step, onStep, expanded, onExpan
   );
 }
 
-export default function DeviceSalesSection({ devices, cardCls, t }) {
+export default function DeviceSalesSection({ devices, market = null, cardCls, t }) {
   // this month by default, whichever board lands first: until it is there the
   // fallback below shows what is, and the board moves to it once it arrives
   const [period, setPeriod] = useState(DEFAULT_DEVICE_PERIOD);
@@ -365,8 +410,15 @@ export default function DeviceSalesSection({ devices, cardCls, t }) {
   const [steps, setSteps] = useState({});
   // the combination row whose model list is open
   const [expanded, setExpanded] = useState(null);
+  // the case style each column shows, kept across periods, shops and views
+  const [styles, setStyles] = useState({});
 
-  const slowingOn = view === "slowing";
+  // 市場 needs the market reference: an older server has none, and a view left
+  // on it falls back to 売れ筋
+  const views = market ? VIEWS : VIEWS.filter((key) => key !== "market");
+  const activeView = views.includes(view) ? view : VIEWS[0];
+  const slowingOn = activeView === "slowing";
+  const marketOn = activeView === "market";
   // 失速 lives on this month; a period can also vanish across refreshes
   const wanted = slowingOn ? "thisMonth" : period;
   const activeKey = devices.periods[wanted] ? wanted : devices.available[0];
@@ -380,12 +432,19 @@ export default function DeviceSalesSection({ devices, cardCls, t }) {
   const metricOk = (key) => Boolean(types) && DEVICE_TYPES.every((type) => metricReady(types[type], key));
   const activeMetric = metricOk(metric) ? metric : "units";
   const moneyPending = Boolean(types) && (!metricOk("sales") || !metricOk("orders"));
-  const order = view === "least" ? "asc" : "desc";
+  const order = activeView === "least" ? "asc" : "desc";
+  // a style the board does not offer (films, an older server, 不明 once empty) reads as すべて
+  const styleFor = (type) => {
+    const chosen = styles[type] ?? "all";
+    return styleMix(types?.[type], activeMetric)?.some((part) => part.key === chosen) ? chosen : "all";
+  };
+  // films are not split: on a wide board their column keeps the switch's slot
+  const spacer = Boolean(types) && DEVICE_TYPES.some((type) => types[type].styles);
 
   const scopeShop = shopEntry ? shop : null;
   // last month's boards in the same scope, for the 今月 best-seller marks
   const lastScope =
-    !slowingOn && view === "best" && activeKey === "thisMonth" && devices.periods.lastMonth?.ready
+    !slowingOn && activeView === "best" && activeKey === "thisMonth" && devices.periods.lastMonth?.ready
       ? scopeShop
         ? (devices.periods.lastMonth.shops.find((s) => s.name === scopeShop)?.types ?? null)
         : devices.periods.lastMonth.types
@@ -396,7 +455,10 @@ export default function DeviceSalesSection({ devices, cardCls, t }) {
   const slowing =
     slowingOn && !slowingReason
       ? Object.fromEntries(
-          DEVICE_TYPES.map((type) => [type, buildSlowing(devices, { shop: scopeShop, type, metric: activeMetric })]),
+          DEVICE_TYPES.map((type) => [
+            type,
+            buildSlowing(devices, { shop: scopeShop, type, metric: activeMetric, style: styleFor(type) }),
+          ]),
         )
       : null;
   const pace = slowing ? slowingTotals(devices, { shop: scopeShop, metric: activeMetric }) : null;
@@ -408,6 +470,12 @@ export default function DeviceSalesSection({ devices, cardCls, t }) {
   const choose = (setter) => (value) => {
     setter(value);
     setSteps({});
+    setExpanded(null);
+  };
+  // a new style starts its own column short again
+  const pickStyle = (type) => (style) => {
+    setStyles((prev) => ({ ...prev, [type]: style }));
+    setSteps((prev) => ({ ...prev, [type]: 0 }));
     setExpanded(null);
   };
   const lockedPeriod = (key) => slowingOn && key !== "thisMonth";
@@ -450,8 +518,8 @@ export default function DeviceSalesSection({ devices, cardCls, t }) {
         <div className="flex flex-wrap items-center gap-2 @3xl/devices:ml-auto">
           <Segmented
             label={t(`${NS}.viewGroup`)}
-            options={VIEWS.map((key) => [key, t(`${NS}.${VIEW_LABEL[key]}`)])}
-            active={view}
+            options={views.map((key) => [key, t(`${NS}.${VIEW_LABEL[key]}`)])}
+            active={activeView}
             onPick={choose(setView)}
             disabled={(key) => key === "slowing" && !devices.periods.thisMonth}
           />
@@ -496,7 +564,16 @@ export default function DeviceSalesSection({ devices, cardCls, t }) {
         </div>
       </div>
 
-      {slowingReason ? (
+      {marketOn ? (
+        <MarketView
+          reference={market}
+          ownBoard={types ? types.case : null}
+          metric={activeMetric}
+          step={stepOf("market")}
+          onStep={setStepOf("market")}
+          t={t}
+        />
+      ) : slowingReason ? (
         <span className={EMPTY}>{t(`${NS}.${SLOWING_REASON[slowingReason]}`)}</span>
       ) : types ? (
         <>
@@ -517,6 +594,11 @@ export default function DeviceSalesSection({ devices, cardCls, t }) {
                   key={type}
                   type={type}
                   slowing={slowing[type]}
+                  board={types[type]}
+                  metric={activeMetric}
+                  style={styleFor(type)}
+                  onStyle={pickStyle(type)}
+                  spacer={spacer}
                   visible={tab === type}
                   step={stepOf(type)}
                   onStep={setStepOf(type)}
@@ -532,6 +614,9 @@ export default function DeviceSalesSection({ devices, cardCls, t }) {
                   metric={activeMetric}
                   order={order}
                   previousBoard={lastScope ? lastScope[type] : null}
+                  style={styleFor(type)}
+                  onStyle={pickStyle(type)}
+                  spacer={spacer}
                   visible={tab === type}
                   step={stepOf(type)}
                   onStep={setStepOf(type)}
@@ -550,6 +635,7 @@ export default function DeviceSalesSection({ devices, cardCls, t }) {
       {slowing ? (
         <p className={`text-[10.5px] leading-relaxed ${MUTED}`}>{t(`${NS}.slowingNote`, { min: SLOWING_MIN_UNITS })}</p>
       ) : null}
+      {marketOn ? <p className={`text-[10.5px] leading-relaxed ${MUTED}`}>{t(`${NS}.marketNote`)}</p> : null}
       <p className={`text-[10.5px] leading-relaxed ${MUTED}`}>{t(`${NS}.deviceNote`)}</p>
     </section>
   );

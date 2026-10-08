@@ -13,7 +13,7 @@ vi.mock("utils/proxy/use-widget-api", () => ({
 }));
 
 import Component from "./component";
-import { dailyDeviceSales, monthlyDeviceSales } from "./device-sales.fixtures.mjs";
+import { dailyDeviceSales, marketDeviceModels, monthlyDeviceSales } from "./device-sales.fixtures.mjs";
 
 const service = {
   widget: { type: "uorakutensales", refreshInterval: 60000 },
@@ -129,7 +129,7 @@ describe("widgets/uorakutensales/component", () => {
   });
 
   it("refreshes the device boards together with the monthly sales", () => {
-    const mutate = { monthly: vi.fn(), devices: vi.fn(), devicesMonthly: vi.fn() };
+    const mutate = { monthly: vi.fn(), devices: vi.fn(), devicesMonthly: vi.fn(), market: vi.fn() };
     useWidgetAPI.mockImplementation((_widget, endpoint) => {
       if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
       return { data: undefined, error: undefined, mutate: mutate[endpoint] ?? vi.fn() };
@@ -141,6 +141,21 @@ describe("widgets/uorakutensales/component", () => {
     expect(mutate.monthly).toHaveBeenCalledOnce();
     expect(mutate.devices).toHaveBeenCalledOnce();
     expect(mutate.devicesMonthly).toHaveBeenCalledOnce();
+    expect(mutate.market).toHaveBeenCalledOnce();
+  });
+
+  it("reads the market reference at most once an hour", () => {
+    useWidgetAPI.mockImplementation((_widget, endpoint) => {
+      if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
+      return { data: undefined, error: undefined, mutate: vi.fn() };
+    });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+    expect(useWidgetAPI).toHaveBeenCalledWith(service.widget, "market", { refreshInterval: 3600000 });
+
+    const slow = { widget: { ...service.widget, refreshInterval: 7200000 } };
+    renderWithProviders(<Component service={slow} />, { settings: { hideErrors: false } });
+    expect(useWidgetAPI).toHaveBeenCalledWith(slow.widget, "market", { refreshInterval: 7200000 });
   });
 
   it("shows the device board, and hides it when uo-ec-manager has no device routes", () => {
@@ -167,5 +182,26 @@ describe("widgets/uorakutensales/component", () => {
     expect(screen.queryByText("uorakutensales.deviceSales")).not.toBeInTheDocument();
     // the rest of the widget is untouched
     expect(screen.getByText("uorakutensales.title")).toBeInTheDocument();
+  });
+  it("offers the 市場 view only when the server has the market reference", () => {
+    const notFound = { error: { message: "Rakuten sales service error", data: { error: "Not Found" } } };
+    let payload = { devices: dailyDeviceSales(), devicesMonthly: monthlyDeviceSales(), market: marketDeviceModels() };
+    useWidgetAPI.mockImplementation((_widget, endpoint) => {
+      if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
+      return { data: payload[endpoint], error: undefined, mutate: vi.fn() };
+    });
+
+    const { rerender } = renderWithProviders(<Component service={service} />, {
+      settings: { hideErrors: false },
+    });
+    expect(screen.getByRole("button", { name: "uorakutensales.viewMarket" })).toBeInTheDocument();
+
+    payload = { ...payload, market: notFound };
+    rerender(
+      <SettingsContext.Provider value={{ settings: { hideErrors: false }, setSettings: () => {} }}>
+        <Component service={service} />
+      </SettingsContext.Provider>,
+    );
+    expect(screen.queryByRole("button", { name: "uorakutensales.viewMarket" })).not.toBeInTheDocument();
   });
 });

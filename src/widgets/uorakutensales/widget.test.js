@@ -14,6 +14,7 @@ const READ_ONLY = [
   "monthly",
   "devices",
   "devicesMonthly",
+  "market",
 ];
 
 describe("uorakutensales widget config", () => {
@@ -25,7 +26,15 @@ describe("uorakutensales widget config", () => {
   });
 
   it("allows nothing else", () => {
-    for (const endpoint of ["devicesRefresh", "device-sales", "devicesMonthlyStatus", "admin", "query"]) {
+    for (const endpoint of [
+      "devicesRefresh",
+      "device-sales",
+      "devicesMonthlyStatus",
+      "admin",
+      "query",
+      "market-rankings",
+      "marketRefresh",
+    ]) {
       expect(widget.allowedEndpoints.test(endpoint), endpoint).toBe(false);
     }
   });

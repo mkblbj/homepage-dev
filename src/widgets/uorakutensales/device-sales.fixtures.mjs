@@ -249,3 +249,182 @@ export function slowingDeviceSales() {
   monthly.previousMonth.totals = totalsOf(monthly.previousMonth.types);
   return { daily, monthly };
 }
+
+// A case-style split under a parent board: 手帳型 (folio), 普通 (standard) and
+// 不明 (unknown) sub-boards, rows as in deviceBoard. The parent keeps its own
+// rows and totals — its distinct orders are not the sum of the styles'.
+export function withStyles(board, { folio = [], standard = [], unknown = [] } = {}, styleCoveragePercent = 100) {
+  const styles = { folio: deviceBoard(folio), standard: deviceBoard(standard), unknown: deviceBoard(unknown) };
+  styles.unknown.unclassifiedProducts = [];
+  return { ...board, styleCoveragePercent, styles };
+}
+
+// Today and both months with the case and set boards split by style — the
+// company everywhere, shop 3911 this month. Last month holds 8 units of
+// unconfirmed style; this month none.
+export function styledDeviceSales() {
+  const daily = dailyDeviceSales();
+  const monthly = monthlyDeviceSales();
+  const now = monthly.currentMonth;
+  const before = monthly.previousMonth;
+  daily.types.case = withStyles(daily.types.case, {
+    folio: [
+      ["iPhone 17", 8, 8800, 6],
+      ["OPPO Reno13 A", 4, 14190, 4],
+    ],
+    standard: [
+      ["iPhone 17", 2, 2200, 1],
+      [COMPAT_SE, 2, 2200, 2, "compatibility"],
+    ],
+  });
+  now.types.case = withStyles(now.types.case, {
+    folio: [
+      ["Google Pixel 10a", 50, 65000, 48],
+      ["iPhone 17 e", 40, 54000, 39],
+      ["Galaxy A25", 20, 24000, 19],
+    ],
+    standard: [
+      ["Galaxy A25", 46, 55200, 42],
+      ["Google Pixel 10a", 24, 31200, 23],
+      ["iPhone 17 e", 10, 13500, 10],
+    ],
+  });
+  now.types.case_film_set = withStyles(deviceBoard([["AQUOS wish4", 12, 30000, 12]]), {
+    standard: [["AQUOS wish4", 12, 30000, 12]],
+  });
+  now.totals = totalsOf(now.types);
+  now.shops[0].types.case = withStyles(now.shops[0].types.case, {
+    folio: [["Galaxy A25", 10, 12000, 10]],
+    standard: [["Galaxy A25", 30, 36000, 29]],
+  });
+  before.types.case = withStyles(
+    before.types.case,
+    {
+      folio: [
+        ["Galaxy A25", 300, 360000, 280],
+        ["Google Pixel 10a", 200, 260000, 185],
+        ["iPhone 17", 146, 160600, 136],
+      ],
+      standard: [
+        ["Google Pixel 10a", 124, 161200, 117],
+        ["Galaxy A25", 120, 144000, 112],
+        ["iPhone 17", 100, 110000, 96],
+      ],
+      unknown: [["Galaxy A25", 8, 9600, 8]],
+    },
+    99.2,
+  );
+  return { daily, monthly };
+}
+
+// slowingDeviceSales with the case boards split by style on all three sides:
+// folio Galaxy A25 slows from 10 to 4.5 a day, standard arrows We3 from 6.7 to 1
+export function styledSlowingDeviceSales() {
+  const { daily, monthly } = slowingDeviceSales();
+  daily.types.case = withStyles(daily.types.case, {
+    folio: [
+      ["Galaxy A25", 3, 3600, 3],
+      ["arrows We3", 2, 2400, 2],
+    ],
+    standard: [
+      ["Galaxy A25", 3, 3600, 3],
+      ["Rising", 2, 2400, 2],
+    ],
+  });
+  monthly.currentMonth.types.case = withStyles(monthly.currentMonth.types.case, {
+    folio: [
+      ["Galaxy A25", 30, 36000, 29],
+      ["arrows We3", 14, 16800, 13],
+    ],
+    standard: [
+      ["Rising", 32, 38400, 30],
+      ["Galaxy A25", 30, 36000, 29],
+      ["arrows We3", 6, 7200, 6],
+    ],
+  });
+  monthly.previousMonth.types.case = withStyles(monthly.previousMonth.types.case, {
+    folio: [
+      ["Galaxy A25", 300, 360000, 285],
+      ["arrows We3", 100, 120000, 95],
+    ],
+    standard: [
+      ["arrows We3", 200, 240000, 195],
+      ["Galaxy A25", 120, 144000, 115],
+      ["Rising", 90, 108000, 88],
+      ["DIGNO BX3", 60, 72000, 58],
+      ["Tiny", 20, 24000, 20],
+    ],
+  });
+  return { daily, monthly };
+}
+
+// GET /api/market-rankings/device-models as the server sends it (schemaVersion
+// 2), evidence and full sources included
+export function marketDeviceModels() {
+  const ranks = [
+    [1, "iPhone 17", 100, [100, 100, 100]],
+    [2, "Galaxy A25", 85.14, [96.09, 64.72, 88.4]],
+    [3, "iPhone 18 Pro", 74.14, [87.28, 58.95, 64.09]],
+    [4, "Google Pixel 10a", 56.54, [81.48, 0, 78.99]],
+    [5, "iPhone Air", 8.5, [12.4, 0, 6.1]],
+  ].map(([rank, model, score, [rakutenProducts, yahooSearch, yahooProducts]]) => ({
+    rank,
+    model,
+    score,
+    sourceScores: { rakutenProducts, yahooSearch, yahooProducts },
+    observedDays: 6,
+    productCount: 40 - rank,
+    multiModelProductCount: 30 - rank,
+    keywordCount: rank === 1 ? 1 : 0,
+    bestProductRank: rank,
+    bestSearchRank: rank === 1 ? 49 : null,
+    evidenceIds: [`rakuten:560271:daily|shop:${rank}`, `yahoo:38347:trend|shop:${rank}`],
+  }));
+  const source = (recordedDays, modelCount) => ({
+    configured: true,
+    status: "observed",
+    partial: true,
+    recordedDays,
+    recordedDates: ["2026-10-07"],
+    expectedDays: 38,
+    missingDates: ["2026-09-01"],
+    modelCount,
+    capturedItemCount: 303,
+    boards: [{ key: "rakuten:560271:daily", genreId: "560271", period: "daily", capturedItemCount: 100 }],
+    ranks: [{ rank: 1, model: "iPhone 17", score: 100 }],
+    unassignedItems: [{ title: "全機種対応 ケース" }],
+    latestStatus: "ready",
+    stale: false,
+    lastError: null,
+  });
+  return {
+    schemaVersion: 2,
+    referenceOnly: true,
+    ok: true,
+    partial: true,
+    timezone: "Asia/Tokyo",
+    productType: "case",
+    generatedAtJST: "2026-10-08 15:06:20 JST",
+    semantics: "phone_case_model_demand_reference_from_products_and_search",
+    scoreWeights: { rakutenProducts: 0.5, yahooSearch: 0.3, yahooProducts: 0.2 },
+    startDate: "2026-09-01",
+    endDate: "2026-10-08",
+    status: "observed",
+    recordedDays: 7,
+    expectedDays: 38,
+    recordedDates: ["2026-09-05", "2026-10-07", "2026-10-08"],
+    missingDates: ["2026-09-01", "2026-09-02"],
+    ranks,
+    evidence: [
+      {
+        id: "rakuten:560271:daily|shop:1",
+        provider: "rakuten",
+        type: "product",
+        itemName: "iPhone17 ケース 手帳型",
+        itemUrl: "https://item.rakuten.co.jp/shop/item-1/",
+        observations: [{ date: "2026-10-07", sourceRank: 1, models: ["iPhone 17"], modelShare: 1 }],
+      },
+    ],
+    sources: { rakuten: source(7, 4), yahoo: source(1, 3) },
+  };
+}
