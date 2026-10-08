@@ -116,7 +116,9 @@ function SummaryStrip({ totals, types, metric, tab, onTab, t, pace = null, notes
   // a share means something only when the bar is cut by the metric on screen
   const shareOf = (part) => (mix.metric === metric ? part.share : null);
   return (
-    <div className={`flex flex-col gap-3 p-3.5 @5xl/devices:flex-row @5xl/devices:items-center @5xl/devices:gap-8 ${PANEL}`}>
+    <div
+      className={`flex flex-col gap-3 p-3.5 @5xl/devices:flex-row @5xl/devices:items-center @5xl/devices:gap-8 ${PANEL}`}
+    >
       <div className="flex min-w-0 flex-col gap-1.5 @5xl/devices:min-w-[240px]">
         <span className={`text-[11px] font-bold ${MUTED}`}>{t(`${NS}.deviceTotal`)}</span>
         <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -132,14 +134,20 @@ function SummaryStrip({ totals, types, metric, tab, onTab, t, pace = null, notes
         </span>
         {pace ? (
           <span className="text-[12px] font-semibold tabular-nums text-theme-700 dark:text-theme-200">
-            {t(`${NS}.slowingPace`, { pace: paceText(pace.metric, pace.pace, t), prev: paceText(pace.metric, pace.prevPace, t) })}
+            {t(`${NS}.slowingPace`, {
+              pace: paceText(pace.metric, pace.pace, t),
+              prev: paceText(pace.metric, pace.prevPace, t),
+            })}
             {" · "}
             <span className={LOSS}>{changeText(pace.changePct)}</span>
           </span>
         ) : null}
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-2">
-        <span aria-hidden="true" className="flex h-2.5 gap-0.5 overflow-hidden rounded-full bg-theme-300/30 dark:bg-white/10">
+        <span
+          aria-hidden="true"
+          className="flex h-2.5 gap-0.5 overflow-hidden rounded-full bg-theme-300/30 dark:bg-white/10"
+        >
           {mix.parts.map((part) => (
             <span
               key={part.key}
@@ -153,12 +161,16 @@ function SummaryStrip({ totals, types, metric, tab, onTab, t, pace = null, notes
           {mix.parts.map((part) => (
             <span key={part.key} className="flex items-center gap-1.5">
               <Dot color={TYPE_COLOR[part.key]} />
-              <span className="font-semibold text-theme-700 dark:text-theme-200">{t(`${NS}.${TYPE_LABEL[part.key]}`)}</span>
+              <span className="font-semibold text-theme-700 dark:text-theme-200">
+                {t(`${NS}.${TYPE_LABEL[part.key]}`)}
+              </span>
               {notes ? (
                 <span className={`tabular-nums ${LOSS}`}>{notes[part.key]}</span>
               ) : (
                 <span className="font-extrabold tabular-nums text-theme-900 dark:text-theme-50">
-                  {shareOf(part) != null ? `${shareOf(part).toFixed(1)}%` : metricText(metric, types[part.key][metric], t)}
+                  {shareOf(part) != null
+                    ? `${shareOf(part).toFixed(1)}%`
+                    : metricText(metric, types[part.key][metric], t)}
                 </span>
               )}
             </span>
@@ -236,12 +248,26 @@ function ColumnName({ type, t }) {
   return (
     <span className="hidden items-center gap-2 @5xl/devices:flex">
       <Dot color={TYPE_COLOR[type]} />
-      <span className="text-[13px] font-extrabold text-theme-900 dark:text-theme-50">{t(`${NS}.${TYPE_LABEL[type]}`)}</span>
+      <span className="text-[13px] font-extrabold text-theme-900 dark:text-theme-50">
+        {t(`${NS}.${TYPE_LABEL[type]}`)}
+      </span>
     </span>
   );
 }
 
-function CategoryColumn({ type, board, metric, order, visible, step, onStep, expanded, onExpand, t, previousBoard = null }) {
+function CategoryColumn({
+  type,
+  board,
+  metric,
+  order,
+  visible,
+  step,
+  onStep,
+  expanded,
+  onExpand,
+  t,
+  previousBoard = null,
+}) {
   const { shown, nextStep, nextCount } = reveal(rankDeviceBoard(board, metric, order), step);
   // 今月 best sellers only: where each row stood last month, same metric and scope
   const moves = previousBoard ? rankMoves(shown, previousBoard, metric) : [];
@@ -295,7 +321,9 @@ function SlowingColumn({ type, slowing, visible, step, onStep, expanded, onExpan
             </span>
           </div>
           <div className={`flex flex-wrap items-center gap-x-2 text-[10.5px] ${MUTED}`}>
-            <span className="min-w-0">{t(`${NS}.slowingEligible`, { min: SLOWING_MIN_UNITS, count: slowing.eligible })}</span>
+            <span className="min-w-0">
+              {t(`${NS}.slowingEligible`, { min: SLOWING_MIN_UNITS, count: slowing.eligible })}
+            </span>
             <span className="ml-auto tabular-nums">
               {t(`${NS}.lastMonth`)} {paceText(slowing.metric, slowing.prevPace, t)} ·{" "}
               <span className={LOSS}>{changeText(slowing.changePct)}</span>
@@ -359,7 +387,7 @@ export default function DeviceSalesSection({ devices, cardCls, t }) {
   const lastScope =
     !slowingOn && view === "best" && activeKey === "thisMonth" && devices.periods.lastMonth?.ready
       ? scopeShop
-        ? devices.periods.lastMonth.shops.find((s) => s.name === scopeShop)?.types ?? null
+        ? (devices.periods.lastMonth.shops.find((s) => s.name === scopeShop)?.types ?? null)
         : devices.periods.lastMonth.types
       : null;
   const span = slowingOn ? slowingWindow(devices) : null;
@@ -367,7 +395,9 @@ export default function DeviceSalesSection({ devices, cardCls, t }) {
   const slowingReason = slowingOn ? (activeKey === "thisMonth" ? span.reason : "updating") : null;
   const slowing =
     slowingOn && !slowingReason
-      ? Object.fromEntries(DEVICE_TYPES.map((type) => [type, buildSlowing(devices, { shop: scopeShop, type, metric: activeMetric })]))
+      ? Object.fromEntries(
+          DEVICE_TYPES.map((type) => [type, buildSlowing(devices, { shop: scopeShop, type, metric: activeMetric })]),
+        )
       : null;
   const pace = slowing ? slowingTotals(devices, { shop: scopeShop, metric: activeMetric }) : null;
   const notes = slowing
@@ -389,7 +419,9 @@ export default function DeviceSalesSection({ devices, cardCls, t }) {
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5">
         <div className="flex min-w-0 flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[13px] font-extrabold text-theme-800 dark:text-theme-100">{t(`${NS}.deviceSales`)}</span>
+            <span className="text-[13px] font-extrabold text-theme-800 dark:text-theme-100">
+              {t(`${NS}.deviceSales`)}
+            </span>
             {current.shopCount > 0 && current.coveredShopCount < current.shopCount ? (
               <span
                 title={t(`${NS}.missingShops`, { names: current.missingShops.join(", ") })}
@@ -410,7 +442,9 @@ export default function DeviceSalesSection({ devices, cardCls, t }) {
           <span className={`text-[11.5px] tabular-nums ${MUTED}`}>
             {periodText(activeKey, current.label)}
             {/* last month is closed; its source time is only the nightly re-check */}
-            {activeKey !== "lastMonth" && current.updatedAt ? ` · ${t(`${NS}.asOf`, { time: timeFromJST(current.updatedAt) })}` : ""}
+            {activeKey !== "lastMonth" && current.updatedAt
+              ? ` · ${t(`${NS}.asOf`, { time: timeFromJST(current.updatedAt) })}`
+              : ""}
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-2 @3xl/devices:ml-auto">
@@ -513,7 +547,9 @@ export default function DeviceSalesSection({ devices, cardCls, t }) {
         <span className={EMPTY}>{t(`${NS}.deviceNotReady`)}</span>
       )}
 
-      {slowing ? <p className={`text-[10.5px] leading-relaxed ${MUTED}`}>{t(`${NS}.slowingNote`, { min: SLOWING_MIN_UNITS })}</p> : null}
+      {slowing ? (
+        <p className={`text-[10.5px] leading-relaxed ${MUTED}`}>{t(`${NS}.slowingNote`, { min: SLOWING_MIN_UNITS })}</p>
+      ) : null}
       <p className={`text-[10.5px] leading-relaxed ${MUTED}`}>{t(`${NS}.deviceNote`)}</p>
     </section>
   );

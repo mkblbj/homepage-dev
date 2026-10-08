@@ -143,7 +143,11 @@ test("device board placeholders are preserved across locales", () => {
     assert.match(ns.modelCount, /\{\{count\}\}/, `${locale}.modelCount needs {{count}}`);
     assert.match(ns.singleModelShare, /\{\{pct\}\}/, `${locale}.singleModelShare needs {{pct}}`);
     assert.match(ns.unresolvedUnits, /\{\{count\}\}/, `${locale}.unresolvedUnits needs {{count}}`);
-    assert.match(ns.shopCoverage, /\{\{covered\}\}.*\{\{total\}\}/, `${locale}.shopCoverage needs {{covered}} then {{total}}`);
+    assert.match(
+      ns.shopCoverage,
+      /\{\{covered\}\}.*\{\{total\}\}/,
+      `${locale}.shopCoverage needs {{covered}} then {{total}}`,
+    );
     assert.match(ns.missingShops, /\{\{names\}\}/, `${locale}.missingShops needs {{names}}`);
     assert.match(ns.staleShops, /\{\{count\}\}/, `${locale}.staleShops needs {{count}}`);
     assert.match(ns.slowingPace, /\{\{pace\}\}.*\{\{prev\}\}/, `${locale}.slowingPace needs {{pace}} then {{prev}}`);

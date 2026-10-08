@@ -144,7 +144,11 @@ export function DeviceRow({ row, metric, expanded, onToggle, t, move = null }) {
       data-testid="device-row"
       className={`relative grid grid-cols-[22px_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-0.5 overflow-hidden rounded-lg px-2 py-1.5 ${WIDE_COLS} @xs/list:py-1`}
     >
-      <span aria-hidden="true" className="absolute inset-y-0 left-0 rounded-lg bg-[#2E7DF6]/20" style={{ width: `${row.barPct}%` }} />
+      <span
+        aria-hidden="true"
+        className="absolute inset-y-0 left-0 rounded-lg bg-[#2E7DF6]/20"
+        style={{ width: `${row.barPct}%` }}
+      />
       <span
         className={`relative row-span-2 text-center text-[13px] font-extrabold leading-tight tabular-nums @xs/list:row-span-1 @xs/list:text-[12px] ${
           RANK_TONE[row.rank] ?? MUTED
@@ -161,10 +165,14 @@ export function DeviceRow({ row, metric, expanded, onToggle, t, move = null }) {
         extra={<BulkBadge row={row} t={t} className="hidden @xs/list:inline" />}
       />
       {/* two lines: the active value beside the name, the other two under it */}
-      <span className={`relative row-span-2 text-right text-[15px] font-extrabold tabular-nums @xs/list:hidden ${VALUE_TONE}`}>
+      <span
+        className={`relative row-span-2 text-right text-[15px] font-extrabold tabular-nums @xs/list:hidden ${VALUE_TONE}`}
+      >
         {metricText(metric, row[metric], t)}
       </span>
-      <span className={`relative col-start-2 flex flex-wrap items-center gap-x-1.5 text-[12px] tabular-nums @xs/list:hidden ${MUTED}`}>
+      <span
+        className={`relative col-start-2 flex flex-wrap items-center gap-x-1.5 text-[12px] tabular-nums @xs/list:hidden ${MUTED}`}
+      >
         {others.map((m) => metricText(m, row[m], t)).join(" · ")}
         <BulkBadge row={row} t={t} />
       </span>
@@ -201,7 +209,10 @@ export function changeText(pct) {
 
 export function SlowingRow({ row, metric, expanded, onToggle, t }) {
   return (
-    <li data-testid="device-row" className="relative grid grid-cols-[22px_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 rounded-lg px-2 py-1.5">
+    <li
+      data-testid="device-row"
+      className="relative grid grid-cols-[22px_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 rounded-lg px-2 py-1.5"
+    >
       <span className={`row-span-2 text-center text-[12px] font-extrabold tabular-nums ${MUTED}`}>{row.rank}</span>
       <ModelName row={row} expanded={expanded} onToggle={onToggle} t={t} />
       <span
@@ -212,7 +223,10 @@ export function SlowingRow({ row, metric, expanded, onToggle, t }) {
       </span>
       <span className={`col-span-2 flex min-w-0 items-center gap-2 text-[10.5px] tabular-nums ${MUTED}`}>
         {/* the track is last month's pace; the fill is how much of it is left */}
-        <span aria-hidden="true" className="relative block h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-theme-300/50 dark:bg-white/15">
+        <span
+          aria-hidden="true"
+          className="relative block h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-theme-300/50 dark:bg-white/15"
+        >
           <span className="absolute inset-y-0 left-0 rounded-full bg-[#2E7DF6]" style={{ width: `${row.ratio}%` }} />
         </span>
         <span className="min-w-0">

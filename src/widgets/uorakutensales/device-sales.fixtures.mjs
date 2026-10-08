@@ -206,7 +206,15 @@ export function monthlyDeviceSales() {
       shops: [
         shop("3911", deviceTypes([["Galaxy A25", 200, 240000, 190]])),
         // read for this month, not yet for last month
-        { shopName: "松武", configured: true, status: "not_ready", stale: false, metricsReady: false, totals: null, types: null },
+        {
+          shopName: "松武",
+          configured: true,
+          status: "not_ready",
+          stale: false,
+          metricsReady: false,
+          totals: null,
+          types: null,
+        },
         unconfigured(),
       ],
     },
