@@ -18,7 +18,7 @@ import Container from "components/services/widget/container";
 import { useTranslation } from "next-i18next/pages";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { DASH, buildAttentionModel, isNil, sumNullable } from "./attention-model.mjs";
+import { DASH, buildAttentionModel, isNil } from "./attention-model.mjs";
 
 import useWidgetAPI from "utils/proxy/use-widget-api";
 
@@ -219,6 +219,115 @@ function KpiCard({ label, hint, value, sub, subAlert }) {
   );
 }
 
+// A shop with something to handle. Only the counts it actually has are listed; an unknown
+// count stays on the card as "—", since it is not a zero.
+function ShopCard({ shop, t }) {
+  const tone = toneOf(shop.status);
+  const counts = [
+    { key: "pending", label: t(`${NS}.pendingOrders`), value: shop.pending },
+    { key: "inquiry", label: t(`${NS}.inquiriesShort`), value: shop.inquiry },
+    { key: "reviews", label: t(`${NS}.reviews`), value: shop.reviews },
+  ].filter((count) => count.value !== 0);
+
+  return (
+    <div
+      data-testid="shop-card"
+      className="flex min-w-0 flex-col gap-2 rounded-xl border border-theme-300/30 bg-theme-100/60 py-2.5 pl-3 pr-3.5 dark:border-white/[0.06] dark:bg-white/[0.03]"
+      style={{ borderLeft: `3px solid ${tone.color}` }}
+    >
+      <div className="flex min-w-0 items-center gap-2">
+        <ShopLogo name={shop.name} url={shop.logoUrl} size={18} />
+        <span data-testid="shop-name" className="truncate text-[13px] font-bold text-theme-900 dark:text-theme-50">
+          {shop.name}
+        </span>
+        <span className={`inline-flex shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold ${tone.pill}`}>
+          {statusLabel(t, shop.status)}
+        </span>
+        <span className="ml-auto flex shrink-0 items-baseline gap-0.5">
+          <span
+            data-testid="shop-total"
+            className="text-[20px] font-extrabold leading-none tabular-nums text-theme-900 dark:text-theme-50"
+          >
+            {fmtNullable(t, shop.total)}
+          </span>
+          <span className="text-[10px] font-bold text-theme-600 dark:text-theme-300">{t(`${NS}.unit`)}</span>
+        </span>
+      </div>
+      {counts.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+          {counts.map((count) => (
+            <span key={count.key} className="inline-flex items-center gap-1">
+              <span className="font-medium text-theme-600 dark:text-theme-300">{count.label}</span>
+              <span className="font-bold tabular-nums text-theme-900 dark:text-theme-50">
+                {fmtNullable(t, count.value)}
+              </span>
+              {count.key === "inquiry" && (isNil(shop.overdue) || shop.overdue > 0) ? (
+                <span
+                  className={`font-bold ${isNil(shop.overdue) ? "text-theme-500 dark:text-theme-400" : ACCENT_TEXT}`}
+                >
+                  {t(`${NS}.overdue`)} {fmtNullable(t, shop.overdue)}
+                </span>
+              ) : null}
+              {count.key === "reviews"
+                ? shop.stars.map((x) => (
+                    <span
+                      key={x.star}
+                      className={`inline-flex items-center gap-0.5 rounded-md border px-1.5 py-px text-[10px] font-bold tabular-nums ${RATING_TONE[x.star]}`}
+                    >
+                      {x.star}★{x.n}
+                    </span>
+                  ))
+                : null}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {shop.lastError ? (
+        <span
+          title={shop.lastError}
+          className="truncate font-mono text-[10.5px] font-medium text-rose-600 dark:text-rose-300"
+        >
+          {shop.lastError}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+// Shops with nothing to handle share one line instead of a card each.
+function QuietShops({ shops, t }) {
+  return (
+    <div data-testid="quiet-shops" className="flex flex-wrap items-center gap-x-2 gap-y-1.5 px-1">
+      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 dark:text-emerald-300">
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={3}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="m5 12.5 4.5 4.5L19 7.5" />
+        </svg>
+        {t(`${NS}.quietShops`, { count: shops.length })}
+      </span>
+      <span className="text-[10.5px] font-medium text-theme-500 dark:text-theme-400">{t(`${NS}.quietNote`)}</span>
+      {shops.map((shop) => (
+        <span
+          key={shop.name}
+          className="inline-flex items-center gap-1 rounded-md border border-theme-300/40 bg-theme-100/40 px-1.5 py-0.5 text-[11px] font-semibold text-theme-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-theme-200"
+        >
+          <ShopLogo name={shop.name} url={shop.logoUrl} size={13} />
+          {shop.name}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function LoadingSkeleton() {
   return (
     <div className="@container flex w-full min-w-0 flex-col gap-3 p-1.5">
@@ -402,107 +511,32 @@ export default function Component({ service }) {
           </div>
         </section>
 
-        {/* per-shop table */}
-        <div className="flex items-baseline justify-between gap-2 px-0.5">
-          <span className="text-[12px] font-bold text-theme-800 dark:text-theme-100">{t(`${NS}.byShop`)}</span>
-          <span className="hidden text-[10px] font-medium text-theme-600 dark:text-theme-300 @lg:inline">
-            {t(`${NS}.statusRule`)}
-          </span>
-        </div>
-        <section className={`flex flex-col gap-0.5 px-4 py-3 ${cardCls}`}>
-          <div className="hidden items-center gap-3 border-b border-theme-300/40 px-2 pb-2 text-[10px] font-bold tracking-[0.06em] text-theme-500 dark:border-white/10 dark:text-theme-400 @2xl:flex">
-            <span className="min-w-0 flex-[1.5]">{t(`${NS}.shop`)}</span>
-            <span className="min-w-0 flex-[0.9]">{t(`${NS}.statusCol`)}</span>
-            <span className="min-w-0 flex-[1] text-right">{t(`${NS}.pendingOrders`)}</span>
-            <span className="min-w-0 flex-[0.85] text-right">{t(`${NS}.inquiriesShort`)}</span>
-            <span className="min-w-0 flex-[0.75] text-right">{t(`${NS}.overdue`)}</span>
-            <span className="min-w-0 flex-[1.1] text-right">{t(`${NS}.reviews`)}</span>
-            <span className="min-w-0 flex-[1.7] pl-5">{t(`${NS}.starBreakdown`)}</span>
-            <span className="min-w-0 flex-[0.75] text-right">{t(`${NS}.total`)}</span>
-          </div>
-
-          {model.shops.map((sh) => {
-            const st = toneOf(sh.status);
-            const rowTotal = sumNullable([sh.pending, sh.inquiry, sh.reviews]);
-
-            return (
-              <div
-                key={sh.name}
-                className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg px-2 py-2 transition-colors hover:bg-theme-300/20 dark:hover:bg-white/[0.04]"
-              >
-                <span className="flex min-w-0 flex-[1.5] items-center gap-2">
-                  <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${st.dot}`} />
-                  <ShopLogo name={sh.name} url={sh.logoUrl} size={16} />
-                  <span className="truncate text-[12.5px] font-semibold text-theme-900 dark:text-theme-50">
-                    {sh.name}
-                  </span>
+        {/* per-shop board: a card for each shop with something to handle, the rest on one line */}
+        {model.shops.length > 0 ? (
+          <>
+            <div className="flex items-baseline justify-between gap-2 px-0.5">
+              <span className="flex min-w-0 items-baseline gap-2">
+                <span className="text-[12px] font-bold text-theme-800 dark:text-theme-100">{t(`${NS}.byShop`)}</span>
+                <span className="text-[10.5px] font-semibold tabular-nums text-theme-600 dark:text-theme-300">
+                  {t(`${NS}.covered`, { covered: model.coveredShopCount, total: model.shopCount })}
                 </span>
-                <span className="min-w-0 flex-[0.9]">
-                  <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${st.pill}`}>
-                    {statusLabel(t, sh.status)}
-                  </span>
-                </span>
-                <span className="min-w-0 flex-[1] text-right text-[13px] font-bold tabular-nums text-theme-900 dark:text-theme-50">
-                  {fmtNullable(t, sh.pending)}
-                </span>
-                <span className="min-w-0 flex-[0.85] text-right text-[13px] font-bold tabular-nums text-theme-900 dark:text-theme-50">
-                  {fmtNullable(t, sh.inquiry)}
-                </span>
-                <span
-                  className={`min-w-0 flex-[0.75] text-right text-[13px] font-bold tabular-nums ${
-                    sh.overdue > 0 ? ACCENT_TEXT : "text-theme-400 dark:text-theme-500"
-                  }`}
-                >
-                  {fmtNullable(t, sh.overdue)}
-                </span>
-                <span className="min-w-0 flex-[1.1] text-right text-[13px] font-bold tabular-nums text-theme-900 dark:text-theme-50">
-                  {fmtNullable(t, sh.reviews)}
-                </span>
-                {/* Follows its column header, which is @2xl-only: below that the row's
-                    zero-basis cells shrink far enough for the badges to overlap the total. */}
-                <span className="hidden min-w-0 flex-[1.7] gap-1.5 @2xl:flex @2xl:pl-5">
-                  {sh.stars.map((x) => (
-                    <span
-                      key={x.star}
-                      className={`inline-flex items-center gap-0.5 rounded-md border px-1.5 py-px text-[10px] font-bold tabular-nums ${RATING_TONE[x.star]}`}
-                    >
-                      {x.star}★{x.n}
-                    </span>
-                  ))}
-                </span>
-                <span className="min-w-0 flex-[0.75] text-right text-[13.5px] font-extrabold tabular-nums text-theme-900 dark:text-theme-50">
-                  {fmtNullable(t, rowTotal)}
-                </span>
-              </div>
-            );
-          })}
-
-          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-theme-300/50 px-2 pt-2.5 dark:border-white/15">
-            <span className="min-w-0 flex-[1.5] text-[11.5px] font-bold text-theme-900 dark:text-theme-50">
-              {t(`${NS}.total`)}{" "}
-              <span className="font-medium text-theme-600 dark:text-theme-300">
-                {t(`${NS}.covered`, { covered: model.coveredShopCount, total: model.shopCount })}
               </span>
-            </span>
-            <span className="min-w-0 flex-[0.9]" />
-            <span className="min-w-0 flex-[1] text-right text-[13.5px] font-extrabold tabular-nums text-theme-900 dark:text-theme-50">
-              {fmtNullable(t, model.pending)}
-            </span>
-            <span className="min-w-0 flex-[0.85] text-right text-[13.5px] font-extrabold tabular-nums text-theme-900 dark:text-theme-50">
-              {fmtNullable(t, model.inquiry)}
-            </span>
-            <span className={`min-w-0 flex-[0.75] text-right text-[13.5px] font-extrabold tabular-nums ${ACCENT_TEXT}`}>
-              {fmtNullable(t, model.overdue)}
-            </span>
-            <span className="min-w-0 flex-[1.1] text-right text-[13.5px] font-extrabold tabular-nums text-theme-900 dark:text-theme-50">
-              {fmtNullable(t, model.reviews)}
-            </span>
-            <span className="hidden min-w-0 flex-[1.7] @2xl:block @2xl:pl-5" />
-            <span className={`min-w-0 flex-[0.75] text-right text-[14px] font-extrabold tabular-nums ${ACCENT_TEXT}`}>
-              {fmtNullable(t, model.total)}
-            </span>
-          </div>
-        </section>
+              <span className="hidden text-[10px] font-medium text-theme-600 dark:text-theme-300 @lg:inline">
+                {t(`${NS}.statusRule`)}
+              </span>
+            </div>
+            <section className={`flex flex-col gap-2.5 p-3 ${cardCls}`}>
+              {model.activeShops.length > 0 ? (
+                <div className="grid grid-cols-1 gap-2.5 @md:grid-cols-2 @4xl:grid-cols-3 @6xl:grid-cols-4">
+                  {model.activeShops.map((shop) => (
+                    <ShopCard key={shop.name} shop={shop} t={t} />
+                  ))}
+                </div>
+              ) : null}
+              {model.quietShops.length > 0 ? <QuietShops shops={model.quietShops} t={t} /> : null}
+            </section>
+          </>
+        ) : null}
 
         {/* low-rating unreplied reviews (read-only; no outbound links by design) */}
         <div className="flex flex-wrap items-center justify-between gap-2 px-0.5">
