@@ -249,3 +249,70 @@ export function slowingDeviceSales() {
   monthly.previousMonth.totals = totalsOf(monthly.previousMonth.types);
   return { daily, monthly };
 }
+
+// A case-style split under a parent board: 手帳型 (folio), 普通 (standard) and
+// 不明 (unknown) sub-boards, rows as in deviceBoard. The parent keeps its own
+// rows and totals — its distinct orders are not the sum of the styles'.
+export function withStyles(board, { folio = [], standard = [], unknown = [] } = {}, styleCoveragePercent = 100) {
+  const styles = { folio: deviceBoard(folio), standard: deviceBoard(standard), unknown: deviceBoard(unknown) };
+  styles.unknown.unclassifiedProducts = [];
+  return { ...board, styleCoveragePercent, styles };
+}
+
+// Today and both months with the case and set boards split by style — the
+// company everywhere, shop 3911 this month. Last month holds 8 units of
+// unconfirmed style; this month none.
+export function styledDeviceSales() {
+  const daily = dailyDeviceSales();
+  const monthly = monthlyDeviceSales();
+  const now = monthly.currentMonth;
+  const before = monthly.previousMonth;
+  daily.types.case = withStyles(daily.types.case, {
+    folio: [
+      ["iPhone 17", 8, 8800, 6],
+      ["OPPO Reno13 A", 4, 14190, 4],
+    ],
+    standard: [
+      ["iPhone 17", 2, 2200, 1],
+      [COMPAT_SE, 2, 2200, 2, "compatibility"],
+    ],
+  });
+  now.types.case = withStyles(now.types.case, {
+    folio: [
+      ["Google Pixel 10a", 50, 65000, 48],
+      ["iPhone 17 e", 40, 54000, 39],
+      ["Galaxy A25", 20, 24000, 19],
+    ],
+    standard: [
+      ["Galaxy A25", 46, 55200, 42],
+      ["Google Pixel 10a", 24, 31200, 23],
+      ["iPhone 17 e", 10, 13500, 10],
+    ],
+  });
+  now.types.case_film_set = withStyles(deviceBoard([["AQUOS wish4", 12, 30000, 12]]), {
+    standard: [["AQUOS wish4", 12, 30000, 12]],
+  });
+  now.totals = totalsOf(now.types);
+  now.shops[0].types.case = withStyles(now.shops[0].types.case, {
+    folio: [["Galaxy A25", 10, 12000, 10]],
+    standard: [["Galaxy A25", 30, 36000, 29]],
+  });
+  before.types.case = withStyles(
+    before.types.case,
+    {
+      folio: [
+        ["Galaxy A25", 300, 360000, 280],
+        ["Google Pixel 10a", 200, 260000, 185],
+        ["iPhone 17", 146, 160600, 136],
+      ],
+      standard: [
+        ["Google Pixel 10a", 124, 161200, 117],
+        ["Galaxy A25", 120, 144000, 112],
+        ["iPhone 17", 100, 110000, 96],
+      ],
+      unknown: [["Galaxy A25", 8, 9600, 8]],
+    },
+    99.2,
+  );
+  return { daily, monthly };
+}

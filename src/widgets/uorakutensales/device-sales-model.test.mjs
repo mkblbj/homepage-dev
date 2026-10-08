@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   buildDeviceSales,
+  CASE_STYLES,
   categoryMix,
   compatParts,
   DEVICE_TYPES,
@@ -10,8 +11,18 @@ import {
   metricReady,
   rankDeviceBoard,
   rankMoves,
+  styleBoard,
+  styleMix,
 } from "./device-sales-model.mjs";
-import { COMPAT_LONG, COMPAT_SE, dailyDeviceSales, monthlyDeviceSales } from "./device-sales.fixtures.mjs";
+import {
+  COMPAT_LONG,
+  COMPAT_SE,
+  dailyDeviceSales,
+  deviceBoard,
+  monthlyDeviceSales,
+  styledDeviceSales,
+  withStyles,
+} from "./device-sales.fixtures.mjs";
 
 const SE_NAME = "iPhone SE（第2代） / iPhone SE（第3代）";
 
@@ -273,4 +284,125 @@ test("rankMoves leaves no marks without a comparable board", () => {
   // units never wait for money
   const byUnits = rankDeviceBoard(periods.thisMonth.types.case, "units");
   assert.equal(rankMoves(byUnits, pending, "units")[0].dir, "up");
+});
+
+function styledPeriods() {
+  const { daily, monthly } = styledDeviceSales();
+  return buildDeviceSales(daily, monthly).periods;
+}
+
+test("case and set boards carry their 手帳型 / 普通 / 不明 boards; films have none", () => {
+  const periods = styledPeriods();
+  const caseBoard = periods.thisMonth.types.case;
+
+  assert.deepEqual(CASE_STYLES, ["folio", "standard", "unknown"]);
+  assert.deepEqual(Object.keys(caseBoard.styles), CASE_STYLES);
+  assert.deepEqual(
+    caseBoard.styles.folio.rows.map((r) => [r.fullModel, r.units]),
+    [
+      ["Google Pixel 10a", 50],
+      ["iPhone 17 e", 40],
+      ["Galaxy A25", 20],
+    ],
+  );
+  const { units, sales, orders } = caseBoard.styles.standard;
+  assert.deepEqual({ units, sales, orders }, { units: 80, sales: 99900, orders: 75 });
+  assert.equal(caseBoard.styleCoverage, 100);
+  assert.equal(periods.lastMonth.types.case.styleCoverage, 99.2);
+  // a style board has no styles of its own, and films are never split
+  assert.equal(caseBoard.styles.folio.styles, null);
+  assert.equal(periods.thisMonth.types.film.styles, null);
+  assert.deepEqual(
+    periods.thisMonth.types.case_film_set.styles.standard.rows.map((r) => r.fullModel),
+    ["AQUOS wish4"],
+  );
+  // a shop's boards split the same way, and today's too
+  const shop = periods.thisMonth.shops.find((s) => s.name === "3911");
+  assert.deepEqual(
+    shop.types.case.styles.standard.rows.map((r) => r.units),
+    [30],
+  );
+  assert.deepEqual(
+    periods.today.types.case.styles.standard.rows.map((r) => r.compat),
+    [false, true],
+  );
+});
+
+test("a style's distinct orders are its own, and the parent's are never the styles' sum", () => {
+  const caseBoard = styledPeriods().thisMonth.types.case;
+
+  assert.equal(caseBoard.orders, 178);
+  assert.equal(caseBoard.styles.folio.orders, 106);
+  assert.equal(caseBoard.styles.standard.orders, 75);
+});
+
+test("a board from a server without styles has none", () => {
+  const { periods } = buildDeviceSales(dailyDeviceSales(), monthlyDeviceSales());
+
+  assert.equal(periods.today.types.case.styles, null);
+  assert.equal(periods.today.types.case.styleCoverage, null);
+  assert.equal(styleMix(periods.today.types.case, "units"), null);
+});
+
+test("styleBoard picks a style; すべて, films and boards without styles stay themselves", () => {
+  const types = styledPeriods().thisMonth.types;
+
+  assert.equal(styleBoard(types.case, "folio"), types.case.styles.folio);
+  assert.equal(styleBoard(types.case, "all"), types.case);
+  assert.equal(styleBoard(types.film, "folio"), types.film);
+  assert.equal(styleBoard(null, "folio"), null);
+});
+
+test("styleMix splits the metric on screen; orders fall back to units; 不明 only while it holds units", () => {
+  const periods = styledPeriods();
+  const caseBoard = periods.thisMonth.types.case;
+
+  assert.deepEqual(
+    styleMix(caseBoard, "units").map((p) => [p.key, p.value, Math.round(p.share)]),
+    [
+      ["folio", 110, 58],
+      ["standard", 80, 42],
+    ],
+  );
+  assert.deepEqual(
+    styleMix(caseBoard, "sales").map((p) => p.value),
+    [143000, 99900],
+  );
+  // distinct orders do not add up across styles, so the split stays by units
+  assert.deepEqual(
+    styleMix(caseBoard, "orders").map((p) => p.value),
+    [110, 80],
+  );
+  // last month holds 8 units of unconfirmed style
+  assert.deepEqual(
+    styleMix(periods.lastMonth.types.case, "units").map((p) => [p.key, p.value]),
+    [
+      ["folio", 646],
+      ["standard", 344],
+      ["unknown", 8],
+    ],
+  );
+  // a set with no folio sales still offers both styles, at 0%
+  assert.deepEqual(
+    styleMix(periods.thisMonth.types.case_film_set, "units").map((p) => [p.key, p.share]),
+    [
+      ["folio", 0],
+      ["standard", 100],
+    ],
+  );
+  assert.equal(styleMix(periods.thisMonth.types.film, "units"), null);
+});
+
+test("styleMix gives no shares while nothing sold", () => {
+  const { daily, monthly } = styledDeviceSales();
+  daily.types.case_film_set = withStyles(deviceBoard([]), {});
+  const set = buildDeviceSales(daily, monthly).periods.today.types.case_film_set;
+
+  assert.deepEqual(
+    styleMix(set, "units").map((p) => [p.key, p.value, p.share]),
+    [
+      ["folio", 0, null],
+      ["standard", 0, null],
+    ],
+  );
 });
