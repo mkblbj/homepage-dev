@@ -129,7 +129,7 @@ describe("widgets/uorakutensales/component", () => {
   });
 
   it("refreshes the device boards together with the monthly sales", () => {
-    const mutate = { monthly: vi.fn(), devices: vi.fn(), devicesMonthly: vi.fn() };
+    const mutate = { monthly: vi.fn(), devices: vi.fn(), devicesMonthly: vi.fn(), market: vi.fn() };
     useWidgetAPI.mockImplementation((_widget, endpoint) => {
       if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
       return { data: undefined, error: undefined, mutate: mutate[endpoint] ?? vi.fn() };
@@ -141,6 +141,21 @@ describe("widgets/uorakutensales/component", () => {
     expect(mutate.monthly).toHaveBeenCalledOnce();
     expect(mutate.devices).toHaveBeenCalledOnce();
     expect(mutate.devicesMonthly).toHaveBeenCalledOnce();
+    expect(mutate.market).toHaveBeenCalledOnce();
+  });
+
+  it("reads the market reference at most once an hour", () => {
+    useWidgetAPI.mockImplementation((_widget, endpoint) => {
+      if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
+      return { data: undefined, error: undefined, mutate: vi.fn() };
+    });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+    expect(useWidgetAPI).toHaveBeenCalledWith(service.widget, "market", { refreshInterval: 3600000 });
+
+    const slow = { widget: { ...service.widget, refreshInterval: 7200000 } };
+    renderWithProviders(<Component service={slow} />, { settings: { hideErrors: false } });
+    expect(useWidgetAPI).toHaveBeenCalledWith(slow.widget, "market", { refreshInterval: 7200000 });
   });
 
   it("shows the device board, and hides it when uo-ec-manager has no device routes", () => {

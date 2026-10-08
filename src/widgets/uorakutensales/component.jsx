@@ -21,6 +21,7 @@ import Container from "components/services/widget/container";
 import { useTranslation } from "next-i18next/pages";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { buildMarketReference, MARKET_REFRESH_INTERVAL } from "./device-market-model.mjs";
 import { buildDeviceSales } from "./device-sales-model.mjs";
 import DeviceSalesSection from "./device-sales-section";
 import {
@@ -1431,12 +1432,17 @@ export default function Component({ service }) {
     refreshInterval,
   });
   const { data: peaksData } = useWidgetAPI(widget, "peaks", { refreshInterval });
+  // the market reference changes once a day: never read it more than hourly
+  const { data: marketData, mutate: mutateMarket } = useWidgetAPI(widget, "market", {
+    refreshInterval: Math.max(refreshInterval, MARKET_REFRESH_INTERVAL),
+  });
 
   const freshness = useFreshness(sales?.generatedAtJST, refreshInterval);
   const model = useMemo(() => buildModel(sales, history, logos), [sales, history, logos]);
   const ranking = useMemo(() => buildRanking(rankingData), [rankingData]);
   const peaks = useMemo(() => buildPeaks(peaksData), [peaksData]);
   const devices = useMemo(() => buildDeviceSales(devicesData, devicesMonthlyData), [devicesData, devicesMonthlyData]);
+  const market = useMemo(() => buildMarketReference(marketData), [marketData]);
   // the month total still carries today, so the realtime snapshot is what lets
   // the completed-day pace be measured without a half-run day in it
   const monthly = useMemo(() => buildMonthly(monthlyData, sales), [monthlyData, sales]);
@@ -1463,8 +1469,9 @@ export default function Component({ service }) {
       mutateDevices();
       mutateMonthly();
       mutateDevicesMonthly();
+      mutateMarket();
     },
-    [mutateSales, mutateHistory, mutateRanking, mutateDevices, mutateMonthly, mutateDevicesMonthly],
+    [mutateSales, mutateHistory, mutateRanking, mutateDevices, mutateMonthly, mutateDevicesMonthly, mutateMarket],
   );
 
   if (salesError) return <Container service={service} error={salesError} />;
@@ -1751,7 +1758,7 @@ export default function Component({ service }) {
         {ranking ? <RankingSection ranking={ranking} cardCls={cardCls} t={t} /> : null}
 
         {/* device-model boards: today, this month and last month in one place */}
-        {devices ? <DeviceSalesSection devices={devices} cardCls={cardCls} t={t} /> : null}
+        {devices ? <DeviceSalesSection devices={devices} market={market} cardCls={cardCls} t={t} /> : null}
 
         {model.hasHistory ? (
           <section className={`grid grid-cols-1 gap-x-5 gap-y-4 p-4 @4xl:grid-cols-[300px_1fr] ${cardCls}`}>
