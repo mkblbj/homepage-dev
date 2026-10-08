@@ -316,3 +316,44 @@ export function styledDeviceSales() {
   );
   return { daily, monthly };
 }
+
+// slowingDeviceSales with the case boards split by style on all three sides:
+// folio Galaxy A25 slows from 10 to 4.5 a day, standard arrows We3 from 6.7 to 1
+export function styledSlowingDeviceSales() {
+  const { daily, monthly } = slowingDeviceSales();
+  daily.types.case = withStyles(daily.types.case, {
+    folio: [
+      ["Galaxy A25", 3, 3600, 3],
+      ["arrows We3", 2, 2400, 2],
+    ],
+    standard: [
+      ["Galaxy A25", 3, 3600, 3],
+      ["Rising", 2, 2400, 2],
+    ],
+  });
+  monthly.currentMonth.types.case = withStyles(monthly.currentMonth.types.case, {
+    folio: [
+      ["Galaxy A25", 30, 36000, 29],
+      ["arrows We3", 14, 16800, 13],
+    ],
+    standard: [
+      ["Rising", 32, 38400, 30],
+      ["Galaxy A25", 30, 36000, 29],
+      ["arrows We3", 6, 7200, 6],
+    ],
+  });
+  monthly.previousMonth.types.case = withStyles(monthly.previousMonth.types.case, {
+    folio: [
+      ["Galaxy A25", 300, 360000, 285],
+      ["arrows We3", 100, 120000, 95],
+    ],
+    standard: [
+      ["arrows We3", 200, 240000, 195],
+      ["Galaxy A25", 120, 144000, 115],
+      ["Rising", 90, 108000, 88],
+      ["DIGNO BX3", 60, 72000, 58],
+      ["Tiny", 20, 24000, 20],
+    ],
+  });
+  return { daily, monthly };
+}
