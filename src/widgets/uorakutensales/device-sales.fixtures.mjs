@@ -357,3 +357,74 @@ export function styledSlowingDeviceSales() {
   });
   return { daily, monthly };
 }
+
+// GET /api/market-rankings/device-models as the server sends it (schemaVersion
+// 2), evidence and full sources included
+export function marketDeviceModels() {
+  const ranks = [
+    [1, "iPhone 17", 100, [100, 100, 100]],
+    [2, "Galaxy A25", 85.14, [96.09, 64.72, 88.4]],
+    [3, "iPhone 18 Pro", 74.14, [87.28, 58.95, 64.09]],
+    [4, "Google Pixel 10a", 56.54, [81.48, 0, 78.99]],
+    [5, "iPhone Air", 8.5, [12.4, 0, 6.1]],
+  ].map(([rank, model, score, [rakutenProducts, yahooSearch, yahooProducts]]) => ({
+    rank,
+    model,
+    score,
+    sourceScores: { rakutenProducts, yahooSearch, yahooProducts },
+    observedDays: 6,
+    productCount: 40 - rank,
+    multiModelProductCount: 30 - rank,
+    keywordCount: rank === 1 ? 1 : 0,
+    bestProductRank: rank,
+    bestSearchRank: rank === 1 ? 49 : null,
+    evidenceIds: [`rakuten:560271:daily|shop:${rank}`, `yahoo:38347:trend|shop:${rank}`],
+  }));
+  const source = (recordedDays, modelCount) => ({
+    configured: true,
+    status: "observed",
+    partial: true,
+    recordedDays,
+    recordedDates: ["2026-10-07"],
+    expectedDays: 38,
+    missingDates: ["2026-09-01"],
+    modelCount,
+    capturedItemCount: 303,
+    boards: [{ key: "rakuten:560271:daily", genreId: "560271", period: "daily", capturedItemCount: 100 }],
+    ranks: [{ rank: 1, model: "iPhone 17", score: 100 }],
+    unassignedItems: [{ title: "全機種対応 ケース" }],
+    latestStatus: "ready",
+    stale: false,
+    lastError: null,
+  });
+  return {
+    schemaVersion: 2,
+    referenceOnly: true,
+    ok: true,
+    partial: true,
+    timezone: "Asia/Tokyo",
+    productType: "case",
+    generatedAtJST: "2026-10-08 15:06:20 JST",
+    semantics: "phone_case_model_demand_reference_from_products_and_search",
+    scoreWeights: { rakutenProducts: 0.5, yahooSearch: 0.3, yahooProducts: 0.2 },
+    startDate: "2026-09-01",
+    endDate: "2026-10-08",
+    status: "observed",
+    recordedDays: 7,
+    expectedDays: 38,
+    recordedDates: ["2026-09-05", "2026-10-07", "2026-10-08"],
+    missingDates: ["2026-09-01", "2026-09-02"],
+    ranks,
+    evidence: [
+      {
+        id: "rakuten:560271:daily|shop:1",
+        provider: "rakuten",
+        type: "product",
+        itemName: "iPhone17 ケース 手帳型",
+        itemUrl: "https://item.rakuten.co.jp/shop/item-1/",
+        observations: [{ date: "2026-10-07", sourceRank: 1, models: ["iPhone 17"], modelShare: 1 }],
+      },
+    ],
+    sources: { rakuten: source(7, 4), yahoo: source(1, 3) },
+  };
+}
