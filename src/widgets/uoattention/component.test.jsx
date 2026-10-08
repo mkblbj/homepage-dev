@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithProviders } from "test-utils/render-with-providers";
@@ -96,6 +96,26 @@ function snapshot(overrides = {}) {
   };
 }
 
+// a shop with nothing to handle
+function clearShop(shopName, overrides = {}) {
+  return {
+    shopName,
+    status: "normal",
+    pendingOrderCount: 0,
+    unansweredInquiryCount: 0,
+    overdueInquiryCount: 0,
+    unrepliedReviewCount: 0,
+    productReviewCount: 0,
+    shopReviewCount: 0,
+    reviewCountByRating: { 1: 0, 2: 0, 3: 0 },
+    lastError: null,
+    ...overrides,
+  };
+}
+
+const shopCards = () => screen.queryAllByTestId("shop-card");
+const shopCard = (name) => shopCards().find((card) => within(card).getByTestId("shop-name").textContent === name);
+
 function review(n, rating) {
   return {
     reviewId: `rvw_${String(n).padStart(4, "0")}`,
@@ -141,8 +161,8 @@ describe("widgets/uoattention/component", () => {
     render();
 
     expect(screen.getByText("uoattention.openTotal")).toBeInTheDocument();
-    // 0 pending + 1 inquiry + 9 reviews, shown twice: hero + company totals row.
-    expect(screen.getAllByText("10")).toHaveLength(2);
+    // 0 pending + 1 inquiry + 9 reviews, in the hero only: the shop board repeats no company totals.
+    expect(screen.getAllByText("10")).toHaveLength(1);
     expect(screen.getAllByText("2026-07-31 14:20 JST").length).toBeGreaterThan(0);
   });
 
@@ -185,6 +205,78 @@ describe("widgets/uoattention/component", () => {
 
     expect(screen.getByText("uoattention.sourceMainMenu")).toBeInTheDocument();
     expect(screen.getByText("uoattention.sourceReviews")).toBeInTheDocument();
+  });
+
+  it("gives each shop with something to handle a card and folds the rest into one line", () => {
+    mockData(snapshot({ shopCount: 4, shops: [...snapshot().shops, clearShop("hagumi"), clearShop("kurumu")] }));
+    render();
+
+    expect(shopCards().map((card) => within(card).getByTestId("shop-name").textContent)).toEqual(["3911", "0406"]);
+    const quiet = screen.getByTestId("quiet-shops");
+    expect(within(quiet).getByText("uoattention.quietShops")).toBeInTheDocument();
+    expect(within(quiet).getByText("hagumi")).toBeInTheDocument();
+    expect(within(quiet).getByText("kurumu")).toBeInTheDocument();
+  });
+
+  it("drops the company totals row and shows the coverage beside the title", () => {
+    mockData(snapshot());
+    render();
+
+    expect(screen.queryByText("uoattention.total")).not.toBeInTheDocument();
+    expect(screen.getByText("uoattention.byShop").parentElement).toHaveTextContent("uoattention.covered");
+  });
+
+  it("lists only the counts a shop actually has on its card", () => {
+    mockData(snapshot());
+    render();
+
+    // 3911 has unreplied reviews and nothing else
+    const card = shopCard("3911");
+    expect(within(card).getByText("uoattention.reviews")).toBeInTheDocument();
+    expect(within(card).getByText("2★3")).toBeInTheDocument();
+    expect(within(card).queryByText("uoattention.pendingOrders")).not.toBeInTheDocument();
+    expect(within(card).queryByText("uoattention.inquiriesShort")).not.toBeInTheDocument();
+    expect(within(card).getByTestId("shop-total")).toHaveTextContent("8");
+  });
+
+  it("calls out overdue inquiries on the card", () => {
+    const [, second] = snapshot().shops;
+    mockData(snapshot({ shops: [{ ...second, unansweredInquiryCount: 3, overdueInquiryCount: 2 }] }));
+    render();
+
+    expect(within(shopCard("0406")).getByText("uoattention.overdue 2")).toBeInTheDocument();
+  });
+
+  it("keeps a shop with unknown counts on a card, as dashes", () => {
+    const [first] = snapshot().shops;
+    const unknown = { pendingOrderCount: null, unansweredInquiryCount: null, unrepliedReviewCount: null };
+    mockData(snapshot({ shops: [{ ...first, status: "unknown", ...unknown, reviewCountByRating: {} }] }));
+    render();
+
+    expect(within(shopCard("3911")).getAllByText("—")).toHaveLength(4);
+  });
+
+  it("shows a shop's last error on its card", () => {
+    mockData(snapshot({ shops: [clearShop("hagumi", { lastError: "RMS login failed" })] }));
+    render();
+
+    expect(within(shopCard("hagumi")).getByText("RMS login failed")).toBeInTheDocument();
+    expect(screen.queryByTestId("quiet-shops")).not.toBeInTheDocument();
+  });
+
+  it("leaves the shop board out when the snapshot lists no shops", () => {
+    mockData(snapshot({ shops: [] }));
+    render();
+
+    expect(screen.queryByText("uoattention.byShop")).not.toBeInTheDocument();
+  });
+
+  it("shows just the all-clear line when no shop needs handling", () => {
+    mockData(snapshot({ shops: [clearShop("hagumi"), clearShop("kurumu")] }));
+    render();
+
+    expect(shopCards()).toHaveLength(0);
+    expect(screen.getByTestId("quiet-shops")).toHaveTextContent("hagumi");
   });
 
   it("filters the review feed by rating", () => {

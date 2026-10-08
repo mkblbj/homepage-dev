@@ -102,6 +102,23 @@ const snapshot = {
   lastError: null,
 };
 
+// a shop with nothing to handle; overrides turn it into the case under test
+function clearShop(shopName, overrides = {}) {
+  return {
+    shopName,
+    status: "normal",
+    pendingOrderCount: 0,
+    unansweredInquiryCount: 0,
+    overdueInquiryCount: 0,
+    unrepliedReviewCount: 0,
+    reviewCountByRating: { 1: 0, 2: 0, 3: 0 },
+    lastError: null,
+    ...overrides,
+  };
+}
+
+const UNKNOWN_COUNTS = { pendingOrderCount: null, unansweredInquiryCount: null, unrepliedReviewCount: null };
+
 describe("widgets/uoattention/attention-model", () => {
   it("returns null without data", () => {
     expect(buildAttentionModel(undefined)).toBeNull();
@@ -175,6 +192,71 @@ describe("widgets/uoattention/attention-model", () => {
 
     expect(model.status).toBe("unknown");
     expect(model.shops[0].status).toBe("unknown");
+  });
+
+  it("gives each shop its open total, unknown only when every count is", () => {
+    const model = buildAttentionModel({
+      ...snapshot,
+      shops: [...snapshot.shops, clearShop("x", { status: "unknown", ...UNKNOWN_COUNTS })],
+    });
+
+    expect(model.shops.map((shop) => shop.total)).toEqual([8, 1, null]);
+  });
+
+  it("folds shops with nothing to handle out of the active list", () => {
+    const model = buildAttentionModel({
+      ...snapshot,
+      shops: [clearShop("hagumi"), ...snapshot.shops, clearShop("kurumu")],
+    });
+
+    expect(model.quietShops.map((shop) => shop.name)).toEqual(["hagumi", "kurumu"]);
+    expect(model.activeShops.map((shop) => shop.name)).toEqual(["3911", "0406"]);
+    // the full list stays as the Server sent it
+    expect(model.shops.map((shop) => shop.name)).toEqual(["hagumi", "3911", "0406", "kurumu"]);
+  });
+
+  it("keeps a normal shop active while it has a count, an unknown count or an error", () => {
+    const model = buildAttentionModel({
+      ...snapshot,
+      shops: [
+        clearShop("counted", { unansweredInquiryCount: 1 }),
+        clearShop("pending-unknown", { pendingOrderCount: null }),
+        clearShop("overdue-unknown", { overdueInquiryCount: null }),
+        clearShop("failing", { lastError: "RMS login failed" }),
+      ],
+    });
+
+    expect(model.quietShops).toEqual([]);
+    expect(model.activeShops.map((shop) => shop.name).sort()).toEqual(
+      ["counted", "failing", "overdue-unknown", "pending-unknown"].sort(),
+    );
+  });
+
+  it("keeps a shop the Server did not call normal active even with zero counts", () => {
+    const model = buildAttentionModel({ ...snapshot, shops: [clearShop("flagged", { status: "attention" })] });
+
+    expect(model.activeShops.map((shop) => shop.name)).toEqual(["flagged"]);
+  });
+
+  it("orders the active shops by severity, then by open count", () => {
+    const model = buildAttentionModel({
+      ...snapshot,
+      shops: [
+        clearShop("normal-3", { pendingOrderCount: 3 }),
+        clearShop("attention-9", { status: "attention", unansweredInquiryCount: 9 }),
+        clearShop("unknown", { status: "unknown", ...UNKNOWN_COUNTS }),
+        clearShop("critical-2", { status: "critical", unrepliedReviewCount: 2 }),
+        clearShop("critical-8", { status: "critical", unansweredInquiryCount: 3, unrepliedReviewCount: 5 }),
+      ],
+    });
+
+    expect(model.activeShops.map((shop) => shop.name)).toEqual([
+      "critical-8",
+      "critical-2",
+      "attention-9",
+      "unknown",
+      "normal-3",
+    ]);
   });
 
   it("identifies reviewed items by management number and drops the full title", () => {
