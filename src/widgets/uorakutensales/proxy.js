@@ -14,6 +14,8 @@ const EXPECTED_METHOD_BY_ENDPOINT = {
   ranking: "GET",
   peaks: "GET",
   monthly: "GET",
+  devices: "GET",
+  devicesMonthly: "GET",
 };
 
 function parseResponseData(data) {

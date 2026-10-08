@@ -8,6 +8,8 @@
  *   "history" → GET /api/history/sales  trailing-7d snapshot (context)
  *   "ranking" → GET /api/item-rankings  today's item boards
  *   "monthly" → GET /api/sales/monthly  this month so far + last month complete
+ *   "devices"        → GET /api/device-sales          today's device-model boards
+ *   "devicesMonthly" → GET /api/device-sales/monthly  this month + last month device boards
  *   "peaks"   → GET /api/history/peaks  all-time record boards
  *   "logos"   → GET /api/shops/logos    shop logo urls
  *
@@ -19,6 +21,8 @@ import Container from "components/services/widget/container";
 import { useTranslation } from "next-i18next/pages";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { buildDeviceSales } from "./device-sales-model.mjs";
+import DeviceSalesSection from "./device-sales-section";
 import {
   ACCENT,
   buildModel,
@@ -1282,13 +1286,19 @@ export default function Component({ service }) {
   const { data: history, mutate: mutateHistory } = useWidgetAPI(widget, "history", { refreshInterval });
   const { data: logos } = useWidgetAPI(widget, "logos", { refreshInterval });
   const { data: rankingData, mutate: mutateRanking } = useWidgetAPI(widget, "ranking", { refreshInterval });
+  const { data: devicesData, mutate: mutateDevices } = useWidgetAPI(widget, "devices", { refreshInterval });
   const { data: monthlyData, mutate: mutateMonthly } = useWidgetAPI(widget, "monthly", { refreshInterval });
+  // the device month boards are read in the same round as the monthly sales
+  const { data: devicesMonthlyData, mutate: mutateDevicesMonthly } = useWidgetAPI(widget, "devicesMonthly", {
+    refreshInterval,
+  });
   const { data: peaksData } = useWidgetAPI(widget, "peaks", { refreshInterval });
 
   const freshness = useFreshness(sales?.generatedAtJST, refreshInterval);
   const model = useMemo(() => buildModel(sales, history, logos), [sales, history, logos]);
   const ranking = useMemo(() => buildRanking(rankingData), [rankingData]);
   const peaks = useMemo(() => buildPeaks(peaksData), [peaksData]);
+  const devices = useMemo(() => buildDeviceSales(devicesData, devicesMonthlyData), [devicesData, devicesMonthlyData]);
   // the month total still carries today, so the realtime snapshot is what lets
   // the completed-day pace be measured without a half-run day in it
   const monthly = useMemo(() => buildMonthly(monthlyData, sales), [monthlyData, sales]);
@@ -1312,9 +1322,11 @@ export default function Component({ service }) {
       mutateSales();
       mutateHistory();
       mutateRanking();
+      mutateDevices();
       mutateMonthly();
+      mutateDevicesMonthly();
     },
-    [mutateSales, mutateHistory, mutateRanking, mutateMonthly],
+    [mutateSales, mutateHistory, mutateRanking, mutateDevices, mutateMonthly, mutateDevicesMonthly],
   );
 
   if (salesError) return <Container service={service} error={salesError} />;
@@ -1556,6 +1568,9 @@ export default function Component({ service }) {
         </section>
 
         {ranking ? <RankingSection ranking={ranking} cardCls={cardCls} t={t} /> : null}
+
+        {/* device-model boards: today, this month and last month in one place */}
+        {devices ? <DeviceSalesSection devices={devices} cardCls={cardCls} t={t} /> : null}
 
         {model.hasHistory ? (
           <section className={`grid grid-cols-1 gap-x-5 gap-y-4 p-4 @4xl:grid-cols-[300px_1fr] ${cardCls}`}>
