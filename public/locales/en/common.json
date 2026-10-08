@@ -1506,7 +1506,9 @@
         "slowingEligible": "{{count}} models with {{min}}+ last month",
         "slowingLossTitle": "Lost per day",
         "prevRank": "#{{rank}} last month",
-        "slowingNote": "Per-day averages compare this month's finished days (not today) with all of last month: models that sold {{min}}+ last month, biggest daily drop first."
+        "slowingNote": "Per-day averages compare this month's finished days (not today) with all of last month: models that sold {{min}}+ last month, biggest daily drop first.",
+        "rankNew": "NEW",
+        "prevRankNone": "No sales last month"
     },
     "uoshippingdashboard": {
         "allPlatforms": "All",

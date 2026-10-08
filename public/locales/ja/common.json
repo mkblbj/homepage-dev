@@ -1506,7 +1506,9 @@
         "slowingEligible": "先月{{min}}個以上の{{count}}機種",
         "slowingLossTitle": "1日あたりの減少",
         "prevRank": "先月{{rank}}位",
-        "slowingNote": "1日平均は今月の完了日（今日の途中分は除く）と先月全体で比較しています。先月{{min}}個以上売れた機種のうち、1日あたりの減少が大きい順です。"
+        "slowingNote": "1日平均は今月の完了日（今日の途中分は除く）と先月全体で比較しています。先月{{min}}個以上売れた機種のうち、1日あたりの減少が大きい順です。",
+        "rankNew": "NEW",
+        "prevRankNone": "先月は販売なし"
     },
     "uoshippingdashboard": {
         "allPlatforms": "全部",

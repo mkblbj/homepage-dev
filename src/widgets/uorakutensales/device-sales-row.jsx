@@ -75,6 +75,30 @@ function BulkBadge({ row, t, className = "" }) {
 // A model name is never cut at its end, where Pro / Max / Lite / 5G sit: it
 // wraps to two lines instead. A combination of three or more models shows the
 // first one and a count; the full list opens under the row on demand.
+const MOVE_TONE = {
+  up: "text-emerald-600 dark:text-emerald-400",
+  down: "text-rose-600 dark:text-rose-400",
+  same: "text-theme-400 dark:text-theme-500",
+  new: "text-amber-600 dark:text-amber-300",
+};
+
+function RankMove({ move, t }) {
+  if (!move) return null;
+  let label = "→";
+  if (move.dir === "new") label = t(`${NS}.rankNew`);
+  if (move.dir === "up") label = `↑${move.delta}`;
+  if (move.dir === "down") label = `↓${move.delta}`;
+  return (
+    <span
+      data-testid="device-move"
+      className={`block text-[8.5px] font-bold tabular-nums ${MOVE_TONE[move.dir]}`}
+      title={move.prevRank == null ? t(`${NS}.prevRankNone`) : t(`${NS}.prevRank`, { rank: move.prevRank })}
+    >
+      {label}
+    </span>
+  );
+}
+
 export function ModelName({ row, expanded, onToggle, t, extra = null }) {
   const folded = row.models.length >= 3;
   return (
@@ -113,7 +137,7 @@ export function ModelList({ row }) {
   );
 }
 
-export function DeviceRow({ row, metric, expanded, onToggle, t }) {
+export function DeviceRow({ row, metric, expanded, onToggle, t, move = null }) {
   const others = DEVICE_METRICS.filter((m) => m !== metric);
   return (
     <li
@@ -122,11 +146,12 @@ export function DeviceRow({ row, metric, expanded, onToggle, t }) {
     >
       <span aria-hidden="true" className="absolute inset-y-0 left-0 rounded-lg bg-[#2E7DF6]/20" style={{ width: `${row.barPct}%` }} />
       <span
-        className={`relative row-span-2 text-center text-[13px] font-extrabold tabular-nums @xs/list:row-span-1 @xs/list:text-[12px] ${
+        className={`relative row-span-2 text-center text-[13px] font-extrabold leading-tight tabular-nums @xs/list:row-span-1 @xs/list:text-[12px] ${
           RANK_TONE[row.rank] ?? MUTED
         }`}
       >
         {row.rank}
+        <RankMove move={move} t={t} />
       </span>
       <ModelName
         row={row}

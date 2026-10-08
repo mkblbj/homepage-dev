@@ -103,6 +103,8 @@ const REQUIRED_KEYS = [
   "slowingLossTitle",
   "prevRank",
   "slowingNote",
+  "rankNew",
+  "prevRankNone",
 ];
 
 function loadNamespace(locale) {

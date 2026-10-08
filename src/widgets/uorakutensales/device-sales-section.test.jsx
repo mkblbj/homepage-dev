@@ -204,4 +204,24 @@ describe("widgets/uorakutensales/device-sales-section", () => {
     expect(screen.getByText("uorakutensales.slowingMonthStart")).toBeInTheDocument();
     expect(screen.queryAllByTestId("device-row")).toHaveLength(0);
   });
+
+  it("marks this month's best sellers against last month, and nowhere else", () => {
+    renderBoard();
+    expect(screen.queryAllByTestId("device-move")).toHaveLength(0);
+
+    click("uorakutensales.thisMonth");
+    const moves = column("case").getAllByTestId("device-move");
+    expect(moves.map((el) => el.textContent)).toEqual(["↑1", "↓1", "uorakutensales.rankNew"]);
+    expect(moves[0]).toHaveAttribute("title", "uorakutensales.prevRank 2");
+    expect(moves[2]).toHaveAttribute("title", "uorakutensales.prevRankNone");
+
+    // 少ない順 reads ranks from the bottom: no marks there
+    click("uorakutensales.viewLeast");
+    expect(screen.queryAllByTestId("device-move")).toHaveLength(0);
+
+    // 松武 has no board last month → no marks rather than a column of NEW
+    click("uorakutensales.viewBest");
+    fireEvent.change(shopSelect(), { target: { value: "松武" } });
+    expect(screen.queryAllByTestId("device-move")).toHaveLength(0);
+  });
 });

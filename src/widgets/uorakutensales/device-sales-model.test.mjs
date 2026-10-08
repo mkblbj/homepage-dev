@@ -10,6 +10,7 @@ import {
   displayModelName,
   metricReady,
   rankDeviceBoard,
+  rankMoves,
 } from "./device-sales-model.mjs";
 
 const SE_NAME = "iPhone SE（第2代） / iPhone SE（第3代）";
@@ -246,4 +247,27 @@ test("categoryMix splits the active metric, and orders fall back to units", () =
   assert.equal(categoryMix(types, "orders").metric, "units");
   assert.equal(categoryMix(types, "sales").metric, "sales");
   assert.equal(categoryMix(null, "units"), null);
+});
+
+test("rankMoves compares this month with last month under the same metric", () => {
+  const { periods } = buildDeviceSales(null, monthlyDeviceSales());
+  const byUnits = rankDeviceBoard(periods.thisMonth.types.case, "units");
+
+  assert.deepEqual(rankMoves(byUnits, periods.lastMonth.types.case, "units"), [
+    { dir: "up", prevRank: 2, delta: 1 }, // Google Pixel 10a
+    { dir: "down", prevRank: 1, delta: 1 }, // Galaxy A25
+    { dir: "new", prevRank: null, delta: 0 }, // iPhone 17 e
+  ]);
+});
+
+test("rankMoves leaves no marks without a comparable board", () => {
+  const { periods } = buildDeviceSales(null, monthlyDeviceSales());
+  const bySales = rankDeviceBoard(periods.thisMonth.types.case, "sales");
+  const pending = { ...periods.lastMonth.types.case, metricsReady: false };
+
+  assert.deepEqual(rankMoves(bySales, null, "sales"), [null, null, null]);
+  assert.deepEqual(rankMoves(bySales, pending, "sales"), [null, null, null]);
+  // units never wait for money
+  const byUnits = rankDeviceBoard(periods.thisMonth.types.case, "units");
+  assert.equal(rankMoves(byUnits, pending, "units")[0].dir, "up");
 });

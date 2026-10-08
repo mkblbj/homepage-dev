@@ -21,6 +21,7 @@ import {
   DEVICE_TYPES,
   metricReady,
   rankDeviceBoard,
+  rankMoves,
 } from "./device-sales-model.mjs";
 import {
   changeText,
@@ -239,8 +240,10 @@ function ColumnName({ type, t }) {
   );
 }
 
-function CategoryColumn({ type, board, metric, order, visible, step, onStep, expanded, onExpand, t }) {
+function CategoryColumn({ type, board, metric, order, visible, step, onStep, expanded, onExpand, t, previousBoard = null }) {
   const { shown, nextStep, nextCount } = reveal(rankDeviceBoard(board, metric, order), step);
+  // 今月 best sellers only: where each row stood last month, same metric and scope
+  const moves = previousBoard ? rankMoves(shown, previousBoard, metric) : [];
   // one key per column: a combination can sell as a case and as a film
   const keyOf = (row) => `${type}:${row.fullModel}`;
   return (
@@ -258,11 +261,12 @@ function CategoryColumn({ type, board, metric, order, visible, step, onStep, exp
         <div className="@container/list flex min-w-0 flex-col">
           <ListHeader metric={metric} order={order} t={t} />
           <ol className="flex flex-col gap-0.5">
-            {shown.map((row) => (
+            {shown.map((row, i) => (
               <DeviceRow
                 key={row.fullModel}
                 row={row}
                 metric={metric}
+                move={moves[i] ?? null}
                 expanded={expanded === keyOf(row)}
                 onToggle={() => onExpand(expanded === keyOf(row) ? null : keyOf(row))}
                 t={t}
@@ -348,6 +352,13 @@ export default function DeviceSalesSection({ devices, cardCls, t }) {
   const order = view === "least" ? "asc" : "desc";
 
   const scopeShop = shopEntry ? shop : null;
+  // last month's boards in the same scope, for the 今月 best-seller marks
+  const lastScope =
+    !slowingOn && view === "best" && activeKey === "thisMonth" && devices.periods.lastMonth?.ready
+      ? scopeShop
+        ? devices.periods.lastMonth.shops.find((s) => s.name === scopeShop)?.types ?? null
+        : devices.periods.lastMonth.types
+      : null;
   const span = slowingOn ? slowingWindow(devices) : null;
   // the month board fell away under a running 失速 view: say so, never guess
   const slowingReason = slowingOn ? (activeKey === "thisMonth" ? span.reason : "updating") : null;
@@ -483,6 +494,7 @@ export default function DeviceSalesSection({ devices, cardCls, t }) {
                   board={types[type]}
                   metric={activeMetric}
                   order={order}
+                  previousBoard={lastScope ? lastScope[type] : null}
                   visible={tab === type}
                   step={stepOf(type)}
                   onStep={setStepOf(type)}

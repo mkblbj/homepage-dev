@@ -220,3 +220,19 @@ export function categoryMix(types, metric) {
     parts: values.map((v) => ({ ...v, share: total > 0 && v.value != null ? (v.value / total) * 100 : null })),
   };
 }
+
+// 今月 vs 先月: where each of this month's rows stood last month, ranked by the
+// same metric in the same scope (company, or the same shop). Last month's board
+// lists every model that sold, so a model missing from it sold nothing then.
+// Without a comparable board there are no marks at all — never a column of "new".
+export function rankMoves(rows, previousBoard, metric) {
+  if (!previousBoard || !metricReady(previousBoard, metric)) return rows.map(() => null);
+  const before = new Map(rankDeviceBoard(previousBoard, metric).map((r) => [r.fullModel, r.rank]));
+  return rows.map((row) => {
+    const prevRank = before.get(row.fullModel);
+    if (prevRank == null) return { dir: "new", prevRank: null, delta: 0 };
+    const delta = prevRank - row.rank;
+    if (delta === 0) return { dir: "same", prevRank, delta: 0 };
+    return { dir: delta > 0 ? "up" : "down", prevRank, delta: Math.abs(delta) };
+  });
+}

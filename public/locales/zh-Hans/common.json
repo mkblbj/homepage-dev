@@ -1519,7 +1519,9 @@
         "slowingEligible": "上月 {{min}} 个以上的 {{count}} 款",
         "slowingLossTitle": "每天减少",
         "prevRank": "上月第 {{rank}} 名",
-        "slowingNote": "日均按本月已结束的天数（不含今天）与上月全月对比：只看上月卖出 {{min}} 个以上的机型，按每天减少量从大到小排列。"
+        "slowingNote": "日均按本月已结束的天数（不含今天）与上月全月对比：只看上月卖出 {{min}} 个以上的机型，按每天减少量从大到小排列。",
+        "rankNew": "新上榜",
+        "prevRankNone": "上月无销量"
     },
     "uoshippingdashboard": {
         "allPlatforms": "全部",
