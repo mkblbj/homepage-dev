@@ -13,6 +13,7 @@ vi.mock("utils/proxy/use-widget-api", () => ({
 }));
 
 import Component from "./component";
+import { dailyDeviceSales, monthlyDeviceSales } from "./device-sales.fixtures.mjs";
 
 const service = {
   widget: { type: "uorakutensales", refreshInterval: 60000 },
@@ -113,5 +114,58 @@ describe("widgets/uorakutensales/component", () => {
     expect(mutateSales).toHaveBeenCalledOnce();
     expect(mutateHistory).toHaveBeenCalledOnce();
     expect(mutateRanking).toHaveBeenCalledOnce();
+  });
+
+  it("reads both device boards on the widget's own interval", () => {
+    useWidgetAPI.mockImplementation((_widget, endpoint) => {
+      if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
+      return { data: undefined, error: undefined, mutate: vi.fn() };
+    });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+
+    expect(useWidgetAPI).toHaveBeenCalledWith(service.widget, "devices", { refreshInterval: 60000 });
+    expect(useWidgetAPI).toHaveBeenCalledWith(service.widget, "devicesMonthly", { refreshInterval: 60000 });
+  });
+
+  it("refreshes the device boards together with the monthly sales", () => {
+    const mutate = { monthly: vi.fn(), devices: vi.fn(), devicesMonthly: vi.fn() };
+    useWidgetAPI.mockImplementation((_widget, endpoint) => {
+      if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
+      return { data: undefined, error: undefined, mutate: mutate[endpoint] ?? vi.fn() };
+    });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+    fireEvent.click(screen.getByRole("button", { name: "uorakutensales.refresh" }));
+
+    expect(mutate.monthly).toHaveBeenCalledOnce();
+    expect(mutate.devices).toHaveBeenCalledOnce();
+    expect(mutate.devicesMonthly).toHaveBeenCalledOnce();
+  });
+
+  it("shows the device board, and hides it when uo-ec-manager has no device routes", () => {
+    let payload = { devices: dailyDeviceSales(), devicesMonthly: monthlyDeviceSales() };
+    useWidgetAPI.mockImplementation((_widget, endpoint) => {
+      if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
+      return { data: payload[endpoint], error: undefined, mutate: vi.fn() };
+    });
+
+    const { rerender } = renderWithProviders(<Component service={service} />, {
+      settings: { hideErrors: false },
+    });
+    expect(screen.getByText("uorakutensales.deviceSales")).toBeInTheDocument();
+
+    // an older server answers 404, which the proxy relays as { error }
+    const notFound = { error: { message: "Rakuten sales service error", data: { error: "Not Found" } } };
+    payload = { devices: notFound, devicesMonthly: notFound };
+    rerender(
+      <SettingsContext.Provider value={{ settings: { hideErrors: false }, setSettings: () => {} }}>
+        <Component service={service} />
+      </SettingsContext.Provider>,
+    );
+
+    expect(screen.queryByText("uorakutensales.deviceSales")).not.toBeInTheDocument();
+    // the rest of the widget is untouched
+    expect(screen.getByText("uorakutensales.title")).toBeInTheDocument();
   });
 });
