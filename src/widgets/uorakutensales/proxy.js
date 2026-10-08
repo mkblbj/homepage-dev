@@ -1,4 +1,4 @@
-import { buildSalesProxyRequest } from "./proxy-config.mjs";
+import { buildSalesProxyRequest, shapeProxyResponse } from "./proxy-config.mjs";
 
 import getServiceWidget from "utils/config/service-helpers";
 import createLogger from "utils/logger";
@@ -16,6 +16,7 @@ const EXPECTED_METHOD_BY_ENDPOINT = {
   monthly: "GET",
   devices: "GET",
   devicesMonthly: "GET",
+  market: "GET",
 };
 
 function parseResponseData(data) {
@@ -84,7 +85,7 @@ export default async function uoRakutenSalesProxyHandler(req, res) {
       });
     }
 
-    return res.status(status).json(resultData ?? {});
+    return res.status(status).json(shapeProxyResponse(endpoint, resultData) ?? {});
   } catch (e) {
     logger.error("Error processing Rakuten sales proxy request: %s", e.message);
     return res.status(400).json({ error: e.message });
