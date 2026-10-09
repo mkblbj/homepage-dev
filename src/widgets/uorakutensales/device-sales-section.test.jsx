@@ -3,6 +3,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { buildDeviceEvidence } from "./device-evidence-model.mjs";
 import { buildMarketEvidence, buildMarketReference } from "./device-market-model.mjs";
 import { buildDeviceSales } from "./device-sales-model.mjs";
 import DeviceSalesSection from "./device-sales-section";
@@ -12,11 +13,12 @@ import {
   deviceTypes,
   marketDeviceModels,
   monthlyDeviceSales,
+  ownDeviceEvidence,
   slowingDeviceSales,
   styledDeviceSales,
   styledSlowingDeviceSales,
 } from "./device-sales.fixtures.mjs";
-import { pickModelEvidence } from "./proxy-config.mjs";
+import { pickModelEvidence, shapeProxyResponse } from "./proxy-config.mjs";
 
 const SE_NAME = "iPhone SE（第2代） / iPhone SE（第3代）";
 const U = "uorakutensales.unitsShort";
@@ -84,6 +86,28 @@ const marketList = () =>
       within(row).getByTestId("market-model").textContent,
       within(row).queryAllByTestId("market-flag")[0]?.textContent ?? null,
     ]);
+const ownBoard = ({
+  daily = dailyDeviceSales(),
+  monthly = monthlyDeviceSales(),
+  deviceEvidence = null,
+  onDeviceEvidence = () => {},
+} = {}) => (
+  <DeviceSalesSection
+    devices={buildDeviceSales(daily, monthly)}
+    deviceEvidence={deviceEvidence}
+    onDeviceEvidence={onDeviceEvidence}
+    cardCls=""
+    t={t}
+  />
+);
+// a row's 内訳 as the widget hands it down: the server's list, slimmed by the proxy
+const ownEvidence = (key, payload = ownDeviceEvidence()) => ({
+  key,
+  ...buildDeviceEvidence(shapeProxyResponse("devicesEvidence", payload)),
+});
+const evidenceRows = (panel) => within(panel).getAllByTestId("own-evidence-row");
+const evidenceShops = (panel) =>
+  evidenceRows(panel).map((li) => within(li).getByTestId("own-evidence-shop").textContent);
 function renderStyled() {
   const { daily, monthly } = styledDeviceSales();
   return renderBoard(daily, monthly, { period: null });
@@ -551,5 +575,161 @@ describe("widgets/uorakutensales/device-sales-section", () => {
 
     rerender(marketBoard({ evidence: { model: "Galaxy A25", status: "failed", total: 0, items: [] } }));
     expect(screen.getByText("uorakutensales.evidenceFailed")).toBeInTheDocument();
+  });
+  it("opens a model's 内訳 from its name, with the board's period, model and category", () => {
+    const onDeviceEvidence = vi.fn();
+    render(ownBoard({ onDeviceEvidence }));
+    click("uorakutensales.lastMonth");
+
+    fireEvent.click(column("case").getByRole("button", { name: "iPhone 17" }));
+
+    expect(onDeviceEvidence).toHaveBeenLastCalledWith({
+      key: "case:iPhone 17",
+      month: "2026-09",
+      model: "iPhone 17",
+      type: "case",
+    });
+  });
+
+  it("carries the chosen style, the shop and today's date into the 内訳's scope", () => {
+    const onDeviceEvidence = vi.fn();
+    const { daily, monthly } = styledDeviceSales();
+    render(ownBoard({ daily, monthly, onDeviceEvidence }));
+
+    pickStyle("case", /styleFolio/);
+    fireEvent.click(column("case").getByRole("button", { name: "Google Pixel 10a" }));
+    expect(onDeviceEvidence).toHaveBeenLastCalledWith({
+      key: "case:Google Pixel 10a",
+      month: "2026-10",
+      model: "Google Pixel 10a",
+      type: "case",
+      style: "folio",
+    });
+
+    pickStyle("case", "uorakutensales.styleAll");
+    fireEvent.change(shopSelect(), { target: { value: "3911" } });
+    fireEvent.click(column("case").getByRole("button", { name: "Galaxy A25" }));
+    expect(onDeviceEvidence).toHaveBeenLastCalledWith({
+      key: "case:Galaxy A25",
+      month: "2026-10",
+      model: "Galaxy A25",
+      type: "case",
+      shopName: "3911",
+    });
+
+    fireEvent.change(shopSelect(), { target: { value: "__all__" } });
+    click("uorakutensales.periodToday");
+    // a combination row is asked for by the full name the board ranks it under
+    fireEvent.click(column("case").getByRole("button", { name: SE_NAME }));
+    expect(onDeviceEvidence).toHaveBeenLastCalledWith({
+      key: "case:iPhone SE（第2代） / iPhone SE（第3代）（多机型）",
+      date: "2026-10-07",
+      model: "iPhone SE（第2代） / iPhone SE（第3代）（多机型）",
+      type: "case",
+    });
+  });
+
+  it("lists our products by the metric on screen, with how each was recognized", () => {
+    render(ownBoard({ deviceEvidence: ownEvidence("case:iPhone 17") }));
+    click("uorakutensales.lastMonth");
+
+    const toggle = column("case").getByRole("button", { name: "iPhone 17" });
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    const panel = column("case").getByTestId("own-evidence");
+    expect(within(panel).getByText("uorakutensales.ownEvidenceTitle 4")).toBeInTheDocument();
+    expect(within(panel).getByText(`11${U} · ¥13660 · 8uorakutensales.ordersUnit`)).toBeInTheDocument();
+    expect(
+      within(panel).getByText("uorakutensales.sourceSelection 2 · uorakutensales.sourceTitle 2", { exact: false }),
+    ).toBeInTheDocument();
+    expect(evidenceShops(panel)).toEqual(["3911", "松田", "天海", "hagumi"]);
+
+    const [history, title, series, unresolved] = evidenceRows(panel);
+    expect(
+      within(series).getByText(
+        "uorakutensales.ownEvidenceModel: uorakutensales.sourceSelection ●iPhone シリ-ズ = iPhone 17",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(series).getByText(/uorakutensales\.styleFolio: uorakutensales\.sourceSeries.*102/),
+    ).toBeInTheDocument();
+    const example = within(series).getByRole("link", { name: /uorakutensales\.ownEvidenceExample/ });
+    expect(example).toHaveAttribute("href", "https://item.rakuten.co.jp/0406colors/18cls01-zenfone9/");
+    expect(example).toHaveAttribute("target", "_blank");
+    expect(example).toHaveAttribute("rel", "noopener noreferrer");
+    expect(within(history).getByText(/uorakutensales\.sourceSku 機種 = iPhone 17/)).toBeInTheDocument();
+    expect(within(history).getByTitle("iPhone 17 手帳型 ケース レザー")).toBeInTheDocument();
+    expect(
+      within(title).getByText(/uorakutensales\.styleStandard: uorakutensales\.sourceTitle.*クリア/),
+    ).toBeInTheDocument();
+    expect(within(unresolved).getByText(/uorakutensales\.ruleMissingStyle/)).toBeInTheDocument();
+    expect(within(title).queryByRole("link")).toBeNull();
+
+    click("uorakutensales.sortSales");
+    expect(evidenceShops(column("case").getByTestId("own-evidence"))).toEqual(["3911", "松田", "hagumi", "天海"]);
+  });
+
+  it("shows ten products first and the rest on demand", () => {
+    const payload = ownDeviceEvidence();
+    payload.evidence = Array.from({ length: 12 }, (_, i) => ({
+      ...payload.evidence[1],
+      id: `row-${i}`,
+      shopName: `店${i + 1}`,
+      unitsSold: 20 - i,
+    }));
+    payload.pagination = { ...payload.pagination, totalItems: 12 };
+    render(ownBoard({ deviceEvidence: ownEvidence("case:iPhone 17", payload) }));
+    click("uorakutensales.lastMonth");
+
+    const panel = column("case").getByTestId("own-evidence");
+    expect(evidenceRows(panel)).toHaveLength(10);
+    fireEvent.click(within(panel).getByRole("button", { name: "uorakutensales.showMore 2" }));
+    expect(evidenceRows(panel)).toHaveLength(12);
+    fireEvent.click(within(panel).getByRole("button", { name: "uorakutensales.showLess" }));
+    expect(evidenceRows(panel)).toHaveLength(10);
+  });
+
+  it("says when the 内訳 is loading, empty or could not be read", () => {
+    const { rerender } = render(
+      ownBoard({ deviceEvidence: { key: "case:iPhone 17", ...buildDeviceEvidence(undefined) } }),
+    );
+    click("uorakutensales.lastMonth");
+    expect(column("case").getByText("uorakutensales.ownEvidenceLoading")).toBeInTheDocument();
+
+    const none = ownDeviceEvidence();
+    Object.assign(none, { evidence: [], summary: { unitsSold: 0, salesYen: 0, orderCount: 0, metricsReady: true } });
+    rerender(ownBoard({ deviceEvidence: ownEvidence("case:iPhone 17", none) }));
+    expect(column("case").getByText("uorakutensales.ownEvidenceNone")).toBeInTheDocument();
+
+    rerender(
+      ownBoard({ deviceEvidence: { key: "case:iPhone 17", ...buildDeviceEvidence({ error: { message: "x" } }) } }),
+    );
+    expect(column("case").getByText("uorakutensales.ownEvidenceFailed")).toBeInTheDocument();
+  });
+
+  it("closes the 内訳 when the period, the style or the view changes", () => {
+    const onDeviceEvidence = vi.fn();
+    const { daily, monthly } = styledDeviceSales();
+    render(ownBoard({ daily, monthly, onDeviceEvidence, deviceEvidence: ownEvidence("case:Galaxy A25") }));
+
+    onDeviceEvidence.mockClear();
+    click("uorakutensales.lastMonth");
+    expect(onDeviceEvidence).toHaveBeenCalledWith(null);
+
+    onDeviceEvidence.mockClear();
+    pickStyle("case", /styleFolio/);
+    expect(onDeviceEvidence).toHaveBeenCalledWith(null);
+
+    onDeviceEvidence.mockClear();
+    click("uorakutensales.viewLeast");
+    expect(onDeviceEvidence).toHaveBeenCalledWith(null);
+  });
+
+  it("keeps the 失速 rows without a 内訳", () => {
+    const { daily, monthly } = slowingDeviceSales();
+    render(ownBoard({ daily, monthly }));
+    click("uorakutensales.viewSlowing");
+
+    expect(models("case")).toEqual(["arrows We3", "Galaxy A25", "DIGNO BX3"]);
+    expect(column("case").queryByRole("button", { name: "arrows We3" })).toBeNull();
   });
 });

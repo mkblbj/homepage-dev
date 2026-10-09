@@ -219,4 +219,22 @@ describe("widgets/uorakutensales/component", () => {
 
     expect(useWidgetAPI).toHaveBeenCalledWith(service.widget, "marketEvidence", { model: "iPhone 18 Pro" });
   });
+  it("reads a model's own evidence only while its 内訳 is open", () => {
+    const payload = { devices: dailyDeviceSales(), devicesMonthly: monthlyDeviceSales() };
+    useWidgetAPI.mockImplementation((_widget, endpoint) => {
+      if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
+      return { data: payload[endpoint], error: undefined, mutate: vi.fn() };
+    });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+    expect(useWidgetAPI).not.toHaveBeenCalledWith(service.widget, "devicesEvidence", expect.anything());
+
+    fireEvent.click(screen.getByRole("button", { name: "Google Pixel 10a" }));
+
+    expect(useWidgetAPI).toHaveBeenCalledWith(service.widget, "devicesEvidence", {
+      month: "2026-10",
+      model: "Google Pixel 10a",
+      type: "case",
+    });
+  });
 });

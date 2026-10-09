@@ -132,16 +132,35 @@ function RankMove({ move, t }) {
   );
 }
 
-export function ModelName({ row, expanded, onToggle, t, extra = null }) {
+// With `onEvidence` the name opens the model's 内訳 (our products behind it).
+export function ModelName({ row, expanded, onToggle, t, extra = null, onEvidence = null, evidenceOpen = false }) {
   const folded = row.models.length >= 3;
+  const name = (
+    <span
+      data-testid="device-model"
+      className="line-clamp-2 min-w-0 break-words text-[14px] font-semibold leading-snug text-theme-900 @xs/list:text-[12.5px] dark:text-theme-50"
+    >
+      {folded ? row.models[0] : row.model}
+    </span>
+  );
   return (
     <span className="relative flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5" title={row.models.join(" / ")}>
-      <span
-        data-testid="device-model"
-        className="line-clamp-2 min-w-0 break-words text-[14px] font-semibold leading-snug text-theme-900 @xs/list:text-[12.5px] dark:text-theme-50"
-      >
-        {folded ? row.models[0] : row.model}
-      </span>
+      {onEvidence ? (
+        <button
+          type="button"
+          aria-expanded={evidenceOpen}
+          title={t(`${NS}.ownEvidenceToggle`)}
+          onClick={press(onEvidence)}
+          className="flex min-w-0 items-baseline gap-1 text-left"
+        >
+          {name}
+          <span aria-hidden="true" className={`shrink-0 text-[10px] ${MUTED}`}>
+            {evidenceOpen ? "▾" : "▸"}
+          </span>
+        </button>
+      ) : (
+        name
+      )}
       {folded ? (
         <button
           type="button"
@@ -170,7 +189,16 @@ export function ModelList({ row }) {
   );
 }
 
-export function DeviceRow({ row, metric, expanded, onToggle, t, move = null }) {
+export function DeviceRow({
+  row,
+  metric,
+  expanded,
+  onToggle,
+  t,
+  move = null,
+  onEvidence = null,
+  evidenceOpen = false,
+}) {
   const others = DEVICE_METRICS.filter((m) => m !== metric);
   return (
     <li
@@ -196,6 +224,8 @@ export function DeviceRow({ row, metric, expanded, onToggle, t, move = null }) {
         onToggle={onToggle}
         t={t}
         extra={<BulkBadge row={row} t={t} className="hidden @xs/list:inline" />}
+        onEvidence={onEvidence}
+        evidenceOpen={evidenceOpen}
       />
       {/* two lines: the active value beside the name, the other two under it */}
       <span

@@ -21,6 +21,7 @@ import Container from "components/services/widget/container";
 import { useTranslation } from "next-i18next/pages";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { buildDeviceEvidence } from "./device-evidence-model.mjs";
 import { buildMarketEvidence, buildMarketReference, MARKET_REFRESH_INTERVAL } from "./device-market-model.mjs";
 import { buildDeviceSales } from "./device-sales-model.mjs";
 import DeviceSalesSection from "./device-sales-section";
@@ -1441,6 +1442,14 @@ export default function Component({ service }) {
   const { data: evidenceData } = useWidgetAPI(widget, evidenceModel ? "marketEvidence" : "", {
     model: evidenceModel,
   });
+  // the board row whose 内訳 is open, with the scope its products are read in
+  const [deviceEvidenceQuery, setDeviceEvidenceQuery] = useState(null);
+  const { key: deviceEvidenceKey = null, ...deviceEvidenceSearch } = deviceEvidenceQuery ?? {};
+  const { data: deviceEvidenceData } = useWidgetAPI(
+    widget,
+    deviceEvidenceQuery ? "devicesEvidence" : "",
+    deviceEvidenceSearch,
+  );
 
   const freshness = useFreshness(sales?.generatedAtJST, refreshInterval);
   const model = useMemo(() => buildModel(sales, history, logos), [sales, history, logos]);
@@ -1451,6 +1460,10 @@ export default function Component({ service }) {
   const evidence = useMemo(
     () => (evidenceModel ? { model: evidenceModel, ...buildMarketEvidence(evidenceData) } : null),
     [evidenceModel, evidenceData],
+  );
+  const deviceEvidence = useMemo(
+    () => (deviceEvidenceKey ? { key: deviceEvidenceKey, ...buildDeviceEvidence(deviceEvidenceData) } : null),
+    [deviceEvidenceKey, deviceEvidenceData],
   );
   // the month total still carries today, so the realtime snapshot is what lets
   // the completed-day pace be measured without a half-run day in it
@@ -1773,6 +1786,8 @@ export default function Component({ service }) {
             market={market}
             evidence={evidence}
             onEvidence={setEvidenceModel}
+            deviceEvidence={deviceEvidence}
+            onDeviceEvidence={setDeviceEvidenceQuery}
             cardCls={cardCls}
             t={t}
           />
