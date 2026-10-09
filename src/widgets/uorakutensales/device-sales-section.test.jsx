@@ -656,6 +656,8 @@ describe("widgets/uorakutensales/device-sales-section", () => {
     expect(example).toHaveAttribute("href", "https://item.rakuten.co.jp/0406colors/18cls01-zenfone9/");
     expect(example).toHaveAttribute("target", "_blank");
     expect(example).toHaveAttribute("rel", "noopener noreferrer");
+    // the sample is another product of the series, and says so on hover
+    expect(example).toHaveAttribute("title", "uorakutensales.ownEvidenceExampleTitle");
     expect(within(history).getByText(/uorakutensales\.sourceSku 機種 = iPhone 17/)).toBeInTheDocument();
     expect(within(history).getByTitle("iPhone 17 手帳型 ケース レザー")).toBeInTheDocument();
     expect(
