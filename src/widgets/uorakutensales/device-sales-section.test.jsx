@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { buildMarketReference } from "./device-market-model.mjs";
+import { buildMarketEvidence, buildMarketReference } from "./device-market-model.mjs";
 import { buildDeviceSales } from "./device-sales-model.mjs";
 import DeviceSalesSection from "./device-sales-section";
 import {
@@ -16,6 +16,7 @@ import {
   styledDeviceSales,
   styledSlowingDeviceSales,
 } from "./device-sales.fixtures.mjs";
+import { pickModelEvidence } from "./proxy-config.mjs";
 
 const SE_NAME = "iPhone SE（第2代） / iPhone SE（第3代）";
 const U = "uorakutensales.unitsShort";
@@ -52,17 +53,29 @@ const chips = (type) =>
     .getAllByRole("button")
     .map((b) => b.textContent);
 const pickStyle = (type, name) => fireEvent.click(within(styleSwitch(type)).getByRole("button", { name }));
-function renderMarket({
+const marketBoard = ({
   daily = dailyDeviceSales(),
   monthly = monthlyDeviceSales(),
   market = buildMarketReference(marketDeviceModels()),
-} = {}) {
-  const view = render(
-    <DeviceSalesSection devices={buildDeviceSales(daily, monthly)} market={market} cardCls="" t={t} />,
-  );
+  evidence = null,
+  onEvidence = () => {},
+} = {}) => (
+  <DeviceSalesSection
+    devices={buildDeviceSales(daily, monthly)}
+    market={market}
+    evidence={evidence}
+    onEvidence={onEvidence}
+    cardCls=""
+    t={t}
+  />
+);
+function renderMarket(props) {
+  const view = render(marketBoard(props));
   click("uorakutensales.viewMarket");
   return view;
 }
+// a model's 根拠 as the widget hands it down: picked by the proxy, read by the model
+const evidenceFor = (model) => ({ model, ...buildMarketEvidence(pickModelEvidence(marketDeviceModels(), model)) });
 // each market row: [model, its flag or null]
 const marketList = () =>
   screen
@@ -463,5 +476,80 @@ describe("widgets/uorakutensales/device-sales-section", () => {
     rerender(board(null));
     expect(screen.getByRole("button", { name: "uorakutensales.viewBest" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByTestId("device-column-case")).toBeInTheDocument();
+  });
+  it("opens a model's 根拠 from its name, and closes it again", () => {
+    const onEvidence = vi.fn();
+    const { rerender } = renderMarket({ onEvidence });
+
+    const toggle = screen.getByRole("button", { name: "iPhone 18 Pro" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(toggle);
+    expect(onEvidence).toHaveBeenLastCalledWith("iPhone 18 Pro");
+
+    rerender(marketBoard({ onEvidence, evidence: { model: "iPhone 18 Pro", status: "loading", total: 0, items: [] } }));
+    expect(screen.getByRole("button", { name: "iPhone 18 Pro" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("uorakutensales.evidenceLoading")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "iPhone 18 Pro" }));
+    expect(onEvidence).toHaveBeenLastCalledWith(null);
+  });
+
+  it("lists the evidence by contribution, with sources, ranks, model counts and links", () => {
+    renderMarket({ evidence: evidenceFor("iPhone 18 Pro") });
+
+    // only under its own model
+    expect(screen.getAllByTestId("market-evidence")).toHaveLength(1);
+    const panel = within(screen.getAllByTestId("market-row")[2]).getByTestId("market-evidence");
+    expect(within(panel).getByText("uorakutensales.evidenceTitle 5")).toBeInTheDocument();
+    const items = within(panel).getAllByTestId("evidence-item");
+    expect(items.map((li) => within(li).getByTestId("evidence-source").textContent)).toEqual([
+      "uorakutensales.evidenceRakutenDaily",
+      "uorakutensales.evidenceYahooSearch",
+      "uorakutensales.evidenceYahooTrend",
+      "uorakutensales.evidenceRakutenRealtime",
+      "uorakutensales.evidenceRakutenRealtime",
+    ]);
+    // the realtime #1 listing names eleven models, seen on two days
+    expect(within(items[4]).getByText("#1")).toBeInTheDocument();
+    expect(within(items[4]).getByText("uorakutensales.evidenceModels 11")).toBeInTheDocument();
+    expect(within(items[4]).getByText("uorakutensales.evidenceDays 2")).toBeInTheDocument();
+    const link = within(items[2]).getByRole("link", { name: "iFace 公式 iPhone18pro ケース iPhone17 iPhone 17e" });
+    expect(link).toHaveAttribute("href", "https://store.shopping.yahoo.co.jp/iface/18pro.html");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    // a link that is not a public Rakuten / Yahoo page stays plain text
+    expect(within(items[0]).queryByRole("link")).toBeNull();
+    expect(within(items[0]).getByText("リンクの壊れた商品")).toBeInTheDocument();
+  });
+
+  it("shows ten entries first and the rest on demand", () => {
+    const items = Array.from({ length: 12 }, (_, i) => ({
+      id: `e${i}`,
+      group: "rakutenProducts",
+      period: "daily",
+      type: "product",
+      title: `商品 ${i + 1}`,
+      url: null,
+      bestRank: i + 1,
+      bestDate: "2026-10-07",
+      days: 1,
+      models: 1,
+    }));
+    renderMarket({ evidence: { model: "iPhone 17", status: "ready", total: 12, items } });
+
+    const panel = screen.getByTestId("market-evidence");
+    expect(within(panel).getAllByTestId("evidence-item")).toHaveLength(10);
+    fireEvent.click(within(panel).getByRole("button", { name: "uorakutensales.showMore 2" }));
+    expect(within(panel).getAllByTestId("evidence-item")).toHaveLength(12);
+    fireEvent.click(within(panel).getByRole("button", { name: "uorakutensales.showLess" }));
+    expect(within(panel).getAllByTestId("evidence-item")).toHaveLength(10);
+  });
+
+  it("says when a model has no evidence, or it could not be read", () => {
+    const { rerender } = renderMarket({ evidence: evidenceFor("Galaxy A25") });
+    expect(screen.getByText("uorakutensales.evidenceNone")).toBeInTheDocument();
+
+    rerender(marketBoard({ evidence: { model: "Galaxy A25", status: "failed", total: 0, items: [] } }));
+    expect(screen.getByText("uorakutensales.evidenceFailed")).toBeInTheDocument();
   });
 });

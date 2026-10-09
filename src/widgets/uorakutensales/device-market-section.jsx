@@ -2,10 +2,13 @@
  * 市場 — the market view of the 機種別販売 board: uo-ec-manager's reference
  * ranking of phone-case models (public Rakuten / Yahoo rankings and searches),
  * each model set against our own case sales for the period, shop and metric
- * chosen above. Under 42rem of list width a model takes two lines.
+ * chosen above. Under 42rem of list width a model takes two lines. A model's
+ * name opens its 根拠: the listings and searches behind its score.
  */
+import { useState } from "react";
+
 import { MARKET_GAP_TOP, MARKET_SOURCES, marketRows, OWN_STRONG_TO, OWN_WEAK_FROM } from "./device-market-model.mjs";
-import { EMPTY, metricText, MoreLess, MUTED, NS, PANEL, reveal, VALUE_TONE } from "./device-sales-row";
+import { EMPTY, metricText, MoreLess, MUTED, NS, PANEL, press, reveal, VALUE_TONE } from "./device-sales-row";
 import { mdLabel } from "./sales-model.mjs";
 
 const METRIC_LABEL = { units: "sortUnits", sales: "sortSales", orders: "sortOrders" };
@@ -87,8 +90,108 @@ function MarketHeader({ reference, t }) {
   );
 }
 
-function MarketRow({ row, metric, t }) {
+// where a piece of evidence was seen: the ranking, or the search board
+const EVIDENCE_SOURCE = {
+  "rakutenProducts:daily": "evidenceRakutenDaily",
+  "rakutenProducts:realtime": "evidenceRakutenRealtime",
+  "yahooProducts:trend": "evidenceYahooTrend",
+  "yahooSearch:ranking": "evidenceYahooSearch",
+  "yahooSearch:up": "evidenceYahooRising",
+};
+// a model can have hundreds of pieces; the first ten carry most of its score
+const EVIDENCE_PREVIEW = 10;
+// narrow: the title takes a line of its own; from 42rem it follows the figures
+const EVIDENCE_TITLE =
+  "min-w-0 basis-full truncate text-theme-800 @2xl/market:basis-0 @2xl/market:flex-1 dark:text-theme-100";
+
+function EvidenceItem({ item, t }) {
+  return (
+    <li data-testid="evidence-item" className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px]">
+      <span
+        data-testid="evidence-source"
+        className="shrink-0 rounded border border-theme-300/60 px-1 text-[9.5px] font-bold text-theme-600 dark:border-theme-600/60 dark:text-theme-300"
+      >
+        {t(`${NS}.${EVIDENCE_SOURCE[`${item.group}:${item.period}`] ?? "evidenceOther"}`)}
+      </span>
+      <span className="shrink-0 font-bold tabular-nums text-theme-800 dark:text-theme-100">
+        {item.bestRank != null ? `#${item.bestRank}` : "—"}
+      </span>
+      <span className={`shrink-0 tabular-nums ${MUTED}`}>{mdLabel(item.bestDate)}</span>
+      {item.days > 1 ? (
+        <span className={`shrink-0 ${MUTED}`}>{t(`${NS}.evidenceDays`, { count: item.days })}</span>
+      ) : null}
+      {item.models > 1 ? (
+        <span className="shrink-0 rounded bg-theme-500/10 px-1 text-[9.5px] font-bold text-theme-600 dark:text-theme-300">
+          {t(`${NS}.evidenceModels`, { count: item.models })}
+        </span>
+      ) : null}
+      {item.url ? (
+        <a
+          href={item.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={item.title}
+          // the widget sits inside a clickable service card: open the page, not the card
+          onClick={(e) => e.stopPropagation()}
+          className={`${EVIDENCE_TITLE} underline-offset-2 hover:underline`}
+        >
+          {item.title}
+        </a>
+      ) : (
+        <span title={item.title} className={EVIDENCE_TITLE}>
+          {item.title}
+        </span>
+      )}
+    </li>
+  );
+}
+
+// The 根拠 under a model: still loading, failed, empty, or its evidence most
+// contributing first — ten at a time, the rest on demand.
+function MarketEvidence({ evidence, t }) {
+  const [all, setAll] = useState(false);
+  const ready = evidence.status === "ready" && evidence.items.length > 0;
+  let message = null;
+  if (evidence.status === "loading") message = "evidenceLoading";
+  else if (evidence.status === "failed") message = "evidenceFailed";
+  else if (!ready) message = "evidenceNone";
+  const shown = all ? evidence.items : evidence.items.slice(0, EVIDENCE_PREVIEW);
+  return (
+    <div
+      data-testid="market-evidence"
+      className="col-span-full mt-1 flex min-w-0 flex-col gap-1 rounded-md bg-theme-900/5 px-2.5 py-2 dark:bg-white/5"
+    >
+      {message ? (
+        <span className={`text-[11px] ${MUTED}`}>{t(`${NS}.${message}`)}</span>
+      ) : (
+        <>
+          <div className={`flex flex-wrap items-baseline gap-x-2 text-[10.5px] ${MUTED}`}>
+            <span className="font-bold">{t(`${NS}.evidenceTitle`, { count: evidence.total })}</span>
+            <span>{t(`${NS}.evidenceNote`)}</span>
+          </div>
+          <ol className="flex flex-col gap-1">
+            {shown.map((item) => (
+              <EvidenceItem key={item.id} item={item} t={t} />
+            ))}
+          </ol>
+          {evidence.items.length > EVIDENCE_PREVIEW ? (
+            <button
+              type="button"
+              onClick={press(() => setAll((open) => !open))}
+              className={`self-start text-[10.5px] font-bold hover:underline ${MUTED}`}
+            >
+              {all ? t(`${NS}.showLess`) : t(`${NS}.showMore`, { count: evidence.items.length - EVIDENCE_PREVIEW })}
+            </button>
+          ) : null}
+        </>
+      )}
+    </div>
+  );
+}
+
+function MarketRow({ row, metric, evidence, onEvidence, t }) {
   const { own } = row;
+  const open = evidence?.model === row.model;
   return (
     <li
       data-testid="market-row"
@@ -102,12 +205,23 @@ function MarketRow({ row, metric, t }) {
         {row.rank}
       </span>
       <span className="flex min-w-0 items-center gap-1.5">
-        <span
-          data-testid="market-model"
-          className="truncate text-[13px] font-semibold text-theme-900 dark:text-theme-50"
+        <button
+          type="button"
+          aria-expanded={open}
+          title={t(`${NS}.evidenceToggle`)}
+          onClick={press(() => onEvidence(open ? null : row.model))}
+          className="flex min-w-0 items-center gap-1 text-left"
         >
-          {row.model}
-        </span>
+          <span
+            data-testid="market-model"
+            className="truncate text-[13px] font-semibold text-theme-900 dark:text-theme-50"
+          >
+            {row.model}
+          </span>
+          <span aria-hidden="true" className={`shrink-0 text-[10px] ${MUTED}`}>
+            {open ? "▾" : "▸"}
+          </span>
+        </button>
         <span className="@2xl/market:hidden">
           <Flag kind={row.flag} t={t} />
         </span>
@@ -152,11 +266,21 @@ function MarketRow({ row, metric, t }) {
       <span className={`col-start-2 col-end-4 text-[11.5px] tabular-nums @2xl/market:hidden ${MUTED}`}>
         {own ? t(`${NS}.marketOwnRow`, { rank: own.rank, value: metricText(metric, own.value, t) }) : "—"}
       </span>
+      {open ? <MarketEvidence evidence={evidence} t={t} /> : null}
     </li>
   );
 }
 
-export default function MarketView({ reference, ownBoard, metric, step, onStep, t }) {
+export default function MarketView({
+  reference,
+  ownBoard,
+  metric,
+  step,
+  onStep,
+  t,
+  evidence = null,
+  onEvidence = () => {},
+}) {
   const rows = reference.ready ? marketRows(reference, ownBoard, metric) : [];
   const { shown, nextStep, nextCount } = reveal(rows, step);
   return (
@@ -184,7 +308,14 @@ export default function MarketView({ reference, ownBoard, metric, step, onStep, 
             </div>
             <ol className="flex flex-col gap-0.5">
               {shown.map((row) => (
-                <MarketRow key={row.model} row={row} metric={metric} t={t} />
+                <MarketRow
+                  key={row.model}
+                  row={row}
+                  metric={metric}
+                  evidence={evidence}
+                  onEvidence={onEvidence}
+                  t={t}
+                />
               ))}
             </ol>
           </div>
