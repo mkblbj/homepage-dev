@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { buildMarketReference } from "./device-market-model.mjs";
-import { marketDeviceModels } from "./device-sales.fixtures.mjs";
+import { marketDeviceModels, ownDeviceEvidence } from "./device-sales.fixtures.mjs";
 import {
   buildSalesProxyRequest,
+  deviceEvidenceQuery,
   marketEvidenceModel,
   normalizeSalesServiceUrl,
   pickModelEvidence,
@@ -36,6 +37,8 @@ test("buildSalesProxyRequest maps every allowed endpoint to its read-only path",
     market: "/api/market-rankings/device-models",
     // one model's evidence, picked out of the same reference by the proxy
     marketEvidence: "/api/market-rankings/device-models",
+    // our own products behind one model, read with that model's scope
+    devicesEvidence: "/api/device-sales/evidence",
   };
 
   for (const [endpoint, path] of Object.entries(cases)) {
@@ -194,4 +197,86 @@ test("shapeProxyResponse picks one model's evidence for marketEvidence", () => {
   assert.equal(evidence.total, 5);
   assert.equal(evidence.items.length, 5);
   assert.equal(JSON.stringify(evidence).includes("Galaxy A25"), false);
+});
+
+test("deviceEvidenceQuery forwards one model's scope and fixes the page", () => {
+  assert.deepEqual(
+    deviceEvidenceQuery(
+      JSON.stringify({ month: "2026-10", model: "iPhone 17", type: "case", style: "folio", shopName: "3911" }),
+    ),
+    {
+      month: "2026-10",
+      model: "iPhone 17",
+      type: "case",
+      style: "folio",
+      shopName: "3911",
+      page: "1",
+      pageSize: "500",
+    },
+  );
+  const combination = "iPhone SE（第2代） / iPhone SE（第3代）（多机型）";
+  assert.deepEqual(deviceEvidenceQuery(JSON.stringify({ date: "2026-10-09", model: combination, type: "film" })), {
+    date: "2026-10-09",
+    model: combination,
+    type: "film",
+    page: "1",
+    pageSize: "500",
+  });
+});
+
+test("deviceEvidenceQuery refuses anything the server would not take", () => {
+  const base = { month: "2026-10", model: "iPhone 17", type: "case" };
+  for (const query of [
+    undefined,
+    "",
+    "not json",
+    JSON.stringify([base]),
+    // a date and a month, or neither
+    JSON.stringify({ ...base, date: "2026-10-09" }),
+    JSON.stringify({ model: "iPhone 17", type: "case" }),
+    JSON.stringify({ ...base, month: "2026-1" }),
+    JSON.stringify({ model: "iPhone 17", type: "case", date: "2026/10/09" }),
+    JSON.stringify({ ...base, model: "" }),
+    JSON.stringify({ ...base, model: "x".repeat(301) }),
+    JSON.stringify({ ...base, type: "tablet" }),
+    JSON.stringify({ ...base, style: "leather" }),
+    JSON.stringify({ ...base, type: "film", style: "folio" }),
+    JSON.stringify({ ...base, shopName: "" }),
+    JSON.stringify({ ...base, shopName: 3911 }),
+  ]) {
+    assert.equal(deviceEvidenceQuery(query), null, `query ${query}`);
+  }
+});
+
+test("buildSalesProxyRequest puts a device evidence scope on the URL", () => {
+  const request = buildSalesProxyRequest({
+    endpoint: "devicesEvidence",
+    baseUrl: "http://127.0.0.1:3912",
+    search: { month: "2026-10", model: "iPhone 17", type: "case", page: "1", pageSize: "500" },
+  });
+
+  assert.equal(request.url.pathname, "/api/device-sales/evidence");
+  assert.deepEqual(Object.fromEntries(request.url.searchParams), {
+    month: "2026-10",
+    model: "iPhone 17",
+    type: "case",
+    page: "1",
+    pageSize: "500",
+  });
+});
+
+test("shapeProxyResponse drops the daily figures and unsafe example links from device evidence", () => {
+  const raw = ownDeviceEvidence();
+  const slim = shapeProxyResponse("devicesEvidence", raw);
+
+  assert.equal(slim.evidence.length, 4);
+  assert.ok(slim.evidence.every((row) => !("daily" in row)));
+  assert.deepEqual(slim.evidence.find((row) => row.id === "b2").caseStyleEvidence.references, [
+    { kind: "series-example", url: "https://item.rakuten.co.jp/0406colors/18cls01-zenfone9/" },
+  ]);
+  assert.deepEqual(slim.summary, raw.summary);
+  assert.deepEqual(slim.pagination, raw.pagination);
+  // the payload it was given is left as it was
+  assert.equal(raw.evidence[1].daily.length, 2);
+  assert.equal(raw.evidence[2].caseStyleEvidence.references.length, 2);
 });

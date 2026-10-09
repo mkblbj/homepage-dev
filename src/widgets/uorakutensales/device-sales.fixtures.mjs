@@ -524,3 +524,144 @@ export function marketDeviceModels() {
     sources: { rakuten: source(7, 4), yahoo: source(1, 3) },
   };
 }
+
+// GET /api/device-sales/evidence for this month's iPhone 17 cases as the server
+// sends it: one row per product and recognition basis, units desc, with daily
+// figures — a title / title row, a selection / verified-series row (one safe
+// and one unsafe example link), an SKU / product-history row and an
+// unresolved-style row
+export function ownDeviceEvidence() {
+  const day = (date, unitsSold, salesYen, orderCount) => ({
+    date,
+    unitsSold,
+    salesYen,
+    orderCount,
+    metricsReady: true,
+  });
+  const row = (id, shopName, itemNumber, title, caseStyle, [unitsSold, salesYen, orderCount], evidence, daily) => ({
+    id,
+    shopName,
+    itemNumber,
+    title,
+    type: "case",
+    caseStyle,
+    model: "iPhone 17",
+    kind: "single",
+    ...evidence,
+    unitsSold,
+    salesYen,
+    orderCount,
+    metricsReady: true,
+    daily,
+  });
+  return {
+    schemaVersion: 1,
+    source: "rakuten-order-api",
+    timezone: "Asia/Tokyo",
+    generatedAtJST: "2026-10-09 10:30:14 JST",
+    ok: true,
+    partial: true,
+    status: "provisional",
+    metricsReady: true,
+    month: "2026-10",
+    startDate: "2026-10-01",
+    endDate: "2026-10-09",
+    filters: { model: "iPhone 17", shopName: null, type: "case", style: null },
+    summary: { unitsSold: 11, salesYen: 13660, orderCount: 8, metricsReady: true },
+    pagination: { page: 1, pageSize: 500, totalItems: 4, totalPages: 1, hasMore: false, nextPage: null },
+    evidence: [
+      row(
+        "c3",
+        "3911",
+        "CA0510-iPhone 17",
+        "iPhone 17 ケース レザー",
+        "folio",
+        [4, 6160, 3],
+        {
+          deviceEvidence: {
+            source: "selection",
+            models: ["iPhone 17"],
+            reason: null,
+            options: [{ source: "sku", key: "機種", value: "iPhone 17", models: ["iPhone 17"] }],
+          },
+          caseStyleEvidence: {
+            style: "folio",
+            source: "same-shop-product-history",
+            rule: "folio-shape-title",
+            matchedText: "手帳",
+            references: [],
+            productTitle: "iPhone 17 手帳型 ケース レザー",
+            inheritedSource: "title",
+          },
+        },
+        [day("2026-10-02", 4, 6160, 3)],
+      ),
+      row(
+        "a1",
+        "松田",
+        "RS-Q1CV0901PC-iPhone 17",
+        "MagSafe対応 iPhone17 ケース クリア ハード",
+        "standard",
+        [3, 2970, 3],
+        {
+          deviceEvidence: { source: "title", models: ["iPhone 17"], reason: null, options: [] },
+          caseStyleEvidence: {
+            style: "standard",
+            source: "title",
+            rule: "back-shell-title",
+            matchedText: "クリア",
+            references: [],
+          },
+        },
+        [day("2026-10-06", 1, 990, 1), day("2026-10-08", 2, 1980, 2)],
+      ),
+      row(
+        "b2",
+        "天海",
+        "■102-全機種対応",
+        "iphone17 ケース 手帳型 WE2 WE3 GalaxyA37",
+        "folio",
+        [2, 1980, 1],
+        {
+          deviceEvidence: {
+            source: "selection",
+            models: ["iPhone 17"],
+            reason: null,
+            options: [{ source: "selected-choice", key: "●iPhone シリ-ズ", value: "iPhone 17", models: ["iPhone 17"] }],
+          },
+          caseStyleEvidence: {
+            style: "folio",
+            source: "verified-series",
+            rule: "verified-folio-series",
+            matchedText: "102",
+            references: [
+              { kind: "series-example", url: "https://item.rakuten.co.jp/0406colors/18cls01-zenfone9/" },
+              { kind: "series-example", url: "javascript:alert(1)" },
+            ],
+          },
+        },
+        [day("2026-10-01", 2, 1980, 1)],
+      ),
+      row(
+        "d4",
+        "hagumi",
+        "HG-77-iPhone 17",
+        "iPhone 17 ケース おしゃれ",
+        "unknown",
+        [2, 2550, 2],
+        {
+          deviceEvidence: { source: "title", models: ["iPhone 17"], reason: null, options: [] },
+          caseStyleEvidence: {
+            style: "unknown",
+            source: "unresolved",
+            rule: "missing-case-style",
+            matchedText: null,
+            references: [],
+          },
+        },
+        [day("2026-10-07", 2, 2550, 2)],
+      ),
+    ],
+    shops: [{ shopName: "3911", configured: true, status: "ready", stale: false, metricsReady: true }],
+  };
+}
