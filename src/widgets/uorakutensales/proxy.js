@@ -1,4 +1,9 @@
-import { buildSalesProxyRequest, marketEvidenceModel, shapeProxyResponse } from "./proxy-config.mjs";
+import {
+  buildSalesProxyRequest,
+  deviceEvidenceQuery,
+  marketEvidenceModel,
+  shapeProxyResponse,
+} from "./proxy-config.mjs";
 
 import getServiceWidget from "utils/config/service-helpers";
 import createLogger from "utils/logger";
@@ -18,6 +23,7 @@ const EXPECTED_METHOD_BY_ENDPOINT = {
   devicesMonthly: "GET",
   market: "GET",
   marketEvidence: "GET",
+  devicesEvidence: "GET",
 };
 
 function parseResponseData(data) {
@@ -63,6 +69,15 @@ export default async function uoRakutenSalesProxyHandler(req, res) {
     }
   }
 
+  // devicesEvidence forwards its scope (period, model, category, style, shop)
+  let search = null;
+  if (endpoint === "devicesEvidence") {
+    search = deviceEvidenceQuery(req.query.query);
+    if (!search) {
+      return res.status(400).json({ error: "Invalid device evidence query" });
+    }
+  }
+
   const widget = await getServiceWidget(group, service, index);
   if (!widget) {
     logger.debug("Invalid or missing widget for service '%s' in group '%s'", service, group);
@@ -73,6 +88,7 @@ export default async function uoRakutenSalesProxyHandler(req, res) {
     const { url, params } = buildSalesProxyRequest({
       endpoint,
       baseUrl: widget.url,
+      search,
     });
     const [status, contentType, data] = await httpProxy(url, params);
     const resultData = parseResponseData(data);

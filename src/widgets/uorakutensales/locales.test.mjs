@@ -145,6 +145,23 @@ const REQUIRED_KEYS = [
   "evidenceYahooSearch",
   "evidenceYahooRising",
   "evidenceOther",
+  "ownEvidenceToggle",
+  "ownEvidenceTitle",
+  "ownEvidenceLoading",
+  "ownEvidenceFailed",
+  "ownEvidenceNone",
+  "ownEvidenceMore",
+  "ownEvidenceExample",
+  "ownEvidenceModel",
+  "sourceSelection",
+  "sourceSku",
+  "sourceTitle",
+  "sourceSeries",
+  "sourceHistory",
+  "sourceUnresolved",
+  "ruleMissingStyle",
+  "ruleConflictingHistory",
+  "quoted",
 ];
 
 function loadNamespace(locale) {
@@ -218,5 +235,14 @@ test("根拠 placeholders are preserved across locales", () => {
     for (const key of ["evidenceTitle", "evidenceModels", "evidenceDays"]) {
       assert.match(ns[key], /\{\{count\}\}/, `${locale}.${key} needs {{count}}`);
     }
+  }
+});
+
+test("内訳 placeholders are preserved across locales", () => {
+  for (const locale of LOCALES) {
+    const ns = loadNamespace(locale);
+    assert.match(ns.ownEvidenceTitle, /\{\{count\}\}/, `${locale}.ownEvidenceTitle needs {{count}}`);
+    assert.match(ns.ownEvidenceMore, /\{\{count\}\}/, `${locale}.ownEvidenceMore needs {{count}}`);
+    assert.match(ns.quoted, /\{\{text\}\}/, `${locale}.quoted needs {{text}}`);
   }
 });

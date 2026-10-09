@@ -20,6 +20,8 @@ const ENDPOINT_PATHS = {
   market: "/api/market-rankings/device-models",
   // one model's evidence: the proxy reads the same reference and picks it out
   marketEvidence: "/api/market-rankings/device-models",
+  // our own products behind one model, read with that model's scope
+  devicesEvidence: "/api/device-sales/evidence",
 };
 
 export function normalizeSalesServiceUrl(baseUrl = DEFAULT_SALES_SERVICE_URL) {
@@ -30,16 +32,22 @@ export function normalizeSalesServiceUrl(baseUrl = DEFAULT_SALES_SERVICE_URL) {
   return normalized || DEFAULT_SALES_SERVICE_URL;
 }
 
-export function buildSalesProxyRequest({ endpoint, baseUrl }) {
+// `search` is the validated scope of a devicesEvidence read; every other
+// endpoint is read without a query string
+export function buildSalesProxyRequest({ endpoint, baseUrl, search = null }) {
   const path = ENDPOINT_PATHS[endpoint];
   if (!path) {
     throw new Error(`Unsupported Rakuten sales endpoint: ${endpoint}`);
   }
 
   const serviceUrl = normalizeSalesServiceUrl(baseUrl);
+  const url = new URL(`${serviceUrl}${path}`);
+  if (search) {
+    Object.entries(search).forEach(([key, value]) => url.searchParams.set(key, value));
+  }
 
   return {
-    url: new URL(`${serviceUrl}${path}`),
+    url,
     params: {
       method: "GET",
       headers: {
@@ -146,23 +154,90 @@ export function pickModelEvidence(reference, model) {
   return { model, total: ranked.length, items: ranked };
 }
 
-// The model a marketEvidence request asks for, out of the proxy's `query`
-// parameter (JSON); null for anything that is not one sensible model name.
-export function marketEvidenceModel(query) {
+// the proxy's `query` parameter (JSON) as a plain object, or null
+function parseQuery(query) {
   if (typeof query !== "string" || !query) return null;
   try {
-    const model = JSON.parse(query)?.model;
-    if (typeof model !== "string") return null;
-    const name = model.trim();
-    return name && name.length <= MAX_MODEL_LENGTH ? name : null;
+    const value = JSON.parse(query);
+    return value && typeof value === "object" && !Array.isArray(value) ? value : null;
   } catch {
     return null;
   }
+}
+
+// a non-empty trimmed string up to `max` characters, or null
+function boundedText(value, max) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed && trimmed.length <= max ? trimmed : null;
+}
+
+// The model a marketEvidence request asks for, out of the proxy's `query`
+// parameter; null for anything that is not one sensible model name.
+export function marketEvidenceModel(query) {
+  return boundedText(parseQuery(query)?.model, MAX_MODEL_LENGTH);
+}
+
+const EVIDENCE_TYPES = ["case", "film", "case_film_set"];
+const EVIDENCE_STYLES = ["folio", "standard", "unknown"];
+// a combination row's name lists every model it covers
+const MAX_EVIDENCE_MODEL_LENGTH = 300;
+const MAX_SHOP_NAME_LENGTH = 60;
+// the server's largest page: even last month's biggest model fits in one read
+const EVIDENCE_PAGE_SIZE = "500";
+
+// The scope of a devicesEvidence read — one date or one month, the model as
+// the board ranks it, its category, and optionally a case style and a shop —
+// as the server's query string; null for anything the server would refuse.
+export function deviceEvidenceQuery(query) {
+  const raw = parseQuery(query);
+  if (!raw) return null;
+  const hasDate = raw.date !== undefined;
+  if (hasDate === (raw.month !== undefined)) return null;
+  const period = hasDate ? raw.date : raw.month;
+  if (typeof period !== "string" || !(hasDate ? /^\d{4}-\d{2}-\d{2}$/ : /^\d{4}-\d{2}$/).test(period)) return null;
+  const model = boundedText(raw.model, MAX_EVIDENCE_MODEL_LENGTH);
+  if (!model || !EVIDENCE_TYPES.includes(raw.type)) return null;
+  const search = { [hasDate ? "date" : "month"]: period, model, type: raw.type };
+  if (raw.style !== undefined) {
+    if (!EVIDENCE_STYLES.includes(raw.style) || raw.type === "film") return null;
+    search.style = raw.style;
+  }
+  if (raw.shopName !== undefined) {
+    const shop = boundedText(raw.shopName, MAX_SHOP_NAME_LENGTH);
+    if (!shop) return null;
+    search.shopName = shop;
+  }
+  return { ...search, page: "1", pageSize: EVIDENCE_PAGE_SIZE };
+}
+
+// The 内訳 list never charts a product's days, and an example link is kept
+// only when it is a public Rakuten / Yahoo page. Not a list → untouched.
+function slimDeviceEvidence(data) {
+  if (!data || typeof data !== "object" || !Array.isArray(data.evidence)) return data;
+  return {
+    ...data,
+    evidence: data.evidence.map((row) => {
+      const copy = { ...row };
+      delete copy.daily;
+      const style = copy.caseStyleEvidence;
+      if (style && typeof style === "object") {
+        copy.caseStyleEvidence = {
+          ...style,
+          references: (Array.isArray(style.references) ? style.references : [])
+            .map((ref) => ({ ...ref, url: linkOf(ref?.url) }))
+            .filter((ref) => ref.url),
+        };
+      }
+      return copy;
+    }),
+  };
 }
 
 // what a successful read of each endpoint hands to the browser
 export function shapeProxyResponse(endpoint, data, params = {}) {
   if (endpoint === "market") return slimMarketReference(data);
   if (endpoint === "marketEvidence") return pickModelEvidence(data, params.model);
+  if (endpoint === "devicesEvidence") return slimDeviceEvidence(data);
   return data;
 }

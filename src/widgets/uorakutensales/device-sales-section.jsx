@@ -11,8 +11,9 @@
  * the bottom) and 失速 (this month's daily pace against last month's — this
  * month only).
  */
-import { useState } from "react";
+import { Fragment, useState } from "react";
 
+import OwnEvidence from "./device-evidence-section";
 import MarketView from "./device-market-section";
 import {
   categoryMix,
@@ -292,6 +293,8 @@ function CategoryColumn({
   style = "all",
   onStyle = () => {},
   spacer = false,
+  deviceEvidence = null,
+  onEvidenceRow = () => {},
 }) {
   // the chosen case style's rows, total and meta; last month's marks compare
   // within the same style, or not at all
@@ -318,17 +321,25 @@ function CategoryColumn({
         <div className="@container/list flex min-w-0 flex-col">
           <ListHeader metric={metric} order={order} t={t} />
           <ol className="flex flex-col gap-0.5">
-            {shown.map((row, i) => (
-              <DeviceRow
-                key={row.fullModel}
-                row={row}
-                metric={metric}
-                move={moves[i] ?? null}
-                expanded={expanded === keyOf(row)}
-                onToggle={() => onExpand(expanded === keyOf(row) ? null : keyOf(row))}
-                t={t}
-              />
-            ))}
+            {shown.map((row, i) => {
+              // the model whose 内訳 is open gets its products right under it
+              const open = deviceEvidence?.key === keyOf(row);
+              return (
+                <Fragment key={row.fullModel}>
+                  <DeviceRow
+                    row={row}
+                    metric={metric}
+                    move={moves[i] ?? null}
+                    expanded={expanded === keyOf(row)}
+                    onToggle={() => onExpand(expanded === keyOf(row) ? null : keyOf(row))}
+                    t={t}
+                    onEvidence={() => onEvidenceRow(row, open)}
+                    evidenceOpen={open}
+                  />
+                  {open ? <OwnEvidence evidence={deviceEvidence} metric={metric} t={t} /> : null}
+                </Fragment>
+              );
+            })}
           </ol>
         </div>
       )}
@@ -402,6 +413,8 @@ export default function DeviceSalesSection({
   market = null,
   evidence = null,
   onEvidence = () => {},
+  deviceEvidence = null,
+  onDeviceEvidence = () => {},
   cardCls,
   t,
 }) {
@@ -478,13 +491,29 @@ export default function DeviceSalesSection({
     setter(value);
     setSteps({});
     setExpanded(null);
+    onDeviceEvidence(null);
   };
   // a new style starts its own column short again
   const pickStyle = (type) => (style) => {
     setStyles((prev) => ({ ...prev, [type]: style }));
     setSteps((prev) => ({ ...prev, [type]: 0 }));
     setExpanded(null);
+    onDeviceEvidence(null);
   };
+  // a model's 内訳 is read in the board's own scope: the period, the shop, the
+  // category and the case style on screen, and the model as the board ranks it
+  const evidenceQuery = (type, row) => {
+    const style = styleFor(type);
+    return {
+      key: `${type}:${row.fullModel}`,
+      ...(activeKey === "today" ? { date: current.label } : { month: current.label }),
+      model: row.fullModel,
+      type,
+      ...(style !== "all" ? { style } : {}),
+      ...(scopeShop ? { shopName: scopeShop } : {}),
+    };
+  };
+  const toggleEvidence = (type) => (row, open) => onDeviceEvidence(open ? null : evidenceQuery(type, row));
   const lockedPeriod = (key) => slowingOn && key !== "thisMonth";
   const stepOf = (type) => steps[type] ?? 0;
   const setStepOf = (type) => (step) => setSteps((prev) => ({ ...prev, [type]: step }));
@@ -626,6 +655,8 @@ export default function DeviceSalesSection({
                   style={styleFor(type)}
                   onStyle={pickStyle(type)}
                   spacer={spacer}
+                  deviceEvidence={deviceEvidence}
+                  onEvidenceRow={toggleEvidence(type)}
                   visible={tab === type}
                   step={stepOf(type)}
                   onStep={setStepOf(type)}
