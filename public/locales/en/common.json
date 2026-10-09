@@ -1532,7 +1532,21 @@
         "flagWeakNote": "Market top {{top}}, ours below #{{from}}",
         "flagStrongNote": "Ours in the top {{to}}",
         "marketNotReady": "Market data is still being collected",
-        "marketNote": "The market score is a reference built from public Rakuten and Yahoo rankings and searches (top = 100), not sales or share. Our rank orders our single-model cases (all styles) for the chosen period and shop by the same metric."
+        "marketNote": "The market score is a reference built from public Rakuten and Yahoo rankings and searches (top = 100), not sales or share. Our rank orders our single-model cases (all styles) for the chosen period and shop by the same metric.",
+        "evidenceToggle": "Show evidence",
+        "evidenceTitle": "Evidence: {{count}} (by contribution)",
+        "evidenceNote": "Listings naming several models are split between them",
+        "evidenceLoading": "Loading evidence",
+        "evidenceFailed": "Could not load the evidence",
+        "evidenceNone": "No evidence for this model yet",
+        "evidenceModels": "{{count}} models",
+        "evidenceDays": "{{count}} days",
+        "evidenceRakutenDaily": "Rakuten daily",
+        "evidenceRakutenRealtime": "Rakuten live",
+        "evidenceYahooTrend": "Y trend",
+        "evidenceYahooSearch": "Y search",
+        "evidenceYahooRising": "Y rising",
+        "evidenceOther": "Other"
     },
     "uoshippingdashboard": {
         "allPlatforms": "All",

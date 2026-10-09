@@ -1,4 +1,4 @@
-import { buildSalesProxyRequest, shapeProxyResponse } from "./proxy-config.mjs";
+import { buildSalesProxyRequest, marketEvidenceModel, shapeProxyResponse } from "./proxy-config.mjs";
 
 import getServiceWidget from "utils/config/service-helpers";
 import createLogger from "utils/logger";
@@ -17,6 +17,7 @@ const EXPECTED_METHOD_BY_ENDPOINT = {
   devices: "GET",
   devicesMonthly: "GET",
   market: "GET",
+  marketEvidence: "GET",
 };
 
 function parseResponseData(data) {
@@ -53,6 +54,15 @@ export default async function uoRakutenSalesProxyHandler(req, res) {
     return res.status(405).json({ error: `Unsupported method for ${endpoint}` });
   }
 
+  // marketEvidence names its model in the proxy's query parameter
+  const shape = {};
+  if (endpoint === "marketEvidence") {
+    shape.model = marketEvidenceModel(req.query.query);
+    if (!shape.model) {
+      return res.status(400).json({ error: "Missing market model" });
+    }
+  }
+
   const widget = await getServiceWidget(group, service, index);
   if (!widget) {
     logger.debug("Invalid or missing widget for service '%s' in group '%s'", service, group);
@@ -85,7 +95,7 @@ export default async function uoRakutenSalesProxyHandler(req, res) {
       });
     }
 
-    return res.status(status).json(shapeProxyResponse(endpoint, resultData) ?? {});
+    return res.status(status).json(shapeProxyResponse(endpoint, resultData, shape) ?? {});
   } catch (e) {
     logger.error("Error processing Rakuten sales proxy request: %s", e.message);
     return res.status(400).json({ error: e.message });

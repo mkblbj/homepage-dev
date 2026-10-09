@@ -15,6 +15,7 @@ const READ_ONLY = [
   "devices",
   "devicesMonthly",
   "market",
+  "marketEvidence",
 ];
 
 describe("uorakutensales widget config", () => {

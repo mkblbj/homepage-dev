@@ -1545,7 +1545,21 @@
         "flagWeakNote": "市场前 {{top}} 名、自家 {{from}} 名以后",
         "flagStrongNote": "自家前 {{to}} 名",
         "marketNotReady": "市场数据收集中",
-        "marketNote": "市场分数由乐天、Yahoo 的公开榜单和搜索词算出（第一名 = 100），只是参考值，不是销量或份额。自家名次是所选期间、店铺的手机壳（全部款式、单机型）按同一指标的排名。"
+        "marketNote": "市场分数由乐天、Yahoo 的公开榜单和搜索词算出（第一名 = 100），只是参考值，不是销量或份额。自家名次是所选期间、店铺的手机壳（全部款式、单机型）按同一指标的排名。",
+        "evidenceToggle": "查看依据",
+        "evidenceTitle": "依据 {{count}} 条（按贡献）",
+        "evidenceNote": "写了多个机型的商品按机型数平分",
+        "evidenceLoading": "依据加载中",
+        "evidenceFailed": "依据加载失败",
+        "evidenceNone": "这个机型还没有依据",
+        "evidenceModels": "{{count}} 个机型",
+        "evidenceDays": "{{count}} 天",
+        "evidenceRakutenDaily": "乐天日榜",
+        "evidenceRakutenRealtime": "乐天实时",
+        "evidenceYahooTrend": "Y 趋势",
+        "evidenceYahooSearch": "Y 搜索",
+        "evidenceYahooRising": "Y 急升",
+        "evidenceOther": "其他"
     },
     "uoshippingdashboard": {
         "allPlatforms": "全部",

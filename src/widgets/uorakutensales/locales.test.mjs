@@ -131,6 +131,20 @@ const REQUIRED_KEYS = [
   "flagStrongNote",
   "marketNotReady",
   "marketNote",
+  "evidenceToggle",
+  "evidenceTitle",
+  "evidenceNote",
+  "evidenceLoading",
+  "evidenceFailed",
+  "evidenceNone",
+  "evidenceModels",
+  "evidenceDays",
+  "evidenceRakutenDaily",
+  "evidenceRakutenRealtime",
+  "evidenceYahooTrend",
+  "evidenceYahooSearch",
+  "evidenceYahooRising",
+  "evidenceOther",
 ];
 
 function loadNamespace(locale) {
@@ -195,5 +209,14 @@ test("市場 placeholders are preserved across locales", () => {
     assert.match(ns.marketOwnRow, /\{\{rank\}\}.*\{\{value\}\}/, `${locale}.marketOwnRow`);
     assert.match(ns.flagWeakNote, /\{\{top\}\}.*\{\{from\}\}/, `${locale}.flagWeakNote`);
     assert.match(ns.flagStrongNote, /\{\{to\}\}/, `${locale}.flagStrongNote`);
+  }
+});
+
+test("根拠 placeholders are preserved across locales", () => {
+  for (const locale of LOCALES) {
+    const ns = loadNamespace(locale);
+    for (const key of ["evidenceTitle", "evidenceModels", "evidenceDays"]) {
+      assert.match(ns[key], /\{\{count\}\}/, `${locale}.${key} needs {{count}}`);
+    }
   }
 });

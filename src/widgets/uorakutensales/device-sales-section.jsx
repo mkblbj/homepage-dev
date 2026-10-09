@@ -397,7 +397,14 @@ function SlowingColumn({
   );
 }
 
-export default function DeviceSalesSection({ devices, market = null, cardCls, t }) {
+export default function DeviceSalesSection({
+  devices,
+  market = null,
+  evidence = null,
+  onEvidence = () => {},
+  cardCls,
+  t,
+}) {
   // this month by default, whichever board lands first: until it is there the
   // fallback below shows what is, and the board moves to it once it arrives
   const [period, setPeriod] = useState(DEFAULT_DEVICE_PERIOD);
@@ -571,6 +578,8 @@ export default function DeviceSalesSection({ devices, market = null, cardCls, t 
           metric={activeMetric}
           step={stepOf("market")}
           onStep={setStepOf("market")}
+          evidence={evidence}
+          onEvidence={onEvidence}
           t={t}
         />
       ) : slowingReason ? (

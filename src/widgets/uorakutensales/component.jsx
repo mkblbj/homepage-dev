@@ -21,7 +21,7 @@ import Container from "components/services/widget/container";
 import { useTranslation } from "next-i18next/pages";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { buildMarketReference, MARKET_REFRESH_INTERVAL } from "./device-market-model.mjs";
+import { buildMarketEvidence, buildMarketReference, MARKET_REFRESH_INTERVAL } from "./device-market-model.mjs";
 import { buildDeviceSales } from "./device-sales-model.mjs";
 import DeviceSalesSection from "./device-sales-section";
 import {
@@ -1436,6 +1436,11 @@ export default function Component({ service }) {
   const { data: marketData, mutate: mutateMarket } = useWidgetAPI(widget, "market", {
     refreshInterval: Math.max(refreshInterval, MARKET_REFRESH_INTERVAL),
   });
+  // the market model whose 根拠 is open; its evidence is read only while it is
+  const [evidenceModel, setEvidenceModel] = useState(null);
+  const { data: evidenceData } = useWidgetAPI(widget, evidenceModel ? "marketEvidence" : "", {
+    model: evidenceModel,
+  });
 
   const freshness = useFreshness(sales?.generatedAtJST, refreshInterval);
   const model = useMemo(() => buildModel(sales, history, logos), [sales, history, logos]);
@@ -1443,6 +1448,10 @@ export default function Component({ service }) {
   const peaks = useMemo(() => buildPeaks(peaksData), [peaksData]);
   const devices = useMemo(() => buildDeviceSales(devicesData, devicesMonthlyData), [devicesData, devicesMonthlyData]);
   const market = useMemo(() => buildMarketReference(marketData), [marketData]);
+  const evidence = useMemo(
+    () => (evidenceModel ? { model: evidenceModel, ...buildMarketEvidence(evidenceData) } : null),
+    [evidenceModel, evidenceData],
+  );
   // the month total still carries today, so the realtime snapshot is what lets
   // the completed-day pace be measured without a half-run day in it
   const monthly = useMemo(() => buildMonthly(monthlyData, sales), [monthlyData, sales]);
@@ -1758,7 +1767,16 @@ export default function Component({ service }) {
         {ranking ? <RankingSection ranking={ranking} cardCls={cardCls} t={t} /> : null}
 
         {/* device-model boards: today, this month and last month in one place */}
-        {devices ? <DeviceSalesSection devices={devices} market={market} cardCls={cardCls} t={t} /> : null}
+        {devices ? (
+          <DeviceSalesSection
+            devices={devices}
+            market={market}
+            evidence={evidence}
+            onEvidence={setEvidenceModel}
+            cardCls={cardCls}
+            t={t}
+          />
+        ) : null}
 
         {model.hasHistory ? (
           <section className={`grid grid-cols-1 gap-x-5 gap-y-4 p-4 @4xl:grid-cols-[300px_1fr] ${cardCls}`}>

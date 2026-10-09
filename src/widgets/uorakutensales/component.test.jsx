@@ -204,4 +204,19 @@ describe("widgets/uorakutensales/component", () => {
     );
     expect(screen.queryByRole("button", { name: "uorakutensales.viewMarket" })).not.toBeInTheDocument();
   });
+  it("reads a market model's evidence only while its 根拠 is open", () => {
+    const payload = { devices: dailyDeviceSales(), devicesMonthly: monthlyDeviceSales(), market: marketDeviceModels() };
+    useWidgetAPI.mockImplementation((_widget, endpoint) => {
+      if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
+      return { data: payload[endpoint], error: undefined, mutate: vi.fn() };
+    });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+    expect(useWidgetAPI).not.toHaveBeenCalledWith(service.widget, "marketEvidence", expect.anything());
+
+    fireEvent.click(screen.getByRole("button", { name: "uorakutensales.viewMarket" }));
+    fireEvent.click(screen.getByRole("button", { name: "iPhone 18 Pro" }));
+
+    expect(useWidgetAPI).toHaveBeenCalledWith(service.widget, "marketEvidence", { model: "iPhone 18 Pro" });
+  });
 });

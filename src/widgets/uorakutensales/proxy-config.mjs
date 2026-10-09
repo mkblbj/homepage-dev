@@ -18,6 +18,8 @@ const ENDPOINT_PATHS = {
   devicesMonthly: "/api/device-sales/monthly",
   // the market reference for phone-case models, rebuilt once a day
   market: "/api/market-rankings/device-models",
+  // one model's evidence: the proxy reads the same reference and picks it out
+  marketEvidence: "/api/market-rankings/device-models",
 };
 
 export function normalizeSalesServiceUrl(baseUrl = DEFAULT_SALES_SERVICE_URL) {
@@ -75,7 +77,92 @@ export function slimMarketReference(data) {
   return slim;
 }
 
+// The server weighs a ranking signal by 1/√rank, splits a listing that names
+// several models evenly between them, and mixes Rakuten daily / realtime at
+// 70 / 30 and Yahoo search ranking / rising at 5/6 / 1/6.
+const PERIOD_WEIGHT = { daily: 0.7, realtime: 0.3, ranking: 5 / 6, up: 1 / 6, trend: 1 };
+// only public Rakuten / Yahoo pages become links
+const LINK_HOSTS = ["rakuten.co.jp", "yahoo.co.jp"];
+const MAX_MODEL_LENGTH = 100;
+
+function linkOf(value) {
+  try {
+    const url = new URL(String(value));
+    const host = LINK_HOSTS.some((domain) => url.hostname === domain || url.hostname.endsWith(`.${domain}`));
+    return (url.protocol === "https:" || url.protocol === "http:") && host ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function signalOf(item) {
+  const observed = (item.observations || []).reduce((sum, o) => {
+    const rank = Number(o?.sourceRank);
+    return rank > 0 ? sum + (Number(o?.modelShare) || 0) / Math.sqrt(rank) : sum;
+  }, 0);
+  return observed * (PERIOD_WEIGHT[item.period] ?? 1);
+}
+
+function compactEvidence(item) {
+  const seen = (item.observations || []).filter((o) => Number(o?.sourceRank) > 0);
+  const best = seen.reduce((top, o) => (!top || o.sourceRank < top.sourceRank ? o : top), null);
+  return {
+    id: item.id,
+    group: item.group,
+    period: item.period,
+    type: item.type,
+    title: String((item.type === "keyword" ? item.query : item.itemName) ?? "").trim(),
+    url: linkOf(item.type === "keyword" ? item.url : item.itemUrl),
+    bestRank: best ? Number(best.sourceRank) : null,
+    bestDate: best ? String(best.date ?? "") : "",
+    days: seen.length,
+    models: seen.reduce((most, o) => Math.max(most, Array.isArray(o.models) ? o.models.length : 0), 0),
+  };
+}
+
+// One model's evidence out of the full reference, most contributing first:
+// each signal's share of its source, weighted by how much that source adds to
+// the model's score. Only what the 根拠 list shows leaves the proxy.
+export function pickModelEvidence(reference, model) {
+  if (!reference || typeof reference !== "object" || !Array.isArray(reference.ranks)) return reference;
+  const row = reference.ranks.find((r) => r?.model === model);
+  const byId = new Map((Array.isArray(reference.evidence) ? reference.evidence : []).map((item) => [item?.id, item]));
+  const items = (row?.evidenceIds || []).map((id) => byId.get(id)).filter(Boolean);
+  const signalByGroup = {};
+  items.forEach((item) => {
+    signalByGroup[item.group] = (signalByGroup[item.group] ?? 0) + signalOf(item);
+  });
+  const weightOf = (item) => {
+    const total = signalByGroup[item.group];
+    if (!(total > 0)) return 0;
+    const sourceWeight = Number(reference.scoreWeights?.[item.group]) || 0;
+    const sourceScore = Number(row.sourceScores?.[item.group]) || 0;
+    return (sourceWeight * sourceScore * signalOf(item)) / total;
+  };
+  const ranked = items
+    .map((item) => ({ item, weight: weightOf(item) }))
+    .sort((a, b) => b.weight - a.weight)
+    .map(({ item }) => compactEvidence(item));
+  return { model, total: ranked.length, items: ranked };
+}
+
+// The model a marketEvidence request asks for, out of the proxy's `query`
+// parameter (JSON); null for anything that is not one sensible model name.
+export function marketEvidenceModel(query) {
+  if (typeof query !== "string" || !query) return null;
+  try {
+    const model = JSON.parse(query)?.model;
+    if (typeof model !== "string") return null;
+    const name = model.trim();
+    return name && name.length <= MAX_MODEL_LENGTH ? name : null;
+  } catch {
+    return null;
+  }
+}
+
 // what a successful read of each endpoint hands to the browser
-export function shapeProxyResponse(endpoint, data) {
-  return endpoint === "market" ? slimMarketReference(data) : data;
+export function shapeProxyResponse(endpoint, data, params = {}) {
+  if (endpoint === "market") return slimMarketReference(data);
+  if (endpoint === "marketEvidence") return pickModelEvidence(data, params.model);
+  return data;
 }
