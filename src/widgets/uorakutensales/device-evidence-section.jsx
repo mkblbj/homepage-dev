@@ -84,9 +84,23 @@ function EvidenceRow({ row, metric, t }) {
           <Figures figures={row} metric={metric} t={t} />
         </span>
       </span>
-      <span title={row.title} className="truncate text-[11px] text-theme-800 dark:text-theme-100">
-        {row.title}
-      </span>
+      {row.url ? (
+        <a
+          href={row.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={row.title}
+          // the widget sits inside a clickable service card: open the page, not the card
+          onClick={(e) => e.stopPropagation()}
+          className="truncate text-[11px] text-theme-800 underline-offset-2 hover:underline dark:text-theme-100"
+        >
+          {row.title}
+        </a>
+      ) : (
+        <span title={row.title} className="truncate text-[11px] text-theme-800 dark:text-theme-100">
+          {row.title}
+        </span>
+      )}
       <span className="flex flex-wrap items-center gap-1">
         <span className={CHIP}>{deviceChip(row.device, t)}</span>
         {row.style ? (

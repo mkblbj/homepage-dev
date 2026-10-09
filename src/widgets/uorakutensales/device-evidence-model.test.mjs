@@ -45,6 +45,8 @@ test("buildDeviceEvidence keeps the summary, the row count and how each row was 
       shop: "天海",
       itemNumber: "■102-全機種対応",
       title: "iphone17 ケース 手帳型 WE2 WE3 GalaxyA37",
+      // the proxy dropped b2's javascript: page
+      url: null,
       units: 2,
       sales: 1980,
       orders: 1,
@@ -111,4 +113,15 @@ test("rankDeviceEvidence orders the rows by the metric on screen", () => {
     rankDeviceEvidence(pending, "sales").map((r) => r.id),
     ["a1", "d4", "b2", "c3"],
   );
+});
+
+test("a row links to its own product page when it has a web one", () => {
+  const { rows } = ready();
+  const urlOf = (id) => rows.find((r) => r.id === id).url;
+
+  assert.equal(urlOf("c3"), "https://item.rakuten.co.jp/uo3911/ca0510-iphone17");
+  assert.equal(urlOf("d4"), null);
+  // read straight from the server, an unsafe page is still no link
+  const raw = buildDeviceEvidence(ownDeviceEvidence());
+  assert.equal(raw.rows.find((r) => r.id === "b2").url, null);
 });

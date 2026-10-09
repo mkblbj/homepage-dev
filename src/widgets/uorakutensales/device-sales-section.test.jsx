@@ -662,7 +662,8 @@ describe("widgets/uorakutensales/device-sales-section", () => {
       within(title).getByText(/uorakutensales\.styleStandard: uorakutensales\.sourceTitle.*クリア/),
     ).toBeInTheDocument();
     expect(within(unresolved).getByText(/uorakutensales\.ruleMissingStyle/)).toBeInTheDocument();
-    expect(within(title).queryByRole("link")).toBeNull();
+    // a row the title settled has no series example to link
+    expect(within(title).queryByRole("link", { name: /uorakutensales\.ownEvidenceExample/ })).toBeNull();
 
     click("uorakutensales.sortSales");
     expect(evidenceShops(column("case").getByTestId("own-evidence"))).toEqual(["3911", "松田", "hagumi", "天海"]);
@@ -731,5 +732,19 @@ describe("widgets/uorakutensales/device-sales-section", () => {
 
     expect(models("case")).toEqual(["arrows We3", "Galaxy A25", "DIGNO BX3"]);
     expect(column("case").queryByRole("button", { name: "arrows We3" })).toBeNull();
+  });
+  it("opens a product's own page from its title, and leaves rows without a page as text", () => {
+    render(ownBoard({ deviceEvidence: ownEvidence("case:iPhone 17") }));
+    click("uorakutensales.lastMonth");
+
+    const [history, , series, unresolved] = evidenceRows(column("case").getByTestId("own-evidence"));
+    const page = within(history).getByRole("link", { name: "iPhone 17 ケース レザー" });
+    expect(page).toHaveAttribute("href", "https://item.rakuten.co.jp/uo3911/ca0510-iphone17");
+    expect(page).toHaveAttribute("target", "_blank");
+    expect(page).toHaveAttribute("rel", "noopener noreferrer");
+    // the unsafe page was dropped, and d4 has none: their titles stay text
+    expect(within(series).queryByRole("link", { name: "iphone17 ケース 手帳型 WE2 WE3 GalaxyA37" })).toBeNull();
+    expect(within(series).getByText("iphone17 ケース 手帳型 WE2 WE3 GalaxyA37")).toBeInTheDocument();
+    expect(within(unresolved).queryByRole("link")).toBeNull();
   });
 });
