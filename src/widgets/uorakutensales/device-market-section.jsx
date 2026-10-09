@@ -98,6 +98,15 @@ const EVIDENCE_SOURCE = {
   "yahooSearch:ranking": "evidenceYahooSearch",
   "yahooSearch:up": "evidenceYahooRising",
 };
+// Solid colours per source: they read on every page palette (a palette-tinted
+// badge vanishes on a matching background), and 楽天 / Yahoo products / Yahoo
+// searches tell apart at a glance. White text stays above 5:1 on each.
+const SOURCE_TONE = {
+  rakutenProducts: "bg-[#BF0000] text-white",
+  yahooProducts: "bg-[#6001D2] text-white",
+  yahooSearch: "bg-[#1E5FD0] text-white",
+};
+const OTHER_SOURCE_TONE = "bg-slate-600 text-white";
 // a model can have hundreds of pieces; the first ten carry most of its score
 const EVIDENCE_PREVIEW = 10;
 // narrow: the title takes a line of its own; from 42rem it follows the figures
@@ -109,7 +118,7 @@ function EvidenceItem({ item, t }) {
     <li data-testid="evidence-item" className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px]">
       <span
         data-testid="evidence-source"
-        className="shrink-0 rounded border border-theme-300/60 px-1 text-[9.5px] font-bold text-theme-600 dark:border-theme-600/60 dark:text-theme-300"
+        className={`shrink-0 rounded px-1.5 py-px text-[9.5px] font-bold ${SOURCE_TONE[item.group] ?? OTHER_SOURCE_TONE}`}
       >
         {t(`${NS}.${EVIDENCE_SOURCE[`${item.group}:${item.period}`] ?? "evidenceOther"}`)}
       </span>

@@ -20,8 +20,20 @@ const STYLE_SOURCE = {
   unresolved: "sourceUnresolved",
 };
 const RULE = { "missing-case-style": "ruleMissingStyle", "conflicting-product-history": "ruleConflictingHistory" };
-const CHIP =
-  "rounded border border-theme-300/60 px-1.5 py-px text-[10px] font-semibold text-theme-700 dark:border-theme-600/60 dark:text-theme-200";
+// Solid chips that read on every page palette (a palette-tinted chip vanishes
+// on a matching background), coloured by how far each basis can be trusted:
+// green — the order or a verified series said so; blue — read from the title;
+// amber — the same product's earlier title; red — not settled. White text
+// stays above 5:1 on each.
+const CHIP = "rounded px-1.5 py-px text-[10px] font-semibold text-white";
+const DEVICE_TONE = { selection: "bg-emerald-700", title: "bg-[#1E5FD0]" };
+const STYLE_TONE = {
+  "verified-series": "bg-emerald-700",
+  title: "bg-[#1E5FD0]",
+  "same-shop-product-history": "bg-amber-700",
+  unresolved: "bg-rose-700",
+};
+const OTHER_TONE = "bg-slate-600";
 
 // an order's model choice, an SKU attribute, or the title
 function deviceSourceKey(device) {
@@ -102,9 +114,15 @@ function EvidenceRow({ row, metric, t }) {
         </span>
       )}
       <span className="flex flex-wrap items-center gap-1">
-        <span className={CHIP}>{deviceChip(row.device, t)}</span>
+        <span data-testid="own-evidence-chip" className={`${CHIP} ${DEVICE_TONE[row.device.source] ?? OTHER_TONE}`}>
+          {deviceChip(row.device, t)}
+        </span>
         {row.style ? (
-          <span className={CHIP} title={row.style.history ?? undefined}>
+          <span
+            data-testid="own-evidence-chip"
+            className={`${CHIP} ${STYLE_TONE[row.style.source] ?? OTHER_TONE}`}
+            title={row.style.history ?? undefined}
+          >
             {styleChip(row.style, t)}
           </span>
         ) : null}
