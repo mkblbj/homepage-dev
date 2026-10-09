@@ -546,6 +546,19 @@ describe("widgets/uorakutensales/device-sales-section", () => {
     expect(within(items[0]).getByText("リンクの壊れた商品")).toBeInTheDocument();
   });
 
+  it("gives each evidence source its own solid colour, whatever the page palette", () => {
+    renderMarket({ evidence: evidenceFor("iPhone 18 Pro") });
+
+    // 楽天 日次 · Y 検索 · Y トレンド · 楽天 RT · 楽天 RT
+    const tones = within(screen.getByTestId("market-evidence"))
+      .getAllByTestId("evidence-source")
+      .map((badge) => badge.className);
+    expect(new Set(tones.slice(0, 3)).size).toBe(3);
+    expect(tones[3]).toBe(tones[0]);
+    // a palette-tinted badge disappears on a matching background
+    tones.forEach((tone) => expect(tone).not.toMatch(/text-theme-|border-theme-/));
+  });
+
   it("shows ten entries first and the rest on demand", () => {
     const items = Array.from({ length: 12 }, (_, i) => ({
       id: `e${i}`,
