@@ -88,3 +88,16 @@ export function marketRows(reference, ownBoard, metric) {
     return { ...row, own: mine, flag: flagOf(row.rank, mine) };
   });
 }
+
+// What a model's 根拠 panel can show: still loading, failed (the proxy relayed
+// an error, or sent no list), or the model's evidence — most contributing
+// first, as the proxy picked it out. Entries without a title show nothing and
+// drop out; `total` stays the server's count.
+export function buildMarketEvidence(payload) {
+  if (payload == null) return { status: "loading", total: 0, items: [] };
+  if (typeof payload !== "object" || payload.error || !Array.isArray(payload.items)) {
+    return { status: "failed", total: 0, items: [] };
+  }
+  const items = payload.items.filter((item) => item && typeof item === "object" && text(item.title));
+  return { status: "ready", total: measured(payload.total) ?? items.length, items };
+}

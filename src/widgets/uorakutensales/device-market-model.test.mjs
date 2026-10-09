@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildMarketEvidence,
   buildMarketReference,
   MARKET_GAP_TOP,
   MARKET_REFRESH_INTERVAL,
@@ -11,6 +12,7 @@ import {
 } from "./device-market-model.mjs";
 import { buildDeviceSales } from "./device-sales-model.mjs";
 import { dailyDeviceSales, deviceBoard, marketDeviceModels, monthlyDeviceSales } from "./device-sales.fixtures.mjs";
+import { pickModelEvidence } from "./proxy-config.mjs";
 
 // this month's company case board: Pixel 10a 74 · Galaxy A25 66 · iPhone 17 e 50
 function ownCase(bend = () => {}) {
@@ -136,4 +138,38 @@ test("without our board for the scope there are no own figures and no flags", ()
 
   assert.ok(rows.every((r) => r.own === null && r.flag === null));
   assert.deepEqual(marketRows(null, ownCase(), "units"), []);
+});
+
+test("buildMarketEvidence says whether the 根拠 panel is loading, failed or ready", () => {
+  assert.deepEqual(buildMarketEvidence(undefined), { status: "loading", total: 0, items: [] });
+  assert.deepEqual(buildMarketEvidence(null), { status: "loading", total: 0, items: [] });
+  // the proxy relays a failed read as { error }; a payload without items is no list either
+  assert.deepEqual(buildMarketEvidence({ error: { message: "Rakuten sales service error" } }), {
+    status: "failed",
+    total: 0,
+    items: [],
+  });
+  assert.deepEqual(buildMarketEvidence({ model: "iPhone 17" }), { status: "failed", total: 0, items: [] });
+
+  const ready = buildMarketEvidence(pickModelEvidence(marketDeviceModels(), "iPhone 18 Pro"));
+  assert.equal(ready.status, "ready");
+  assert.equal(ready.total, 5);
+  assert.deepEqual(
+    ready.items.map((item) => item.bestRank),
+    [50, 141, 5, 39, 1],
+  );
+});
+
+test("buildMarketEvidence drops entries with nothing to show", () => {
+  const evidence = buildMarketEvidence({
+    model: "iPhone 17",
+    total: 3,
+    items: [{ id: "a", title: "" }, null, { id: "b", title: "iPhone17 ケース" }],
+  });
+
+  assert.deepEqual(
+    evidence.items.map((item) => item.id),
+    ["b"],
+  );
+  assert.equal(evidence.total, 3);
 });
