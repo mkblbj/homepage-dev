@@ -55,10 +55,10 @@ export default async function uoRakutenSalesProxyHandler(req, res) {
   }
 
   // marketEvidence names its model in the proxy's query parameter
-  const params = {};
+  const shape = {};
   if (endpoint === "marketEvidence") {
-    params.model = marketEvidenceModel(req.query.query);
-    if (!params.model) {
+    shape.model = marketEvidenceModel(req.query.query);
+    if (!shape.model) {
       return res.status(400).json({ error: "Missing market model" });
     }
   }
@@ -95,7 +95,7 @@ export default async function uoRakutenSalesProxyHandler(req, res) {
       });
     }
 
-    return res.status(status).json(shapeProxyResponse(endpoint, resultData, params) ?? {});
+    return res.status(status).json(shapeProxyResponse(endpoint, resultData, shape) ?? {});
   } catch (e) {
     logger.error("Error processing Rakuten sales proxy request: %s", e.message);
     return res.status(400).json({ error: e.message });
