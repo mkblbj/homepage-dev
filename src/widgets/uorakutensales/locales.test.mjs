@@ -152,6 +152,7 @@ const REQUIRED_KEYS = [
   "ownEvidenceNone",
   "ownEvidenceMore",
   "ownEvidenceExample",
+  "ownEvidenceExampleTitle",
   "ownEvidenceModel",
   "sourceSelection",
   "sourceSku",
@@ -245,4 +246,10 @@ test("内訳 placeholders are preserved across locales", () => {
     assert.match(ns.ownEvidenceMore, /\{\{count\}\}/, `${locale}.ownEvidenceMore needs {{count}}`);
     assert.match(ns.quoted, /\{\{text\}\}/, `${locale}.quoted needs {{text}}`);
   }
+});
+
+test("the series sample link says it is not the product itself", () => {
+  const ja = loadNamespace("ja");
+  assert.equal(ja.ownEvidenceExample, "シリーズ見本");
+  assert.equal(ja.ownEvidenceExampleTitle, "同じシリーズの見本（この商品ではありません）");
 });

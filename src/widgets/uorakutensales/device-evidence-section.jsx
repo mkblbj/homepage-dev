@@ -113,6 +113,8 @@ function EvidenceRow({ row, metric, t }) {
             href={row.style.example}
             target="_blank"
             rel="noopener noreferrer"
+            // another product of the same series, not this one
+            title={t(`${NS}.ownEvidenceExampleTitle`)}
             // the widget sits inside a clickable service card: open the page, not the card
             onClick={(e) => e.stopPropagation()}
             className="text-[10px] font-semibold text-sky-700 underline-offset-2 hover:underline dark:text-sky-200"
