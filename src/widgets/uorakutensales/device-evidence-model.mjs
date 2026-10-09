@@ -88,6 +88,8 @@ export function buildDeviceEvidence(payload) {
       shop: text(row.shopName),
       itemNumber: text(row.itemNumber),
       title: text(row.title),
+      // the product's own public page, when it has one
+      url: webLink(row.itemUrl),
       ...figuresOf(row),
       device: deviceBasis(row.deviceEvidence),
       style: styleBasis(row),

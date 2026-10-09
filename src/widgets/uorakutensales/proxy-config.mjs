@@ -211,14 +211,15 @@ export function deviceEvidenceQuery(query) {
   return { ...search, page: "1", pageSize: EVIDENCE_PAGE_SIZE };
 }
 
-// The 内訳 list never charts a product's days, and an example link is kept
-// only when it is a public Rakuten / Yahoo page. Not a list → untouched.
+// The 内訳 list never charts a product's days, and a product page or example
+// link is kept only when it is a public Rakuten / Yahoo page. Not a list →
+// untouched.
 function slimDeviceEvidence(data) {
   if (!data || typeof data !== "object" || !Array.isArray(data.evidence)) return data;
   return {
     ...data,
     evidence: data.evidence.map((row) => {
-      const copy = { ...row };
+      const copy = { ...row, itemUrl: linkOf(row.itemUrl) };
       delete copy.daily;
       const style = copy.caseStyleEvidence;
       if (style && typeof style === "object") {

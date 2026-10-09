@@ -529,7 +529,8 @@ export function marketDeviceModels() {
 // sends it: one row per product and recognition basis, units desc, with daily
 // figures — a title / title row, a selection / verified-series row (one safe
 // and one unsafe example link), an SKU / product-history row and an
-// unresolved-style row
+// unresolved-style row. Each row names its product page (itemUrl); b2's is
+// unsafe and d4 has none, so the link guards have something to catch.
 export function ownDeviceEvidence() {
   const day = (date, unitsSold, salesYen, orderCount) => ({
     date,
@@ -538,10 +539,18 @@ export function ownDeviceEvidence() {
     orderCount,
     metricsReady: true,
   });
+  const pages = {
+    c3: ["ca0510-iphone17", "https://item.rakuten.co.jp/uo3911/ca0510-iphone17"],
+    a1: ["rs-q1cv0901pc-iphone17", "https://item.rakuten.co.jp/matsuda-shop/rs-q1cv0901pc-iphone17"],
+    b2: ["102-zenkishu", "javascript:alert(2)"],
+    d4: ["hg-77-iphone17", null],
+  };
   const row = (id, shopName, itemNumber, title, caseStyle, [unitsSold, salesYen, orderCount], evidence, daily) => ({
     id,
     shopName,
     itemNumber,
+    itemManagementNumber: pages[id][0],
+    itemUrl: pages[id][1],
     title,
     type: "case",
     caseStyle,

@@ -280,3 +280,12 @@ test("shapeProxyResponse drops the daily figures and unsafe example links from d
   assert.equal(raw.evidence[1].daily.length, 2);
   assert.equal(raw.evidence[2].caseStyleEvidence.references.length, 2);
 });
+
+test("shapeProxyResponse keeps a device evidence row's own page only when it is a public Rakuten / Yahoo page", () => {
+  const slim = shapeProxyResponse("devicesEvidence", ownDeviceEvidence());
+  const pageOf = (id) => slim.evidence.find((row) => row.id === id).itemUrl;
+
+  assert.equal(pageOf("c3"), "https://item.rakuten.co.jp/uo3911/ca0510-iphone17");
+  assert.equal(pageOf("b2"), null);
+  assert.equal(pageOf("d4"), null);
+});
