@@ -514,6 +514,13 @@ test("buildShopColors spreads a distinct hue per shop, order-independent", () =>
   assert.equal(new Set(Object.values(a)).size, 3); // every shop clearly distinguishable
 });
 
+test("buildShopColors gives today's nine shops nine colours", () => {
+  const shops = ["3911", "0406", "松田", "松武", "天海", "hagumi", "allcase", "kurumu", "aiashop"];
+  const colors = buildShopColors(shops);
+
+  assert.equal(new Set(Object.values(colors)).size, shops.length);
+});
+
 test("buildShopColors covers a full shop set without repeating a hue", () => {
   const shops = ["3911", "0406", "松田", "松武", "天海", "hagumi", "allcase"];
   const colors = buildShopColors(shops);
