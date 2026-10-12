@@ -91,11 +91,13 @@ const ownBoard = ({
   monthly = monthlyDeviceSales(),
   deviceEvidence = null,
   onDeviceEvidence = () => {},
+  shopColors = {},
 } = {}) => (
   <DeviceSalesSection
     devices={buildDeviceSales(daily, monthly)}
     deviceEvidence={deviceEvidence}
     onDeviceEvidence={onDeviceEvidence}
+    shopColors={shopColors}
     cardCls=""
     t={t}
   />
@@ -704,6 +706,24 @@ describe("widgets/uorakutensales/device-sales-section", () => {
     [history, title, series, unresolved]
       .flat()
       .forEach((tone) => expect(tone).not.toMatch(/text-theme-|border-theme-/));
+  });
+
+  it("labels each product's shop solidly, in the colour the widget gives that shop", () => {
+    render(
+      ownBoard({ deviceEvidence: ownEvidence("case:iPhone 17"), shopColors: { 3911: "#E0A878", 松田: "#7FB2E8" } }),
+    );
+    click("uorakutensales.lastMonth");
+
+    const badges = evidenceRows(column("case").getByTestId("own-evidence")).map((li) =>
+      within(li).getByTestId("own-evidence-shop"),
+    );
+    expect(badges.map((badge) => badge.textContent)).toEqual(["3911", "松田", "天海", "hagumi"]);
+    expect(badges[0]).toHaveStyle({ backgroundColor: "#E0A878" });
+    expect(badges[1]).toHaveStyle({ backgroundColor: "#7FB2E8" });
+    // a shop the widget has no colour for gets the shared fallback
+    expect(badges[2]).toHaveStyle({ backgroundColor: "#9AA6B8" });
+    // the palette is light: dark text reads on every one, whatever the page palette
+    badges.forEach((badge) => expect(badge.className).not.toMatch(/text-theme-/));
   });
 
   it("shows ten products first and the rest on demand", () => {

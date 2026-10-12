@@ -9,6 +9,7 @@ import { useState } from "react";
 import { rankDeviceEvidence } from "./device-evidence-model.mjs";
 import { DEVICE_METRICS } from "./device-sales-model.mjs";
 import { metricText, MUTED, NS, press, VALUE_TONE } from "./device-sales-row";
+import { FALLBACK_SHOP_COLOR } from "./sales-model.mjs";
 
 // the first products carry most of a model; the rest open on demand
 const PREVIEW = 10;
@@ -79,14 +80,19 @@ function Figures({ figures, metric, t }) {
   ));
 }
 
-function EvidenceRow({ row, metric, t }) {
+function EvidenceRow({ row, metric, shopColor, t }) {
   return (
     <li
       data-testid="own-evidence-row"
       className="flex min-w-0 flex-col gap-0.5 rounded-md px-1.5 py-1 hover:bg-theme-300/20 dark:hover:bg-white/[0.04]"
     >
       <span className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-[11px]">
-        <span data-testid="own-evidence-shop" className="shrink-0 font-bold text-theme-900 dark:text-theme-50">
+        {/* the shop's own colour from the widget's charts; the palette is light, so the text is dark */}
+        <span
+          data-testid="own-evidence-shop"
+          className="shrink-0 rounded px-1.5 py-px text-[10.5px] font-bold text-slate-900"
+          style={{ backgroundColor: shopColor }}
+        >
           {row.shop}
         </span>
         <span title={row.itemNumber} className={`min-w-0 truncate font-mono text-[10px] ${MUTED}`}>
@@ -145,7 +151,7 @@ function EvidenceRow({ row, metric, t }) {
   );
 }
 
-export default function OwnEvidence({ evidence, metric, t }) {
+export default function OwnEvidence({ evidence, metric, shopColors = {}, t }) {
   const [all, setAll] = useState(false);
   const ready = evidence.status === "ready" && evidence.rows.length > 0;
   let message = null;
@@ -184,7 +190,13 @@ export default function OwnEvidence({ evidence, metric, t }) {
           </span>
           <ol className="flex flex-col gap-1">
             {shown.map((row) => (
-              <EvidenceRow key={row.id} row={row} metric={metric} t={t} />
+              <EvidenceRow
+                key={row.id}
+                row={row}
+                metric={metric}
+                shopColor={shopColors[row.shop] ?? FALLBACK_SHOP_COLOR}
+                t={t}
+              />
             ))}
           </ol>
           {ranked.length > PREVIEW ? (
