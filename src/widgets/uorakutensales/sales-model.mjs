@@ -376,6 +376,9 @@ const SHOP_PALETTE = Object.freeze([
   "#E295B4",
   "#9AA6B8",
   "#B0C97E",
+  // added once the company passed eight shops: appended, so the first eight keep their colours
+  "#7CCFD8",
+  "#D9CF7E",
 ]);
 export const FALLBACK_SHOP_COLOR = "#9AA6B8";
 

@@ -1788,6 +1788,7 @@ export default function Component({ service }) {
             onEvidence={setEvidenceModel}
             deviceEvidence={deviceEvidence}
             onDeviceEvidence={setDeviceEvidenceQuery}
+            shopColors={shopColors}
             cardCls={cardCls}
             t={t}
           />

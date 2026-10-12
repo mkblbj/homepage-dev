@@ -295,6 +295,7 @@ function CategoryColumn({
   spacer = false,
   deviceEvidence = null,
   onEvidenceRow = () => {},
+  shopColors = {},
 }) {
   // the chosen case style's rows, total and meta; last month's marks compare
   // within the same style, or not at all
@@ -336,7 +337,9 @@ function CategoryColumn({
                     onEvidence={() => onEvidenceRow(row, open)}
                     evidenceOpen={open}
                   />
-                  {open ? <OwnEvidence evidence={deviceEvidence} metric={metric} t={t} /> : null}
+                  {open ? (
+                    <OwnEvidence evidence={deviceEvidence} metric={metric} shopColors={shopColors} t={t} />
+                  ) : null}
                 </Fragment>
               );
             })}
@@ -415,6 +418,8 @@ export default function DeviceSalesSection({
   onEvidence = () => {},
   deviceEvidence = null,
   onDeviceEvidence = () => {},
+  // the widget's colour per shop, shared with its charts
+  shopColors = {},
   cardCls,
   t,
 }) {
@@ -657,6 +662,7 @@ export default function DeviceSalesSection({
                   spacer={spacer}
                   deviceEvidence={deviceEvidence}
                   onEvidenceRow={toggleEvidence(type)}
+                  shopColors={shopColors}
                   visible={tab === type}
                   step={stepOf(type)}
                   onStep={setStepOf(type)}
