@@ -34,6 +34,7 @@ test("daytime: output known, today's shipping not yet tallied, tomorrow undecide
   assert.equal(v.updatedAt, "2026-10-16 13:14:32");
   assert.equal(v.output.total, 1100);
   assert.equal(v.output.yesterdayTotal, 844);
+  assert.equal(v.output.yesterdayDate, "2026-10-15");
   assert.equal(v.output.date, "2026-10-16");
   assert.equal(v.shipping.state, "pending");
   assert.equal(v.shipping.total, null);

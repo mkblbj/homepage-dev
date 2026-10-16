@@ -4,7 +4,7 @@ import { buildTodayAttendanceModel } from "../../widgets/uoattendance/attendance
 
 import CourierPanel from "./courier-panel";
 import FooterBar from "./footer-bar";
-import { FRESHNESS } from "./freshness.mjs";
+import { FRESHNESS, worstState } from "./freshness.mjs";
 import { OutputCard, ShippingCard, TomorrowCard } from "./kpi-cards";
 import { AttentionPanel, OrdersPanel } from "./rakuten-panels";
 import { buildAttentionView, buildOrdersView } from "./rakuten-model.mjs";
@@ -73,11 +73,16 @@ export default function Board({ sources }) {
     [todaySchedule.data, actual.data, takada.data],
   );
   const timeline = useMemo(() => buildShiftTimeline({ todayModel, nowMinutes: now.minutes }), [todayModel, now.minutes]);
+  // Punches and the roster are two halves of one panel: without the roster every person would
+  // read as 予定外 and the planned count as 0, so the panel takes the worse of the two.
   const attendanceStamp =
     scheduleWidget && todaySchedule.lastOkAt != null && actual.lastOkAt != null
       ? Math.min(todaySchedule.lastOkAt, actual.lastOkAt)
       : actual.lastOkAt;
-  const attendanceState = sourceState(actual, attendanceStamp, FRESHNESS.attendance, nowMs);
+  const attendanceState = worstState(
+    sourceState(actual, actual.lastOkAt, FRESHNESS.attendance, nowMs),
+    sourceState(todaySchedule, todaySchedule.lastOkAt, FRESHNESS.attendance, nowMs),
+  );
 
   const tomorrowView = useMemo(
     () => buildTomorrowShifts(tomorrowSchedule.data?.message?.tomorrow ?? tomorrowSchedule.data?.message ?? null),
@@ -93,14 +98,17 @@ export default function Board({ sources }) {
     if (!weatherSource.data) return null;
     return sources.weather ? buildWeatherViewFromWeatherApi(weatherSource.data) : buildWeatherView(weatherSource.data);
   }, [sources.weather, weatherSource.data]);
-  const aiState = ai.data?.state === "stale" ? "delayed" : sourceState(ai, ai.lastOkAt, FRESHNESS.aiSummary, nowMs);
+  // Judged by when the summary was generated; a service with no summary yet is simply quiet.
+  const aiStamp = parseJstStamp(ai.data?.generatedAtJST) ?? (ai.data && !ai.data.summary ? ai.lastOkAt : null);
+  const aiFreshness = sourceState(ai, aiStamp, FRESHNESS.aiSummary, nowMs);
+  const aiState = ai.data?.state === "stale" ? worstState(aiFreshness, "delayed") : aiFreshness;
   const segments = useMemo(
     () =>
       buildTickerSegments({
         weather: weatherState === "unavailable" ? null : weatherView,
-        ai: ai.data,
+        ai: aiState === "unavailable" ? null : ai.data,
       }),
-    [weatherState, weatherView, ai.data],
+    [weatherState, weatherView, aiState, ai.data],
   );
 
   const statuses = [
@@ -109,7 +117,7 @@ export default function Board({ sources }) {
     { name: "未対応", state: attentionView?.stale ? "delayed" : attentionState, detail: lateDetail(attentionState, attention.lastOkAt, nowMs) },
     { name: "勤怠", state: attendanceState, detail: lateDetail(attendanceState, attendanceStamp, nowMs) },
     { name: "天気", state: weatherState, detail: lateDetail(weatherState, weatherSource.lastOkAt, nowMs) },
-    { name: "AI サマリー", state: aiState, detail: lateDetail(aiState, ai.lastOkAt, nowMs) },
+    { name: "AI サマリー", state: aiState, detail: lateDetail(aiState, aiStamp, nowMs) },
   ];
 
   return (

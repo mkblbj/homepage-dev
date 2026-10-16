@@ -380,7 +380,8 @@
 
 .compareRow {
   display: grid;
-  grid-template-columns: 56px minmax(0, 1fr) 76px;
+  grid-template-columns: 152px minmax(0, 1fr) 76px;
+  white-space: nowrap;
   align-items: center;
   gap: 12px;
   font-size: 20px;

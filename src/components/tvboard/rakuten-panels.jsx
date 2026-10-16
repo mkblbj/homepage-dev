@@ -118,6 +118,10 @@ export function AttentionPanel({ view, state, stampMs, lastOkAt }) {
               </span>
             ) : null}
           </div>
+        ) : view.partial ? (
+          <span className={styles.muted} style={{ fontSize: 22 }}>
+            一部の件数が不明です
+          </span>
         ) : (
           <span style={{ display: "inline-flex", alignItems: "center", gap: 10, fontSize: 26, fontWeight: 700, color: "#34D399" }}>
             <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#34D399" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

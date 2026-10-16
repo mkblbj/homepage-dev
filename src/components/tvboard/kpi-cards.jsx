@@ -13,7 +13,7 @@ function Body({ state, lastOkAt, children }) {
 }
 
 export function OutputCard({ view, state, stampMs, lastOkAt }) {
-  const { total, yesterdayTotal, date } = view.output;
+  const { total, yesterdayTotal, yesterdayDate, date } = view.output;
   const max = Math.max(total ?? 0, yesterdayTotal ?? 0);
   const width = (value) => (max > 0 && value != null ? `${(value / max) * 100}%` : "0%");
 
@@ -33,14 +33,14 @@ export function OutputCard({ view, state, stampMs, lastOkAt }) {
         </div>
         <div className={styles.compareRows}>
           <div className={styles.compareRow}>
-            <span>昨日</span>
+            <span>昨日 {formatMd(yesterdayDate)}</span>
             <div className={styles.compareTrack}>
               <div className={styles.compareFill} style={{ width: width(yesterdayTotal), background: "#5B6B7A" }} />
             </div>
             <span className={styles.compareValue}>{yesterdayTotal == null ? "—" : yesterdayTotal.toLocaleString("ja-JP")}</span>
           </div>
           <div className={classNames(styles.compareRow, styles.compareRowToday)}>
-            <span>今日</span>
+            <span>今日 {formatMd(date)}</span>
             <div className={styles.compareTrack}>
               <div className={styles.compareFill} style={{ width: width(total), background: "#4C93E0" }} />
             </div>
@@ -79,6 +79,10 @@ export function ShippingCard({ view, state, stampMs, lastOkAt }) {
               {shipping.firstAt ? <span className={styles.muted} style={{ fontSize: 20 }}>{shipping.firstAt} から</span> : null}
             </div>
           </>
+        ) : shipping.state === "unknown" ? (
+          <span className={styles.muted} style={{ fontSize: 26 }}>
+            今日の出荷データがありません
+          </span>
         ) : (
           <div className={styles.pendingRow}>
             <span className={styles.pendingBadge}>計上前</span>

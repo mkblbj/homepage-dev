@@ -134,6 +134,22 @@ test("未対応 shows at most five shops and counts the rest", () => {
   assert.equal(a.moreCount, 2);
 });
 
+test("an unknown review count makes the total partial, never a clean zero", () => {
+  const unknownReviews = buildAttentionView(
+    {
+      ...attention,
+      summary: { pendingOrderCount: 0, unansweredInquiryCount: 0, unrepliedReviewCount: null },
+      shops: [],
+    },
+    logos,
+  );
+  assert.equal(unknownReviews.partial, true);
+  const allUnknown = buildAttentionView({ ...attention, summary: {}, shops: [] }, logos);
+  assert.equal(allUnknown.total, null);
+  assert.equal(allUnknown.partial, true);
+  assert.equal(buildAttentionView(attention, logos).partial, false);
+});
+
 test("a stale source is reported; an unreadable payload is null", () => {
   const stale = buildAttentionView({ ...attention, sources: { mainMenu: { stale: true } } }, logos);
   assert.equal(stale.stale, true);
