@@ -9,8 +9,18 @@ export const FRESHNESS = {
   tomorrowShift: { poll: 15 * 60e3, delay: 15 * 60e3, hide: 60 * 60e3 },
   logos: { poll: 86400e3 },
   weather: { poll: 30 * 60e3, delay: 3 * 3600e3, hide: 6 * 3600e3 },
-  aiSummary: { poll: 5 * 60e3 },
+  // The summary is regenerated hourly; judged by its own generatedAtJST, not by our polls.
+  aiSummary: { poll: 5 * 60e3, delay: 2 * 3600e3, hide: 6 * 3600e3 },
 };
+
+// Most severe first; "unconfigured" never outweighs a part that is configured.
+const SEVERITY = ["unavailable", "loading", "delayed", "ok"];
+
+export function worstState(...states) {
+  const configured = states.filter((state) => state !== "unconfigured");
+  if (configured.length === 0) return "unconfigured";
+  return SEVERITY.find((state) => configured.includes(state)) ?? "ok";
+}
 
 export function classifyFreshness({ stampMs, nowMs, delay = Infinity, hide = Infinity }) {
   if (stampMs == null || !Number.isFinite(stampMs)) return "unavailable";

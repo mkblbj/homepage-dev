@@ -37,7 +37,7 @@ function courierItems(section) {
 
 const UNKNOWN = {
   updatedAt: null,
-  output: { date: null, total: null, yesterdayTotal: null },
+  output: { date: null, total: null, yesterdayTotal: null, yesterdayDate: null },
   shipping: {
     date: null,
     state: "unknown",
@@ -76,6 +76,7 @@ export function buildShippingView(data) {
       date: data.today_output?.date ?? null,
       total: count(data.today_output?.total_quantity),
       yesterdayTotal: count(data.yesterday_output?.total_quantity),
+      yesterdayDate: data.yesterday_output?.date ?? null,
     },
     shipping: {
       date: todayShipping?.date ?? null,

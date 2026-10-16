@@ -145,7 +145,8 @@ export function TomorrowShifts({ view, state, photoBase, lastOkAt }) {
   if (state === "unconfigured") body = <Unconfigured />;
   else if (state === "loading") body = <Loading />;
   else if (state === "unavailable") body = <Unavailable what="シフト" lastOkAt={lastOkAt} compact />;
-  else if (!view.count) body = <div className={styles.loading}>予定なし</div>;
+  else if (view.count === null) body = <div className={styles.loading}>データがありません</div>;
+  else if (view.count === 0) body = <div className={styles.loading}>予定なし</div>;
   else {
     body = (
       <div className={styles.tomorrowGrid}>

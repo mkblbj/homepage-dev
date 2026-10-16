@@ -21,6 +21,7 @@ export default function FooterBar({ clock, axis, segments, statuses }) {
   const now = jstNow(clock);
   const progress = Math.min(1, Math.max(0, (now.minutes - axis.start) / (axis.end - axis.start)));
   const problems = statuses.filter((status) => status.state === "delayed" || status.state === "unavailable");
+  const loading = statuses.some((status) => status.state === "loading");
 
   return (
     <footer className={styles.footer}>
@@ -50,7 +51,11 @@ export default function FooterBar({ clock, axis, segments, statuses }) {
       </div>
 
       <div className={styles.statusList}>
-        {problems.length === 0 ? (
+        {problems.length === 0 && loading ? (
+          <span className={styles.statusItem} style={{ color: "#7D8A96" }}>
+            読み込み中…
+          </span>
+        ) : problems.length === 0 ? (
           <span className={styles.statusItem} style={{ color: "#34D399" }}>
             <span className={styles.statusDot} style={{ background: "#34D399" }} />
             データ正常

@@ -82,6 +82,8 @@ export function buildAttentionView(data, logos) {
   const active = model.activeShops;
   return {
     total: model.total,
+    // Some count unknown: the total is a floor, so the board must not call it "なし".
+    partial: model.total === null || model.totalPartial || model.pending === null || model.inquiry === null,
     inquiries: model.inquiry,
     reviews: model.reviews,
     pending: model.pending,
