@@ -3,7 +3,15 @@ import test from "node:test";
 
 import { buildTodayAttendanceModel } from "../../widgets/uoattendance/attendance-model.mjs";
 
-import { barGeometry, buildShiftTimeline, buildTomorrowShifts, initialOf, layoutRows, surnameOf } from "./shift-model.mjs";
+import {
+  barGeometry,
+  buildShiftTimeline,
+  buildTomorrowShifts,
+  compactShift,
+  initialOf,
+  layoutRows,
+  surnameOf,
+} from "./shift-model.mjs";
 
 const emp = (name, shift, status) => ({
   employee: name,
@@ -89,10 +97,18 @@ test("bar geometry is a share of the axis; the past share is within the bar", ()
 });
 
 test("rows shrink to fit, then page", () => {
-  assert.deepEqual(layoutRows(11), { rowHeight: 42, perPage: 11, pages: 1 });
-  assert.deepEqual(layoutRows(13), { rowHeight: 37, perPage: 13, pages: 1 });
-  assert.deepEqual(layoutRows(20), { rowHeight: 32, perPage: 15, pages: 2 });
+  assert.deepEqual(layoutRows(10), { rowHeight: 42, perPage: 10, pages: 1 });
+  assert.deepEqual(layoutRows(11), { rowHeight: 38, perPage: 11, pages: 1 });
+  assert.deepEqual(layoutRows(13), { rowHeight: 32, perPage: 13, pages: 1 });
+  assert.deepEqual(layoutRows(20), { rowHeight: 32, perPage: 13, pages: 2 });
   assert.deepEqual(layoutRows(0), { rowHeight: 42, perPage: 1, pages: 1 });
+});
+
+test("shift labels drop leading zeros and :00 so they fit one line", () => {
+  assert.equal(compactShift("09:30-17:00"), "9:30-17");
+  assert.equal(compactShift("13:00-18:00"), "13-18");
+  assert.equal(compactShift("9-18"), "9-18");
+  assert.equal(compactShift("未設定"), "未設定");
 });
 
 test("names show the family name only", () => {

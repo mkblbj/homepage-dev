@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildTickerSegments, buildWeatherView, weatherLabelJa } from "./ticker-model.mjs";
+import { buildTickerSegments, buildWeatherView, buildWeatherViewFromWeatherApi, weatherLabelJa } from "./ticker-model.mjs";
 
 const payload = {
   label: "神戸",
@@ -32,6 +32,24 @@ test("today and tomorrow come out rounded", () => {
   assert.deepEqual(w.tomorrow, { text: "くもり", max: 21, min: 15 });
   assert.equal(buildWeatherView({ error: "x" }), null);
   assert.equal(buildWeatherView(null), null);
+});
+
+test("the homepage's own WeatherAPI forecast (kobeweather) reads the same way", () => {
+  const weatherApi = {
+    location: { name: "Kobe" },
+    forecast: {
+      forecastday: [
+        { date: "2026-10-16", day: { maxtemp_c: 23.4, mintemp_c: 15.6, daily_chance_of_rain: 10, condition: { text: "晴れ" } } },
+        { date: "2026-10-17", day: { maxtemp_c: 20.6, mintemp_c: 14.9, daily_chance_of_rain: 60, condition: { text: "所により曇り" } } },
+      ],
+    },
+  };
+  const w = buildWeatherViewFromWeatherApi(weatherApi);
+  assert.equal(w.label, "神戸");
+  assert.deepEqual(w.today, { text: "晴れ", max: 23, min: 16, pop: 10 });
+  assert.deepEqual(w.tomorrow, { text: "所により曇り", max: 21, min: 15 });
+  assert.equal(buildWeatherViewFromWeatherApi({ error: "x" }), null);
+  assert.equal(buildWeatherViewFromWeatherApi({ forecast: { forecastday: [] } }), null);
 });
 
 const ai = {

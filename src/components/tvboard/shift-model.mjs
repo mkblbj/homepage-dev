@@ -13,6 +13,13 @@ export function surnameOf(name) {
   return text ? text.split(/\s+/)[0] : "";
 }
 
+// "09:30-17:00" → "9:30-17": the TV has room for six people across, not for zeros.
+export function compactShift(text) {
+  return String(text ?? "").replace(/\b0?(\d{1,2})(?::(\d{2}))?\b/g, (match, hour, minute) =>
+    minute && minute !== "00" ? `${Number(hour)}:${minute}` : String(Number(hour)),
+  );
+}
+
 export function initialOf(name) {
   return Array.from(surnameOf(name))[0] || "";
 }
@@ -116,8 +123,9 @@ export function barGeometry(row, axis, nowMinutes) {
   return { leftPct, widthPct, pastPct, overPct };
 }
 
-// The rows area holds 488px: 42px rows, squeezed down to 32px, and only then split into pages.
-export function layoutRows(count, { available = 488, maxRow = 42, minRow = 32 } = {}) {
+// The rows area holds 428px (right column 904 − tomorrow 290 − gap 24 − padding 44 − header,
+// legend and axis 118): 42px rows, squeezed down to 32px, and only then split into pages.
+export function layoutRows(count, { available = 428, maxRow = 42, minRow = 32 } = {}) {
   if (count <= 0) return { rowHeight: maxRow, perPage: 1, pages: 1 };
   if (count * maxRow <= available) return { rowHeight: maxRow, perPage: count, pages: 1 };
   const squeezed = Math.floor(available / count);
@@ -139,7 +147,7 @@ export function buildTomorrowShifts(snapshot) {
       name: surnameOf(employee.employee_name),
       initial: initialOf(employee.employee_name),
       image: employee.image || null,
-      shift: employee.shiftText,
+      shift: compactShift(employee.shiftText),
     })),
   };
 }

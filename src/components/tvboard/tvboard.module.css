@@ -1,0 +1,1222 @@
+/* 工場 TV 出荷ボード — drawn at 1920×1080; values follow the 決定案 artboard (Final.dc.html). */
+
+.stage {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #000;
+  cursor: none;
+  z-index: 50;
+}
+
+.canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1920px;
+  height: 1080px;
+  transform-origin: 0 0;
+}
+
+.board {
+  --jp: "BIZ UDPGothic", "Noto Sans SC", "Hiragino Sans", sans-serif;
+  --num: "Barlow", "BIZ UDPGothic", "Noto Sans SC", sans-serif;
+  --ink: #f1f4f6;
+  --ink-2: #c9d2da;
+  --ink-3: #a9b5c0;
+  --ink-4: #7d8a96;
+  --line: #26313b;
+  --track: #222b34;
+  --blue: #4c93e0;
+  --sky: #7dd3fc;
+  --ok: #34d399;
+  --warn: #fbbf24;
+  --warn-ink: #fcd34d;
+  --bad: #f87171;
+  --bad-ink: #fca5a5;
+
+  position: relative;
+  width: 1920px;
+  height: 1080px;
+  box-sizing: border-box;
+  padding: 28px 32px;
+  overflow: hidden;
+  background: radial-gradient(1200px 600px at 20% -10%, #14202b 0%, #0b1015 60%);
+  color: var(--ink);
+  font-family: var(--jp);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 460px;
+  grid-template-rows: minmax(0, 1fr) 96px;
+  gap: 24px;
+}
+
+.board h2 {
+  margin: 0;
+  font-weight: 700;
+}
+
+.left {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.right {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-height: 0;
+}
+
+.kpiRow {
+  display: grid;
+  grid-template-columns: 500px minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
+  height: 320px;
+  flex: none;
+}
+
+.midRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 500px;
+  gap: 24px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.midSide {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-height: 0;
+}
+
+/* ---------- cards ---------- */
+
+.card {
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 0;
+  background: linear-gradient(160deg, #18232d, #121a21);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  display: flex;
+  flex-direction: column;
+  animation: rise 0.8s ease-out both;
+}
+
+.kpiCard {
+  padding: 24px 30px 20px;
+  justify-content: space-between;
+}
+
+.panel {
+  padding: 22px 28px 20px;
+}
+
+.delayed {
+  border: 2px solid rgba(251, 191, 36, 0.6);
+}
+
+.unavailable {
+  border: 2px solid rgba(248, 113, 113, 0.7);
+}
+
+.amberCard {
+  background: linear-gradient(160deg, #241e12, #17140e);
+  border: 2px solid rgba(251, 191, 36, 0.5);
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.cardTitle {
+  font-size: 32px;
+}
+
+.panelTitle {
+  font-size: 30px;
+}
+
+.cardDate {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.sweep {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 30%;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--sky), transparent);
+  animation: sweep 9s ease-in-out infinite;
+}
+
+/* ---------- small parts ---------- */
+
+.num {
+  font-family: var(--num);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.unit {
+  font-weight: 700;
+  color: var(--ink-3);
+}
+
+.muted {
+  color: var(--ink-3);
+}
+
+.stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 20px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.stampLate {
+  padding: 2px 10px;
+  border-radius: 8px;
+  background: rgba(251, 191, 36, 0.14);
+  color: var(--warn-ink);
+  font-weight: 700;
+}
+
+.dot {
+  position: relative;
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  flex: none;
+}
+
+.dot::before,
+.dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--ok);
+}
+
+.dot::before {
+  animation: ping 2s ease-out infinite;
+}
+
+.dotWarn::before,
+.dotWarn::after {
+  background: var(--warn);
+}
+
+.dotWarn::before {
+  animation: none;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 8px;
+  font-size: 22px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.pillOk {
+  background: rgba(52, 211, 153, 0.16);
+  border: 2px solid rgba(52, 211, 153, 0.55);
+  color: #6ee7b7;
+}
+
+.pillBad {
+  background: rgba(248, 113, 113, 0.16);
+  border: 2px solid rgba(248, 113, 113, 0.6);
+  color: var(--bad-ink);
+}
+
+.chipOutline {
+  padding: 4px 14px;
+  border-radius: 999px;
+  border: 2px solid var(--ink-3);
+  font-size: 20px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.chipSolid {
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #0b1015;
+  font-size: 20px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.unavailableBlock {
+  margin: auto 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.unavailableTitle {
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--bad-ink);
+}
+
+.unavailableNote {
+  font-size: 22px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+.loading {
+  margin: auto 0;
+  text-align: center;
+  font-size: 24px;
+  color: var(--ink-4);
+}
+
+/* ---------- rolling numbers ---------- */
+
+.rolling {
+  position: relative;
+  display: inline-flex;
+  align-items: flex-start;
+  font-family: var(--num);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+  transition:
+    color 0.6s,
+    text-shadow 0.6s;
+}
+
+.rolling[data-flash="true"][data-tone="blue"] {
+  color: #bae6fd;
+  text-shadow: 0 0 28px rgba(125, 211, 252, 0.6);
+}
+
+.rolling[data-flash="true"][data-tone="amber"] {
+  color: #fde68a;
+  text-shadow: 0 0 24px rgba(251, 191, 36, 0.55);
+}
+
+.unknown {
+  color: var(--ink-4);
+}
+
+.digitWindow {
+  display: inline-block;
+  height: 1em;
+  overflow: hidden;
+}
+
+.digitColumn {
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.9s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.digitColumn > span {
+  display: block;
+  height: 1em;
+}
+
+.separator {
+  display: inline-block;
+}
+
+.delta {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  margin-left: 14px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(125, 211, 252, 0.16);
+  border: 2px solid rgba(125, 211, 252, 0.6);
+  color: #bae6fd;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  animation: deltaUp 1.8s ease-out both;
+}
+
+/* ---------- 今日の出力 ---------- */
+
+.bigNumberRow {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.compareRows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.compareRow {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) 76px;
+  align-items: center;
+  gap: 12px;
+  font-size: 20px;
+  color: var(--ink-3);
+}
+
+.compareRowToday {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.compareTrack {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--track);
+  overflow: hidden;
+}
+
+.compareFill {
+  height: 100%;
+  border-radius: 5px;
+  transform-origin: left;
+  animation: growX 1.4s 0.2s ease-out both;
+  transition: width 0.9s;
+}
+
+.compareValue {
+  text-align: right;
+  font-family: var(--num);
+  font-weight: 600;
+  font-size: 24px;
+}
+
+.cardFoot {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ---------- 今日の出荷 ---------- */
+
+.pendingRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.pendingBadge {
+  width: 76px;
+  height: 76px;
+  flex: none;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 4px dashed #4a5866;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ink-3);
+}
+
+.pendingText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.referenceBox {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 2px dashed #34414d;
+}
+
+/* ---------- 明日の予定 ---------- */
+
+.stepper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 6px;
+}
+
+.stepperLine {
+  position: absolute;
+  left: 22px;
+  right: 22px;
+  top: 15px;
+  height: 3px;
+  background: #34414d;
+}
+
+.step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: 22px;
+  color: var(--ink-4);
+}
+
+.stepDot {
+  display: block;
+  width: 32px;
+  height: 32px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: #121a21;
+  border: 3px solid #4a5866;
+}
+
+.stepCurrent {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.stepCurrent .stepDot {
+  background: var(--ink-2);
+  border-color: var(--ink-2);
+  animation: glow 2.4s ease-in-out infinite;
+}
+
+/* ---------- 楽天の注文 ---------- */
+
+.ordersTable {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: 24px;
+  row-gap: 4px;
+  align-items: center;
+}
+
+.ordersColHead {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--ink-2);
+}
+
+.ordersColHead span {
+  margin-left: 6px;
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--ink-3);
+}
+
+.ordersRowHead {
+  font-size: 30px;
+  font-weight: 700;
+}
+
+.ordersRowHead span {
+  margin-left: 8px;
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--ink-3);
+}
+
+.ordersShopHead {
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ink-3);
+}
+
+.ordersShopHead small {
+  font-size: 20px;
+  font-weight: 400;
+  color: var(--ink-4);
+}
+
+.shopTiles {
+  margin-top: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.shopTile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.logo {
+  width: 72px;
+  height: 72px;
+  border-radius: 14px;
+  object-fit: cover;
+  display: block;
+  flex: none;
+}
+
+.logoFallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #2b3947;
+  color: var(--ink);
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.logoDim {
+  opacity: 0.55;
+}
+
+.logoFailed {
+  opacity: 0.4;
+  box-sizing: border-box;
+  border: 3px solid var(--bad);
+}
+
+.shopCount {
+  font-family: var(--num);
+  font-weight: 600;
+  font-size: 32px;
+  line-height: 1;
+}
+
+.shopFailed {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 32px;
+  color: var(--bad-ink);
+  white-space: nowrap;
+}
+
+.shopBar {
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--track);
+  overflow: hidden;
+}
+
+.shopBar > span {
+  display: block;
+  height: 100%;
+  background: var(--blue);
+  transition: width 0.9s;
+}
+
+/* ---------- 配送方法別 ---------- */
+
+.courierBar {
+  display: flex;
+  flex: none;
+  height: 64px;
+  gap: 3px;
+  border-radius: 14px;
+  overflow: hidden;
+  transform-origin: left;
+  animation: growX 1.4s 0.3s ease-out both;
+}
+
+.courierSegment {
+  display: flex;
+  align-items: center;
+  min-width: 4px;
+  padding-left: 12px;
+  box-sizing: border-box;
+  font-family: var(--num);
+  font-weight: 600;
+  font-size: 30px;
+  color: #06121f;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.courierLegend {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 21px;
+}
+
+.courierLegend > span {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 26px;
+  white-space: nowrap;
+}
+
+.courierStamp {
+  position: absolute;
+  right: 28px;
+  bottom: 20px;
+}
+
+.swatch {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border-radius: 4px;
+}
+
+/* ---------- 楽天 未対応 ---------- */
+
+.attentionRow {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 22px;
+}
+
+.attentionBreakdown {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-size: 20px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.attentionShops {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-top: 8px;
+}
+
+.badgeLogo {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  flex: none;
+}
+
+.badgeLogo .logo {
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
+  font-size: 20px;
+}
+
+.badge {
+  position: absolute;
+  right: -10px;
+  top: -10px;
+  min-width: 28px;
+  height: 28px;
+  box-sizing: border-box;
+  padding: 0 6px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--num);
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.badgeAttention {
+  background: var(--warn);
+  color: #1a1300;
+}
+
+.badgeCritical {
+  background: var(--bad);
+  color: #2a0707;
+}
+
+/* ---------- 今日のシフト ---------- */
+
+.shiftSub {
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 18px;
+  color: var(--ink-3);
+}
+
+.legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legendSwatch {
+  width: 22px;
+  height: 10px;
+  border-radius: 5px;
+}
+
+.timeline {
+  position: relative;
+  margin-top: 14px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.axis {
+  position: relative;
+  margin-left: 108px;
+  width: 248px;
+  height: 30px;
+  border-bottom: 2px solid var(--line);
+}
+
+.axis > span {
+  position: absolute;
+  bottom: 5px;
+  transform: translateX(-50%);
+  font-family: var(--num);
+  font-weight: 600;
+  font-size: 18px;
+  color: var(--ink-4);
+}
+
+.shiftRow {
+  display: grid;
+  grid-template-columns: 104px 248px 52px;
+  column-gap: 4px;
+  align-items: center;
+}
+
+.person {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.person > b {
+  font-size: 22px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.avatarWarn {
+  border-color: var(--warn);
+}
+
+.avatarGone {
+  opacity: 0.5;
+}
+
+.barTrack {
+  position: relative;
+  height: 100%;
+}
+
+.bar {
+  position: absolute;
+  top: 50%;
+  height: 18px;
+  margin-top: -9px;
+  box-sizing: border-box;
+  border-radius: 9px;
+  overflow: hidden;
+  background: #2a4560;
+  transform-origin: left;
+  animation: growX 1.2s ease-out both;
+}
+
+.bar > span {
+  display: block;
+  height: 100%;
+  background: var(--blue);
+}
+
+.barLate {
+  background: rgba(251, 191, 36, 0.08);
+  border: 2px dashed var(--warn);
+}
+
+.barAbsent {
+  background: rgba(248, 113, 113, 0.08);
+  border: 2px dashed var(--bad);
+}
+
+.barUp {
+  background: transparent;
+  border: 2px dashed #4a5866;
+}
+
+.barDone {
+  background: #3a4652;
+}
+
+.barDone > span {
+  background: #3a4652;
+}
+
+.barExtra {
+  background: repeating-linear-gradient(135deg, #3a4652 0 6px, #232d36 6px 11px);
+}
+
+.barExtra > span {
+  background: transparent;
+}
+
+.overtime {
+  position: absolute;
+  top: 50%;
+  height: 18px;
+  margin-top: -9px;
+  border-radius: 0 9px 9px 0;
+  background: var(--warn);
+}
+
+.shiftLabel {
+  text-align: right;
+  font-family: var(--num);
+  font-weight: 600;
+  font-size: 19px;
+  white-space: nowrap;
+  color: var(--ink-2);
+}
+
+.labelWarn {
+  color: var(--warn-ink);
+}
+
+.labelBad {
+  color: var(--bad-ink);
+}
+
+.labelMuted {
+  color: var(--ink-3);
+}
+
+.nowLine {
+  position: absolute;
+  top: 30px;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--sky);
+  opacity: 0.9;
+}
+
+.nowTag {
+  position: absolute;
+  bottom: -14px;
+  transform: translateX(-50%);
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--sky);
+  color: #06121f;
+  font-family: var(--num);
+  font-weight: 700;
+  font-size: 18px;
+  white-space: nowrap;
+  animation: glow 2.2s ease-in-out infinite;
+}
+
+.pager {
+  position: absolute;
+  right: 0;
+  bottom: -2px;
+  font-family: var(--num);
+  font-size: 18px;
+  color: var(--ink-3);
+}
+
+/* ---------- 明日のシフト ---------- */
+
+.tomorrowGrid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px 6px;
+}
+
+.tomorrowPerson {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tomorrowPerson .avatar {
+  width: 46px;
+  height: 46px;
+  border: 3px dashed #4a5866;
+  font-size: 20px;
+}
+
+.tomorrowPerson b {
+  font-size: 20px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.tomorrowPerson small {
+  font-family: var(--num);
+  font-weight: 600;
+  font-size: 18px;
+  color: var(--ink-3);
+}
+
+/* ---------- footer ---------- */
+
+.footer {
+  position: relative;
+  grid-column: 1 / -1;
+  box-sizing: border-box;
+  padding: 0 32px;
+  background: #121a21;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  overflow: hidden;
+}
+
+.progressTrack {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 4px;
+  background: #1b252e;
+}
+
+.progressFill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #1e3a55, var(--sky));
+}
+
+.progressDot {
+  position: absolute;
+  top: -5px;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
+  border-radius: 50%;
+  background: var(--sky);
+  animation: glow 2s ease-in-out infinite;
+}
+
+.clock {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  flex: none;
+}
+
+.divider {
+  width: 1px;
+  height: 52px;
+  background: var(--line);
+  flex: none;
+}
+
+.ticker {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.tickerTrack {
+  display: inline-flex;
+  white-space: nowrap;
+  animation: marquee 40s linear infinite;
+}
+
+.tickerCopy {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  padding-right: 96px;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.tickerTag {
+  margin-left: 24px;
+  padding: 4px 12px;
+  border-radius: 8px;
+  background: var(--track);
+  color: var(--ink-2);
+  font-size: 22px;
+}
+
+.tickerTag:first-child {
+  margin-left: 0;
+}
+
+.tickerSub {
+  color: var(--ink-3);
+}
+
+.statusList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: none;
+}
+
+.statusItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 22px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.statusDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex: none;
+}
+
+/* ---------- motion ---------- */
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  80%,
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+@keyframes sweep {
+  0%,
+  70% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(420%);
+  }
+}
+
+@keyframes growX {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(125, 211, 252, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(125, 211, 252, 0);
+  }
+}
+
+@keyframes deltaUp {
+  0% {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  15% {
+    opacity: 1;
+    transform: none;
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-14px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
