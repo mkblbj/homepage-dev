@@ -69,8 +69,8 @@ export function ShippingCard({ view, state, stampMs, lastOkAt }) {
         {shipping.state === "accruing" ? (
           <>
             <div className={styles.bigNumberRow}>
-              <RollingNumber value={shipping.total} size={120} showDelta />
-              <span className={styles.unit} style={{ fontSize: 34 }}>
+              <RollingNumber value={shipping.total} size={100} showDelta />
+              <span className={styles.unit} style={{ fontSize: 32 }}>
                 件
               </span>
             </div>

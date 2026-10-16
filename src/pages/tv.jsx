@@ -1,4 +1,5 @@
 import Board from "components/tvboard/board";
+import { parseDisplayOptions } from "components/tvboard/display-options.mjs";
 import { findWidgetByType } from "components/tvboard/find-widget.mjs";
 import Stage from "components/tvboard/stage";
 import Head from "next/head";
@@ -10,11 +11,13 @@ const FONTS =
 // The workshop TV board. Data sources are found by widget type in the cleaned services config —
 // the same sanitised widgets the home page already sends to browsers — and read through
 // /api/services/proxy, so no URL or credential reaches the TV.
-export async function getServerSideProps() {
+// /tv?desktop=1 is the same board as a Windows desktop wallpaper (see display-options.mjs).
+export async function getServerSideProps({ query }) {
   const groups = await servicesResponse();
   const pick = (type) => findWidgetByType(groups, type);
   return {
     props: {
+      display: parseDisplayOptions(query),
       sources: {
         shipping: pick("uoshippingdashboard"),
         rakuten: pick("uorakutensales"),
@@ -27,7 +30,7 @@ export async function getServerSideProps() {
   };
 }
 
-export default function TvPage({ sources }) {
+export default function TvPage({ sources, display }) {
   return (
     <>
       <Head>
@@ -38,7 +41,7 @@ export default function TvPage({ sources }) {
         {/* eslint-disable-next-line @next/next/no-page-custom-font */}
         <link rel="stylesheet" href={FONTS} />
       </Head>
-      <Stage>
+      <Stage display={display}>
         <Board sources={sources} />
       </Stage>
     </>

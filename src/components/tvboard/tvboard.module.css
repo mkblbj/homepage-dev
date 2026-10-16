@@ -5,8 +5,16 @@
   inset: 0;
   overflow: hidden;
   background: #000;
-  cursor: none;
   z-index: 50;
+}
+
+.noCursor {
+  cursor: none;
+}
+
+/* As a wallpaper the margins sit under the taskbar and icons: fill them with the board's ground. */
+.desktopStage {
+  background: radial-gradient(1400px 800px at 20% -10%, #14202b 0%, #0b1015 60%);
 }
 
 .canvas {

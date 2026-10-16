@@ -1,30 +1,26 @@
+import classNames from "classnames";
 import { useEffect, useState } from "react";
 
+import { fitStage } from "./display-options.mjs";
 import styles from "./tvboard.module.css";
 
-const WIDTH = 1920;
-const HEIGHT = 1080;
-
-// The board is drawn once at 1920×1080 and scaled to whatever the TV reports, letterboxed.
-export default function Stage({ children }) {
+// The board is drawn once at 1920×1080 and scaled into whatever the screen reports: letterboxed
+// on the TV, or inside the taskbar/icon margins when it is a desktop wallpaper.
+export default function Stage({ display, children }) {
   const [box, setBox] = useState(null);
+  const { insets, hideCursor, desktop } = display;
 
   useEffect(() => {
     function fit() {
-      const scale = Math.min(window.innerWidth / WIDTH, window.innerHeight / HEIGHT);
-      setBox({
-        scale,
-        left: (window.innerWidth - WIDTH * scale) / 2,
-        top: (window.innerHeight - HEIGHT * scale) / 2,
-      });
+      setBox(fitStage(window.innerWidth, window.innerHeight, insets));
     }
     fit();
     window.addEventListener("resize", fit);
     return () => window.removeEventListener("resize", fit);
-  }, []);
+  }, [insets]);
 
   return (
-    <div className={styles.stage}>
+    <div className={classNames(styles.stage, hideCursor && styles.noCursor, desktop && styles.desktopStage)}>
       <div
         className={styles.canvas}
         style={
