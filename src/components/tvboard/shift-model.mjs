@@ -123,9 +123,9 @@ export function barGeometry(row, axis, nowMinutes) {
   return { leftPct, widthPct, pastPct, overPct };
 }
 
-// The rows area holds 428px (right column 904 − tomorrow 290 − gap 24 − padding 44 − header,
-// legend and axis 118): 42px rows, squeezed down to 32px, and only then split into pages.
-export function layoutRows(count, { available = 428, maxRow = 42, minRow = 32 } = {}) {
+// The rows area holds 500px (right column 904 − tomorrow 250 − gap 24 − padding 52 − header 78):
+// 48px rows, squeezed down to 34px, and only then split into pages.
+export function layoutRows(count, { available = 500, maxRow = 48, minRow = 34 } = {}) {
   if (count <= 0) return { rowHeight: maxRow, perPage: 1, pages: 1 };
   if (count * maxRow <= available) return { rowHeight: maxRow, perPage: count, pages: 1 };
   const squeezed = Math.floor(available / count);

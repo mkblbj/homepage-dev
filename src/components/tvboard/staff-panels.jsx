@@ -1,15 +1,16 @@
 import classNames from "classnames";
 
-import { Avatar, cardStateClass, Loading, resolvePhotoUrl, Stamp, Unavailable, Unconfigured } from "./parts";
 import { formatClock as minutesClock } from "../../widgets/uoattendance/ring-model.mjs";
 
+import { Avatar, cardStateClass, Loading, resolvePhotoUrl, Stamp, Unavailable, Unconfigured } from "./parts";
 import { barGeometry, layoutRows } from "./shift-model.mjs";
 import { formatMd } from "./tv-time.mjs";
 import styles from "./tvboard.module.css";
 
-const NAME_COLUMN = 104;
-const COLUMN_GAP = 4;
-const TRACK = 248;
+// Row geometry, matching .shiftRow: name 120 | gap 10 | track | gap 10 | label 78, inside 404px.
+const NAME_COLUMN = 120;
+const COLUMN_GAP = 10;
+const TRACK = 404 - NAME_COLUMN - 78 - COLUMN_GAP * 2;
 const PAGE_MS = 10e3;
 
 const BAR_CLASS = {
@@ -58,9 +59,8 @@ export function ShiftTimeline({ timeline, nowMinutes, nowMs, photoBase, state, s
   const layout = layoutRows(rows.length);
   const page = layout.pages > 1 ? Math.floor(nowMs / PAGE_MS) % layout.pages : 0;
   const visible = rows.slice(page * layout.perPage, (page + 1) * layout.perPage);
-  const span = axis.end - axis.start;
-  const share = (minutes) => Math.min(1, Math.max(0, (minutes - axis.start) / span));
-  const nowLeft = NAME_COLUMN + COLUMN_GAP + TRACK * share(nowMinutes);
+  const share = Math.min(1, Math.max(0, (nowMinutes - axis.start) / (axis.end - axis.start)));
+  const nowLeft = NAME_COLUMN + COLUMN_GAP + TRACK * share;
 
   let body;
   if (state === "unconfigured") body = <Unconfigured />;
@@ -70,13 +70,6 @@ export function ShiftTimeline({ timeline, nowMinutes, nowMs, photoBase, state, s
   else {
     body = (
       <div className={styles.timeline}>
-        <div className={styles.axis}>
-          {axis.ticks.map((tick) => (
-            <span key={tick} style={{ left: `${share(tick) * 100}%` }}>
-              {tick / 60}
-            </span>
-          ))}
-        </div>
         {visible.map((row) => (
           <ShiftRow key={row.id} row={row} axis={axis} nowMinutes={nowMinutes} photoBase={photoBase} height={layout.rowHeight} />
         ))}
@@ -93,49 +86,30 @@ export function ShiftTimeline({ timeline, nowMinutes, nowMs, photoBase, state, s
     );
   }
 
-  const showCounts = state === "ok" || state === "delayed";
+  const showCount = state === "ok" || state === "delayed";
   return (
-    <section className={classNames(styles.card, styles.panel, cardStateClass(state))} style={{ flex: "1 1 auto", padding: "22px 24px", animationDelay: "0.2s" }}>
+    <section className={classNames(styles.card, styles.staffPanel, cardStateClass(state))} style={{ flex: "1 1 auto", animationDelay: "0.2s" }}>
       <div className={styles.cardHead} style={{ alignItems: "baseline" }}>
-        <h2 className={styles.panelTitle}>今日のシフト</h2>
-        {showCounts ? (
+        <h2 className={styles.staffTitle}>今日のスタッフ</h2>
+        {showCount ? (
           <span>
-            <span className={styles.muted} style={{ fontSize: 22 }}>
-              出勤中{" "}
-            </span>
-            <span className={styles.num} style={{ fontSize: 52 }}>
+            <span className={styles.num} style={{ fontSize: 60 }}>
               {timeline.working}
             </span>
-            <span className={styles.muted} style={{ fontSize: 22 }}>
+            <span className={styles.muted} style={{ fontSize: 26 }}>
               {" "}
-              / 予定 {timeline.scheduled}
+              名 出勤中
             </span>
           </span>
         ) : null}
       </div>
-      {showCounts ? (
-        <div className={styles.shiftSub}>
-          <span className={styles.legend}>
-            <span>
-              <span className={styles.legendSwatch} style={{ background: "#4C93E0" }} />
-              済んだ時間
-            </span>
-            <span>
-              <span className={styles.legendSwatch} style={{ background: "#2A4560" }} />
-              これから
-            </span>
-          </span>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-            生産 <Stamp state={state} stampMs={stampMs} />
-          </span>
-        </div>
-      ) : null}
+      <Stamp state={state} stampMs={stampMs} />
       {body}
     </section>
   );
 }
 
-const MAX_TOMORROW = 12;
+const MAX_TOMORROW = 10;
 
 export function TomorrowShifts({ view, state, photoBase, lastOkAt }) {
   const people = view.people.length > MAX_TOMORROW ? view.people.slice(0, MAX_TOMORROW - 1) : view.people;
@@ -154,7 +128,6 @@ export function TomorrowShifts({ view, state, photoBase, lastOkAt }) {
           <div key={person.id} className={styles.tomorrowPerson}>
             <Avatar id={person.id} initial={person.initial} photoUrl={resolvePhotoUrl(person.image, photoBase)} />
             <b>{person.name}</b>
-            <small>{person.shift}</small>
           </div>
         ))}
         {rest > 0 ? (
@@ -170,14 +143,24 @@ export function TomorrowShifts({ view, state, photoBase, lastOkAt }) {
 
   return (
     <section
-      className={classNames(styles.card, styles.panel, cardStateClass(state))}
-      style={{ height: 290, flex: "none", padding: "20px 24px", gap: 14, animationDelay: "0.3s" }}
+      className={classNames(styles.card, styles.staffPanel, cardStateClass(state))}
+      style={{ height: 250, flex: "none", gap: 18, animationDelay: "0.3s" }}
     >
-      <div className={styles.cardHead}>
-        <h2 style={{ fontSize: 28 }}>明日のシフト</h2>
-        <span className={styles.cardDate}>
+      <div className={styles.cardHead} style={{ alignItems: "baseline" }}>
+        <h2 className={styles.staffTitle} style={{ fontSize: 30 }}>
+          明日のスタッフ
+        </h2>
+        <span className={styles.muted} style={{ fontSize: 22, whiteSpace: "nowrap" }}>
           {formatMd(view.date)}
-          {view.count ? ` ${view.count} 名` : ""}
+          {view.count ? (
+            <>
+              {" "}
+              <span className={styles.num} style={{ fontSize: 40, color: "#F1F4F6" }}>
+                {view.count}
+              </span>
+              名
+            </>
+          ) : null}
         </span>
       </div>
       {body}

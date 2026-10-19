@@ -31,6 +31,7 @@ test("two halves of one panel show the worse of their states", () => {
 });
 
 test("a source without a delay threshold is ok until it must hide", () => {
-  assert.equal(classifyFreshness({ stampMs: now - 59 * 60e3, nowMs: now, ...FRESHNESS.attention }), "ok");
-  assert.equal(classifyFreshness({ stampMs: now - 61 * 60e3, nowMs: now, ...FRESHNESS.attention }), "unavailable");
+  const hideOnly = { hide: 60 * 60e3 };
+  assert.equal(classifyFreshness({ stampMs: now - 59 * 60e3, nowMs: now, ...hideOnly }), "ok");
+  assert.equal(classifyFreshness({ stampMs: now - 61 * 60e3, nowMs: now, ...hideOnly }), "unavailable");
 });

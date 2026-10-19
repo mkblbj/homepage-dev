@@ -5,195 +5,100 @@ import RollingNumber from "./rolling-number";
 import { formatMd } from "./tv-time.mjs";
 import styles from "./tvboard.module.css";
 
-function Body({ state, lastOkAt, children }) {
+// Four digits ("1,100") need a smaller face to fit a third of the width.
+export const heroSize = (value) => (value != null && Math.abs(value) >= 1000 ? 132 : 180);
+
+function Body({ state, lastOkAt, what, children }) {
   if (state === "unconfigured") return <Unconfigured />;
   if (state === "loading") return <Loading />;
-  if (state === "unavailable") return <Unavailable what="出荷出力データ" lastOkAt={lastOkAt} compact />;
+  if (state === "unavailable") return <Unavailable what={what} lastOkAt={lastOkAt} compact />;
   return children;
 }
 
+function Hero({ value, tone }) {
+  return (
+    <div className={styles.heroRow}>
+      <RollingNumber value={value} size={heroSize(value)} showDelta style={tone ? { color: tone } : undefined} />
+      <span className={styles.heroUnit}>件</span>
+    </div>
+  );
+}
+
+function Tile({ title, date, state, stampMs, lastOkAt, what, delay, children }) {
+  return (
+    <section className={classNames(styles.card, styles.tile, cardStateClass(state))} style={{ animationDelay: delay }}>
+      <div className={styles.cardHead}>
+        <h2 className={styles.tileTitle}>{title}</h2>
+        {date ? <span className={styles.tileDate}>{date}</span> : <Stamp state={state} stampMs={stampMs} />}
+      </div>
+      <Body state={state} lastOkAt={lastOkAt} what={what}>
+        {children}
+      </Body>
+    </section>
+  );
+}
+
 export function OutputCard({ view, state, stampMs, lastOkAt }) {
-  const { total, yesterdayTotal, yesterdayDate, date } = view.output;
-  const max = Math.max(total ?? 0, yesterdayTotal ?? 0);
-  const width = (value) => (max > 0 && value != null ? `${(value / max) * 100}%` : "0%");
-
+  const { total, yesterdayTotal, yesterdayDate } = view.output;
   return (
-    <section className={classNames(styles.card, styles.kpiCard, cardStateClass(state))}>
-      <span className={styles.sweep} />
-      <div className={styles.cardHead}>
-        <h2 className={styles.cardTitle}>今日の出力</h2>
-        <span className={styles.cardDate}>{formatMd(date)}</span>
-      </div>
-      <Body state={state} lastOkAt={lastOkAt}>
-        <div className={styles.bigNumberRow}>
-          <RollingNumber value={total} size={136} showDelta />
-          <span className={styles.unit} style={{ fontSize: 36 }}>
-            件
-          </span>
-        </div>
-        <div className={styles.compareRows}>
-          <div className={styles.compareRow}>
-            <span>昨日 {formatMd(yesterdayDate)}</span>
-            <div className={styles.compareTrack}>
-              <div className={styles.compareFill} style={{ width: width(yesterdayTotal), background: "#5B6B7A" }} />
-            </div>
-            <span className={styles.compareValue}>{yesterdayTotal == null ? "—" : yesterdayTotal.toLocaleString("ja-JP")}</span>
-          </div>
-          <div className={classNames(styles.compareRow, styles.compareRowToday)}>
-            <span>今日 {formatMd(date)}</span>
-            <div className={styles.compareTrack}>
-              <div className={styles.compareFill} style={{ width: width(total), background: "#4C93E0" }} />
-            </div>
-            <span className={styles.compareValue}>{total == null ? "—" : total.toLocaleString("ja-JP")}</span>
-          </div>
-        </div>
-        <div className={styles.cardFoot}>
-          <Stamp state={state} stampMs={stampMs} />
-        </div>
-      </Body>
-    </section>
+    <Tile title="今日の出力" state={state} stampMs={stampMs} lastOkAt={lastOkAt} what="出荷出力データ">
+      <Hero value={total} />
+      <span className={styles.tileNote}>
+        {yesterdayTotal == null ? "" : `昨日 ${formatMd(yesterdayDate)} ${yesterdayTotal.toLocaleString("ja-JP")} 件`}
+      </span>
+    </Tile>
   );
 }
 
-export function ShippingCard({ view, state, stampMs, lastOkAt }) {
-  const { shipping } = view;
-  const { yesterday } = shipping;
-
-  return (
-    <section className={classNames(styles.card, styles.kpiCard, cardStateClass(state))} style={{ animationDelay: "0.1s" }}>
-      <div className={styles.cardHead}>
-        <h2 className={styles.cardTitle}>今日の出荷</h2>
-        <span className={styles.cardDate}>{formatMd(shipping.date)}</span>
-      </div>
-      <Body state={state} lastOkAt={lastOkAt}>
-        {shipping.state === "accruing" ? (
-          <>
-            <div className={styles.bigNumberRow}>
-              <RollingNumber value={shipping.total} size={100} showDelta />
-              <span className={styles.unit} style={{ fontSize: 32 }}>
-                件
-              </span>
-            </div>
-            <div className={styles.bigNumberRow} style={{ alignItems: "center" }}>
-              <span className={classNames(styles.pill, styles.pillOk)}>計上中</span>
-              {shipping.firstAt ? <span className={styles.muted} style={{ fontSize: 20 }}>{shipping.firstAt} から</span> : null}
-            </div>
-          </>
-        ) : shipping.state === "unknown" ? (
-          <span className={styles.muted} style={{ fontSize: 26 }}>
-            今日の出荷データがありません
-          </span>
-        ) : (
-          <div className={styles.pendingRow}>
-            <span className={styles.pendingBadge}>計上前</span>
-            <div className={styles.pendingText}>
-              <span style={{ fontSize: 34, fontWeight: 700, whiteSpace: "nowrap" }}>今日分は未計上</span>
-              {yesterday.recordedAt ? (
-                <span className={styles.muted} style={{ fontSize: 20 }}>
-                  昨日は {yesterday.recordedAt} に計上
-                </span>
-              ) : null}
-            </div>
-          </div>
-        )}
-        <div className={styles.referenceBox}>
-          <span style={{ fontSize: 20, fontWeight: 700, color: "#C9D2DA", whiteSpace: "nowrap" }}>
-            昨日 {formatMd(yesterday.date)} {yesterday.recorded ? "参考" : ""}
-          </span>
-          {yesterday.recorded ? (
-            <span style={{ whiteSpace: "nowrap" }}>
-              <span className={styles.num} style={{ fontSize: shipping.state === "accruing" ? 32 : 42 }}>
-                {yesterday.total == null ? "—" : yesterday.total.toLocaleString("ja-JP")}
-              </span>{" "}
-              <span className={styles.unit} style={{ fontSize: 22 }}>
-                件
-              </span>
-            </span>
-          ) : (
-            <span className={styles.muted} style={{ fontSize: 22 }}>
-              記録なし
-            </span>
-          )}
-        </div>
-        <div className={styles.cardFoot}>
-          <Stamp state={state} stampMs={stampMs} />
-        </div>
-      </Body>
-    </section>
-  );
-}
-
-const STEPS = [
-  { stage: "undecided", label: "未確定" },
-  { stage: "predicted", label: "予測" },
-  { stage: "accruing", label: "集計中" },
-];
-
-export function TomorrowCard({ view, state, stampMs, lastOkAt }) {
+export function TomorrowCard({ view, state, lastOkAt }) {
   const { tomorrow } = view;
-
   let main;
+  let note;
   if (tomorrow.stage === "accruing") {
-    main = (
-      <>
-        <div className={styles.bigNumberRow}>
-          <RollingNumber value={tomorrow.total} size={104} showDelta />
-          <span className={styles.unit} style={{ fontSize: 32 }}>
-            件
-          </span>
-        </div>
-        <span className={styles.muted} style={{ fontSize: 20 }}>
-          まだ増えます ・ 入力済 {tomorrow.enteredShops} / {tomorrow.shopsCount ?? "—"} 店舗
-        </span>
-      </>
-    );
+    main = <Hero value={tomorrow.total} />;
+    note = "まだ増えます";
   } else if (tomorrow.stage === "predicted") {
     main = (
-      <>
-        <div className={styles.bigNumberRow}>
-          <span style={{ fontSize: 38, fontWeight: 700, color: "#C9D2DA" }}>約</span>
-          <RollingNumber value={tomorrow.predicted} size={104} style={{ color: "#C9D2DA" }} />
-          <span className={styles.unit} style={{ fontSize: 32 }}>
-            件
-          </span>
-        </div>
-        <span className={styles.muted} style={{ fontSize: 20 }}>
-          見込みの数です
+      <div className={styles.heroRow}>
+        <span className={styles.heroUnit} style={{ color: "#C9D2DA" }}>
+          約
         </span>
-      </>
+        <RollingNumber value={tomorrow.predicted} size={heroSize(tomorrow.predicted)} style={{ color: "#C9D2DA" }} />
+        <span className={styles.heroUnit}>件</span>
+      </div>
     );
+    note = "見込みの数です";
   } else {
-    main = (
-      <>
-        <span style={{ fontSize: 60, fontWeight: 700, color: "#A9B5C0", lineHeight: 1.1 }}>未確定</span>
-        <span className={styles.muted} style={{ fontSize: 20 }}>
-          いつもは午後に入力が始まります
-        </span>
-      </>
-    );
+    main = <span className={styles.heroWord}>未確定</span>;
+    note = "午後から入力が始まります";
   }
 
   return (
-    <section className={classNames(styles.card, styles.kpiCard, cardStateClass(state))} style={{ animationDelay: "0.2s" }}>
-      <div className={styles.cardHead}>
-        <h2 className={styles.cardTitle}>明日の予定</h2>
-        <span className={styles.cardDate}>{formatMd(tomorrow.date)}</span>
-      </div>
-      <Body state={state} lastOkAt={lastOkAt}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>{main}</div>
-        <div className={styles.stepper}>
-          <span className={styles.stepperLine} />
-          {STEPS.map((step) => (
-            <div key={step.stage} className={classNames(styles.step, step.stage === tomorrow.stage && styles.stepCurrent)}>
-              <span className={styles.stepDot} />
-              <span>{step.label}</span>
-            </div>
-          ))}
-        </div>
-        <div className={styles.cardFoot}>
-          <Stamp state={state} stampMs={stampMs} />
-        </div>
-      </Body>
-    </section>
+    <Tile
+      title="明日の予定"
+      date={formatMd(tomorrow.date)}
+      state={state}
+      lastOkAt={lastOkAt}
+      what="出荷出力データ"
+      delay="0.1s"
+    >
+      {main}
+      <span className={styles.tileNote}>{note}</span>
+    </Tile>
+  );
+}
+
+export function OrdersCard({ view, state, stampMs, lastOkAt }) {
+  return (
+    <Tile title="楽天 今日の注文" state={state} stampMs={stampMs} lastOkAt={lastOkAt} what="楽天の注文データ" delay="0.2s">
+      <Hero value={view.orders} />
+      {view.missing > 0 ? (
+        <span className={styles.tileNote} style={{ color: "#FCA5A5", fontWeight: 700 }}>
+          {view.missing} 店舗を含みません
+        </span>
+      ) : (
+        <span className={styles.tileNote}>{view.shopCount > 0 ? `${view.shopCount} 店舗の合計` : ""}</span>
+      )}
+    </Tile>
   );
 }

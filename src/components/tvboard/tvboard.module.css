@@ -1,4 +1,4 @@
-/* 工場 TV 出荷ボード — drawn at 1920×1080; values follow the 決定案 artboard (Final.dc.html). */
+/* 工場 TV 出荷ボード — drawn at 1920×1080; values follow the 精簡版 artboard (Simple.dc.html). */
 
 .stage {
   position: fixed;
@@ -80,25 +80,10 @@
 
 .kpiRow {
   display: grid;
-  grid-template-columns: 500px minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 24px;
-  height: 320px;
+  height: 372px;
   flex: none;
-}
-
-.midRow {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 500px;
-  gap: 24px;
-  flex: 1 1 auto;
-  min-height: 0;
-}
-
-.midSide {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  min-height: 0;
 }
 
 /* ---------- cards ---------- */
@@ -117,26 +102,12 @@
   animation: rise 0.8s ease-out both;
 }
 
-.kpiCard {
-  padding: 24px 30px 20px;
-  justify-content: space-between;
-}
-
-.panel {
-  padding: 22px 28px 20px;
-}
-
 .delayed {
   border: 2px solid rgba(251, 191, 36, 0.6);
 }
 
 .unavailable {
   border: 2px solid rgba(248, 113, 113, 0.7);
-}
-
-.amberCard {
-  background: linear-gradient(160deg, #241e12, #17140e);
-  border: 2px solid rgba(251, 191, 36, 0.5);
 }
 
 .cardHead {
@@ -146,42 +117,12 @@
   gap: 14px;
 }
 
-.cardTitle {
-  font-size: 32px;
-}
-
-.panelTitle {
-  font-size: 30px;
-}
-
-.cardDate {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--ink-3);
-  white-space: nowrap;
-}
-
-.sweep {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 30%;
-  height: 3px;
-  background: linear-gradient(90deg, transparent, var(--sky), transparent);
-  animation: sweep 9s ease-in-out infinite;
-}
-
 /* ---------- small parts ---------- */
 
 .num {
   font-family: var(--num);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-}
-
-.unit {
-  font-weight: 700;
-  color: var(--ink-3);
 }
 
 .muted {
@@ -249,12 +190,6 @@
   background: rgba(52, 211, 153, 0.16);
   border: 2px solid rgba(52, 211, 153, 0.55);
   color: #6ee7b7;
-}
-
-.pillBad {
-  background: rgba(248, 113, 113, 0.16);
-  border: 2px solid rgba(248, 113, 113, 0.6);
-  color: var(--bad-ink);
 }
 
 .chipOutline {
@@ -372,459 +307,149 @@
   animation: deltaUp 1.8s ease-out both;
 }
 
-/* ---------- 今日の出力 ---------- */
+/* ---------- 今日の出力 / 明日の予定 / 楽天 今日の注文 ---------- */
 
-.bigNumberRow {
+.tile {
+  padding: 30px 36px;
+  justify-content: space-between;
+}
+
+.tileTitle {
+  font-size: 38px;
+  white-space: nowrap;
+}
+
+.tileDate {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.tileNote {
+  font-size: 26px;
+  color: var(--ink-4);
+  white-space: nowrap;
+}
+
+.heroRow {
   display: flex;
   align-items: baseline;
-  gap: 12px;
-}
-
-.compareRows {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.compareRow {
-  display: grid;
-  grid-template-columns: 152px minmax(0, 1fr) 76px;
-  white-space: nowrap;
-  align-items: center;
-  gap: 12px;
-  font-size: 20px;
-  color: var(--ink-3);
-}
-
-.compareRowToday {
-  color: var(--ink);
-  font-weight: 700;
-}
-
-.compareTrack {
-  height: 10px;
-  border-radius: 5px;
-  background: var(--track);
-  overflow: hidden;
-}
-
-.compareFill {
-  height: 100%;
-  border-radius: 5px;
-  transform-origin: left;
-  animation: growX 1.4s 0.2s ease-out both;
-  transition: width 0.9s;
-}
-
-.compareValue {
-  text-align: right;
-  font-family: var(--num);
-  font-weight: 600;
-  font-size: 24px;
-}
-
-.cardFoot {
-  display: flex;
-  justify-content: flex-end;
-}
-
-/* ---------- 今日の出荷 ---------- */
-
-.pendingRow {
-  display: flex;
-  align-items: center;
   gap: 14px;
 }
 
-.pendingBadge {
-  width: 76px;
-  height: 76px;
-  flex: none;
-  box-sizing: border-box;
-  border-radius: 50%;
-  border: 4px dashed #4a5866;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 22px;
+.heroUnit {
+  font-size: 44px;
   font-weight: 700;
   color: var(--ink-3);
 }
 
-.pendingText {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.referenceBox {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 16px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 2px dashed #34414d;
-}
-
-/* ---------- 明日の予定 ---------- */
-
-.stepper {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 6px;
-}
-
-.stepperLine {
-  position: absolute;
-  left: 22px;
-  right: 22px;
-  top: 15px;
-  height: 3px;
-  background: #34414d;
-}
-
-.step {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  font-size: 22px;
-  color: var(--ink-4);
-}
-
-.stepDot {
-  display: block;
-  width: 32px;
-  height: 32px;
-  box-sizing: border-box;
-  border-radius: 50%;
-  background: #121a21;
-  border: 3px solid #4a5866;
-}
-
-.stepCurrent {
-  color: var(--ink);
+.heroWord {
+  font-size: 96px;
   font-weight: 700;
+  line-height: 1;
+  color: var(--ink-3);
 }
 
-.stepCurrent .stepDot {
-  background: var(--ink-2);
-  border-color: var(--ink-2);
-  animation: glow 2.4s ease-in-out infinite;
+/* ---------- 今日の出荷 + 配送方法別 ---------- */
+
+.shipPanel {
+  flex: 1 1 auto;
+  padding: 30px 36px;
+  gap: 18px;
 }
 
-/* ---------- 楽天の注文 ---------- */
-
-.ordersTable {
-  margin-top: 16px;
+.shipBody {
+  flex: 1 1 auto;
+  min-height: 0;
   display: grid;
-  grid-template-columns: 120px minmax(0, 1fr) minmax(0, 1fr);
-  column-gap: 24px;
-  row-gap: 4px;
-  align-items: center;
+  grid-template-columns: 384px minmax(0, 1fr);
+  gap: 48px;
 }
 
-.ordersColHead {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--ink-2);
+.shipLeft {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding-right: 40px;
+  border-right: 1px solid var(--line);
 }
 
-.ordersColHead span {
-  margin-left: 6px;
-  font-size: 22px;
-  font-weight: 400;
-  color: var(--ink-3);
+.shipToday {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
-.ordersRowHead {
+.shipRight {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.shipSubTitle {
   font-size: 30px;
   font-weight: 700;
 }
 
-.ordersRowHead span {
-  margin-left: 8px;
-  font-size: 22px;
-  font-weight: 400;
-  color: var(--ink-3);
-}
-
-.ordersShopHead {
-  margin-top: auto;
-  padding-top: 14px;
-  border-top: 1px solid var(--line);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--ink-3);
-}
-
-.ordersShopHead small {
-  font-size: 20px;
-  font-weight: 400;
-  color: var(--ink-4);
-}
-
-.shopTiles {
-  margin-top: 12px;
+.courierRow {
   display: grid;
-  gap: 10px;
-}
-
-.shopTile {
-  display: flex;
-  flex-direction: column;
+  grid-template-columns: 330px minmax(0, 1fr) 110px;
   align-items: center;
-  gap: 6px;
-  min-width: 0;
+  gap: 24px;
+  height: 52px;
 }
 
-.logo {
-  width: 72px;
-  height: 72px;
-  border-radius: 14px;
-  object-fit: cover;
-  display: block;
-  flex: none;
-}
-
-.logoFallback {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #2b3947;
-  color: var(--ink);
-  font-size: 28px;
+.courierName {
+  font-size: 30px;
   font-weight: 700;
-}
-
-.logoDim {
-  opacity: 0.55;
-}
-
-.logoFailed {
-  opacity: 0.4;
-  box-sizing: border-box;
-  border: 3px solid var(--bad);
-}
-
-.shopCount {
-  font-family: var(--num);
-  font-weight: 600;
-  font-size: 32px;
-  line-height: 1;
-}
-
-.shopFailed {
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 32px;
-  color: var(--bad-ink);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.shopBar {
-  width: 100%;
-  height: 8px;
-  border-radius: 4px;
+.courierTrack {
+  height: 22px;
+  border-radius: 11px;
   background: var(--track);
   overflow: hidden;
 }
 
-.shopBar > span {
+.courierTrack > span {
   display: block;
   height: 100%;
+  border-radius: 11px;
   background: var(--blue);
   transition: width 0.9s;
 }
 
-/* ---------- 配送方法別 ---------- */
-
-.courierBar {
-  display: flex;
-  flex: none;
-  height: 64px;
-  gap: 3px;
-  border-radius: 14px;
-  overflow: hidden;
-  transform-origin: left;
-  animation: growX 1.4s 0.3s ease-out both;
+.courierQty {
+  justify-self: end;
 }
 
-.courierSegment {
-  display: flex;
-  align-items: center;
-  min-width: 4px;
-  padding-left: 12px;
-  box-sizing: border-box;
-  font-family: var(--num);
-  font-weight: 600;
-  font-size: 30px;
-  color: #06121f;
-  overflow: hidden;
+/* ---------- 今日のスタッフ ---------- */
+
+.staffPanel {
+  padding: 26px 28px;
+}
+
+.staffTitle {
+  font-size: 34px;
   white-space: nowrap;
-}
-
-.courierLegend {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 21px;
-}
-
-.courierLegend > span {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 26px;
-  white-space: nowrap;
-}
-
-.courierStamp {
-  position: absolute;
-  right: 28px;
-  bottom: 20px;
-}
-
-.swatch {
-  width: 16px;
-  height: 16px;
-  flex: none;
-  border-radius: 4px;
-}
-
-/* ---------- 楽天 未対応 ---------- */
-
-.attentionRow {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  margin-bottom: 22px;
-}
-
-.attentionBreakdown {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-  font-size: 20px;
-  color: var(--ink-2);
-  white-space: nowrap;
-}
-
-.attentionShops {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding-top: 8px;
-}
-
-.badgeLogo {
-  position: relative;
-  width: 46px;
-  height: 46px;
-  flex: none;
-}
-
-.badgeLogo .logo {
-  width: 46px;
-  height: 46px;
-  border-radius: 10px;
-  font-size: 20px;
-}
-
-.badge {
-  position: absolute;
-  right: -10px;
-  top: -10px;
-  min-width: 28px;
-  height: 28px;
-  box-sizing: border-box;
-  padding: 0 6px;
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--num);
-  font-weight: 700;
-  font-size: 18px;
-}
-
-.badgeAttention {
-  background: var(--warn);
-  color: #1a1300;
-}
-
-.badgeCritical {
-  background: var(--bad);
-  color: #2a0707;
-}
-
-/* ---------- 今日のシフト ---------- */
-
-.shiftSub {
-  margin-top: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 18px;
-  color: var(--ink-3);
-}
-
-.legend {
-  display: inline-flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.legend > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.legendSwatch {
-  width: 22px;
-  height: 10px;
-  border-radius: 5px;
 }
 
 .timeline {
   position: relative;
-  margin-top: 14px;
+  margin-top: 18px;
   flex: 1 1 auto;
   min-height: 0;
 }
 
-.axis {
-  position: relative;
-  margin-left: 108px;
-  width: 248px;
-  height: 30px;
-  border-bottom: 2px solid var(--line);
-}
-
-.axis > span {
-  position: absolute;
-  bottom: 5px;
-  transform: translateX(-50%);
-  font-family: var(--num);
-  font-weight: 600;
-  font-size: 18px;
-  color: var(--ink-4);
-}
-
 .shiftRow {
   display: grid;
-  grid-template-columns: 104px 248px 52px;
-  column-gap: 4px;
+  grid-template-columns: 120px minmax(0, 1fr) 78px;
+  column-gap: 10px;
   align-items: center;
 }
 
@@ -836,7 +461,7 @@
 }
 
 .person > b {
-  font-size: 22px;
+  font-size: 26px;
   font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
@@ -844,8 +469,8 @@
 }
 
 .avatar {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   flex: none;
   box-sizing: border-box;
   border-radius: 50%;
@@ -854,7 +479,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 700;
   color: var(--ink);
 }
@@ -882,10 +507,10 @@
 .bar {
   position: absolute;
   top: 50%;
-  height: 18px;
-  margin-top: -9px;
+  height: 20px;
+  margin-top: -10px;
   box-sizing: border-box;
-  border-radius: 9px;
+  border-radius: 10px;
   overflow: hidden;
   background: #2a4560;
   transform-origin: left;
@@ -932,9 +557,9 @@
 .overtime {
   position: absolute;
   top: 50%;
-  height: 18px;
-  margin-top: -9px;
-  border-radius: 0 9px 9px 0;
+  height: 20px;
+  margin-top: -10px;
+  border-radius: 0 10px 10px 0;
   background: var(--warn);
 }
 
@@ -942,7 +567,7 @@
   text-align: right;
   font-family: var(--num);
   font-weight: 600;
-  font-size: 19px;
+  font-size: 24px;
   white-space: nowrap;
   color: var(--ink-2);
 }
@@ -961,7 +586,7 @@
 
 .nowLine {
   position: absolute;
-  top: 30px;
+  top: 0;
   bottom: 0;
   width: 2px;
   margin-left: -1px;
@@ -993,40 +618,34 @@
   color: var(--ink-3);
 }
 
-/* ---------- 明日のシフト ---------- */
+/* ---------- 明日のスタッフ ---------- */
 
 .tomorrowGrid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 10px 6px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px 8px;
 }
 
 .tomorrowPerson {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
   min-width: 0;
 }
 
 .tomorrowPerson .avatar {
-  width: 46px;
-  height: 46px;
+  width: 40px;
+  height: 40px;
   border: 3px dashed #4a5866;
-  font-size: 20px;
+  font-size: 18px;
 }
 
 .tomorrowPerson b {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
   white-space: nowrap;
-}
-
-.tomorrowPerson small {
-  font-family: var(--num);
-  font-weight: 600;
-  font-size: 18px;
-  color: var(--ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ---------- footer ---------- */
