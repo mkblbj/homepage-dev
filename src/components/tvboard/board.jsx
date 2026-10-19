@@ -2,12 +2,11 @@ import { useMemo } from "react";
 
 import { buildTodayAttendanceModel } from "../../widgets/uoattendance/attendance-model.mjs";
 
-import CourierPanel from "./courier-panel";
 import FooterBar from "./footer-bar";
 import { FRESHNESS, worstState } from "./freshness.mjs";
-import { OutputCard, ShippingCard, TomorrowCard } from "./kpi-cards";
-import { AttentionPanel, OrdersPanel } from "./rakuten-panels";
-import { buildAttentionView, buildOrdersView } from "./rakuten-model.mjs";
+import { OrdersCard, OutputCard, TomorrowCard } from "./kpi-cards";
+import { buildOrdersView } from "./rakuten-model.mjs";
+import ShippingPanel from "./shipping-panel";
 import { buildShippingView } from "./shipping-model.mjs";
 import { buildShiftTimeline, buildTomorrowShifts } from "./shift-model.mjs";
 import { ShiftTimeline, TomorrowShifts } from "./staff-panels";
@@ -22,6 +21,8 @@ function lateDetail(state, stampMs, nowMs) {
   return minutes == null ? "遅延" : `${minutes}分 遅延`;
 }
 
+// The simplified board (2026-10-19): five things the workshop asked for — today's output,
+// tomorrow, today's Rakuten orders, shipping by courier, and who is working.
 export default function Board({ sources }) {
   const clock = useClock();
   useDailyReload(clock);
@@ -33,9 +34,6 @@ export default function Board({ sources }) {
 
   const shipping = useProxy(sources.shipping, null, null, FRESHNESS.shipping.poll);
   const sales = useProxy(sources.rakuten, "sales", null, FRESHNESS.rakuten.poll);
-  const monthly = useProxy(sources.rakuten, "monthly", null, FRESHNESS.monthly.poll);
-  const logos = useProxy(sources.rakuten, "logos", null, FRESHNESS.logos.poll);
-  const attention = useProxy(sources.attention, "attention", null, FRESHNESS.attention.poll);
   const actual = useProxy(attendanceWidget, "actual", null, FRESHNESS.attendance.poll);
   const todaySchedule = useProxy(scheduleWidget, "schedule", { day: "today" }, FRESHNESS.attendance.poll);
   const tomorrowSchedule = useProxy(scheduleWidget, "schedule", { day: "tomorrow" }, FRESHNESS.tomorrowShift.poll);
@@ -50,17 +48,9 @@ export default function Board({ sources }) {
   const shippingState = sourceState(shipping, shippingStamp, FRESHNESS.shipping, nowMs);
 
   // ---- 楽天 ----
-  const ordersView = useMemo(
-    () => buildOrdersView({ sales: sales.data, monthly: monthly.data, logos: logos.data, todayYmd: now.ymd }),
-    [sales.data, monthly.data, logos.data, now.ymd],
-  );
+  const ordersView = useMemo(() => buildOrdersView({ sales: sales.data }), [sales.data]);
   const salesStamp = parseJstStamp(ordersView.generatedAt);
   const salesState = sourceState(sales, salesStamp, FRESHNESS.rakuten, nowMs);
-  const monthState = sourceState(monthly, parseJstStamp(monthly.data?.generatedAtJST), FRESHNESS.monthly, nowMs);
-
-  const attentionView = useMemo(() => buildAttentionView(attention.data, logos.data), [attention.data, logos.data]);
-  const attentionState = sourceState(attention, attention.lastOkAt, FRESHNESS.attention, nowMs);
-  const attentionStamp = parseJstStamp(attentionView?.generatedAt) ?? attention.lastOkAt;
 
   // ---- 勤怠 ----
   const todayModel = useMemo(
@@ -74,7 +64,7 @@ export default function Board({ sources }) {
   );
   const timeline = useMemo(() => buildShiftTimeline({ todayModel, nowMinutes: now.minutes }), [todayModel, now.minutes]);
   // Punches and the roster are two halves of one panel: without the roster every person would
-  // read as 予定外 and the planned count as 0, so the panel takes the worse of the two.
+  // read as 予定外, so the panel takes the worse of the two.
   const attendanceStamp =
     scheduleWidget && todaySchedule.lastOkAt != null && actual.lastOkAt != null
       ? Math.min(todaySchedule.lastOkAt, actual.lastOkAt)
@@ -114,34 +104,23 @@ export default function Board({ sources }) {
   const statuses = [
     { name: "出荷出力", state: shippingState, detail: lateDetail(shippingState, shippingStamp, nowMs) },
     { name: "楽天", state: salesState, detail: lateDetail(salesState, salesStamp, nowMs) },
-    { name: "未対応", state: attentionView?.stale ? "delayed" : attentionState, detail: lateDetail(attentionState, attention.lastOkAt, nowMs) },
     { name: "勤怠", state: attendanceState, detail: lateDetail(attendanceState, attendanceStamp, nowMs) },
     { name: "天気", state: weatherState, detail: lateDetail(weatherState, weatherSource.lastOkAt, nowMs) },
     { name: "AI サマリー", state: aiState, detail: lateDetail(aiState, aiStamp, nowMs) },
   ];
+  // "データ正常 HH:MM": the oldest of the board's own data, so the time never flatters it.
+  const coreStamps = [shippingStamp, salesStamp, attendanceStamp].filter((stamp) => stamp != null);
+  const freshAt = coreStamps.length ? Math.min(...coreStamps) : null;
 
   return (
     <div className={styles.board}>
       <div className={styles.left}>
         <div className={styles.kpiRow}>
           <OutputCard view={shippingView} state={shippingState} stampMs={shippingStamp} lastOkAt={shipping.lastOkAt} />
-          <ShippingCard view={shippingView} state={shippingState} stampMs={shippingStamp} lastOkAt={shipping.lastOkAt} />
-          <TomorrowCard view={shippingView} state={shippingState} stampMs={shippingStamp} lastOkAt={shipping.lastOkAt} />
+          <TomorrowCard view={shippingView} state={shippingState} lastOkAt={shipping.lastOkAt} />
+          <OrdersCard view={ordersView} state={salesState} stampMs={salesStamp} lastOkAt={sales.lastOkAt} />
         </div>
-        <div className={styles.midRow}>
-          <OrdersPanel
-            view={ordersView}
-            state={salesState}
-            stampMs={salesStamp}
-            lastOkAt={sales.lastOkAt}
-            monthState={monthState}
-            todayYmd={now.ymd}
-          />
-          <div className={styles.midSide}>
-            <CourierPanel couriers={shippingView.couriers} state={shippingState} stampMs={shippingStamp} lastOkAt={shipping.lastOkAt} />
-            <AttentionPanel view={attentionView} state={attentionState} stampMs={attentionStamp} lastOkAt={attention.lastOkAt} />
-          </div>
-        </div>
+        <ShippingPanel view={shippingView} state={shippingState} stampMs={shippingStamp} lastOkAt={shipping.lastOkAt} />
       </div>
 
       <div className={styles.right}>
@@ -157,7 +136,7 @@ export default function Board({ sources }) {
         <TomorrowShifts view={tomorrowView} state={tomorrowState} photoBase={photoBase} lastOkAt={tomorrowSchedule.lastOkAt} />
       </div>
 
-      <FooterBar clock={clock} axis={timeline.axis} segments={segments} statuses={statuses} />
+      <FooterBar clock={clock} axis={timeline.axis} segments={segments} statuses={statuses} freshAt={freshAt} />
     </div>
   );
 }

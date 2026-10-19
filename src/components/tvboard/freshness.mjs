@@ -3,11 +3,8 @@
 export const FRESHNESS = {
   shipping: { poll: 30e3, delay: 5 * 60e3, hide: 60 * 60e3 },
   rakuten: { poll: 60e3, delay: 30 * 60e3, hide: 2 * 3600e3 },
-  monthly: { poll: 5 * 60e3, delay: 30 * 60e3, hide: 2 * 3600e3 },
-  attention: { poll: 60e3, hide: 60 * 60e3 },
   attendance: { poll: 5 * 60e3, delay: 15 * 60e3, hide: 60 * 60e3 },
   tomorrowShift: { poll: 15 * 60e3, delay: 15 * 60e3, hide: 60 * 60e3 },
-  logos: { poll: 86400e3 },
   weather: { poll: 30 * 60e3, delay: 3 * 3600e3, hide: 6 * 3600e3 },
   // The summary is regenerated hourly; judged by its own generatedAtJST, not by our polls.
   aiSummary: { poll: 5 * 60e3, delay: 2 * 3600e3, hide: 6 * 3600e3 },

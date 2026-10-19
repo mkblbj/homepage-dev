@@ -17,7 +17,7 @@ function Segments({ segments }) {
   ));
 }
 
-export default function FooterBar({ clock, axis, segments, statuses }) {
+export default function FooterBar({ clock, axis, segments, statuses, freshAt }) {
   const now = jstNow(clock);
   const progress = Math.min(1, Math.max(0, (now.minutes - axis.start) / (axis.end - axis.start)));
   const problems = statuses.filter((status) => status.state === "delayed" || status.state === "unavailable");
@@ -58,7 +58,7 @@ export default function FooterBar({ clock, axis, segments, statuses }) {
         ) : problems.length === 0 ? (
           <span className={styles.statusItem} style={{ color: "#34D399" }}>
             <span className={styles.statusDot} style={{ background: "#34D399" }} />
-            データ正常
+            データ正常{freshAt ? ` ${formatClock(new Date(freshAt))}` : ""}
           </span>
         ) : (
           problems.slice(0, 2).map((status) => (

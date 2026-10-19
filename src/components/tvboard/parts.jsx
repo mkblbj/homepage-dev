@@ -10,22 +10,14 @@ export function cardStateClass(state) {
   return null;
 }
 
-// "● 13:14 更新" while fresh, "遅延 13:54 のデータ" once late.
+// Silent while fresh (the footer carries one "データ正常 HH:MM" for the board);
+// "遅延 13:54 のデータ" on the panel itself once its data runs late.
 export function Stamp({ state, stampMs, className }) {
-  if (stampMs == null || state === "loading" || state === "unavailable") return null;
-  const time = formatClock(new Date(stampMs));
-  if (state === "delayed") {
-    return (
-      <span className={classNames(styles.stamp, styles.stampLate, className)}>
-        <span className={classNames(styles.dot, styles.dotWarn)} />
-        遅延 {time} のデータ
-      </span>
-    );
-  }
+  if (stampMs == null || state !== "delayed") return null;
   return (
-    <span className={classNames(styles.stamp, className)}>
-      <span className={styles.dot} />
-      {time} 更新
+    <span className={classNames(styles.stamp, styles.stampLate, className)}>
+      <span className={classNames(styles.dot, styles.dotWarn)} />
+      遅延 {formatClock(new Date(stampMs))} のデータ
     </span>
   );
 }
@@ -54,16 +46,6 @@ export function Unconfigured() {
 
 export function Loading() {
   return <div className={styles.loading}>読み込み中…</div>;
-}
-
-// Shop logos load from 楽天's cabinet; a missing or broken one falls back to the name's first letter.
-export function ShopLogo({ name, url, className }) {
-  const [broken, setBroken] = useState(false);
-  if (!url || broken) {
-    return <span className={classNames(styles.logo, styles.logoFallback, className)}>{Array.from(name || "?")[0]}</span>;
-  }
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img src={url} alt={name} className={classNames(styles.logo, className)} onError={() => setBroken(true)} />;
 }
 
 const AVATAR_COLORS = ["#3B4C5E", "#4A4F63", "#3F5650", "#544A42", "#4B4458", "#3D5160"];

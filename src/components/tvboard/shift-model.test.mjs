@@ -97,11 +97,11 @@ test("bar geometry is a share of the axis; the past share is within the bar", ()
 });
 
 test("rows shrink to fit, then page", () => {
-  assert.deepEqual(layoutRows(10), { rowHeight: 42, perPage: 10, pages: 1 });
-  assert.deepEqual(layoutRows(11), { rowHeight: 38, perPage: 11, pages: 1 });
-  assert.deepEqual(layoutRows(13), { rowHeight: 32, perPage: 13, pages: 1 });
-  assert.deepEqual(layoutRows(20), { rowHeight: 32, perPage: 13, pages: 2 });
-  assert.deepEqual(layoutRows(0), { rowHeight: 42, perPage: 1, pages: 1 });
+  assert.deepEqual(layoutRows(10), { rowHeight: 48, perPage: 10, pages: 1 });
+  assert.deepEqual(layoutRows(11), { rowHeight: 45, perPage: 11, pages: 1 });
+  assert.deepEqual(layoutRows(14), { rowHeight: 35, perPage: 14, pages: 1 });
+  assert.deepEqual(layoutRows(20), { rowHeight: 34, perPage: 14, pages: 2 });
+  assert.deepEqual(layoutRows(0), { rowHeight: 48, perPage: 1, pages: 1 });
 });
 
 test("shift labels drop leading zeros and :00 so they fit one line", () => {
