@@ -3,7 +3,7 @@
 // 経営表現 widget's wording, since they show the same figures it did.
 import { DASH, mdLabel } from "widgets/uoperformance/performance-model.mjs";
 
-import { Delta, visitDayLabel } from "./daily-check-section";
+import { Delta, ShopName, visitDayLabel } from "./daily-check-section";
 import { FALLBACK_SHOP_COLOR } from "./sales-model.mjs";
 
 const NS = "uorakutensales";
@@ -65,7 +65,7 @@ export function CustomerMixCard({ performance, cardCls = "", t }) {
         {rows.map((r) => (
           <div key={r.key} className="grid grid-cols-[112px_minmax(0,1fr)_96px_52px_60px] items-center gap-3 text-sm">
             <span className="font-semibold text-theme-800 dark:text-theme-100">{r.label}</span>
-            <span className="block h-2 overflow-hidden rounded-full bg-theme-300/40 dark:bg-white/10">
+            <span className="block h-2 overflow-hidden rounded-full bg-theme-300/80 dark:bg-white/10">
               <span
                 className="block h-full rounded-full"
                 style={{ width: `${Math.max(1, ((r.yen || 0) / max) * 100)}%`, backgroundColor: r.color }}
@@ -89,10 +89,15 @@ export function CustomerMixCard({ performance, cardCls = "", t }) {
 }
 
 // `names` are the shop table's active rows, so both tables list shops in the same order
-export function ShopVisitsTable({ performance, names, shopColors, cardCls = "", t }) {
+// a shop the snapshot does not cover keeps its line, read as dashes
+function unknownShop(name) {
+  return { name, visit: null, uu: null, expected: null, delta: null, sampleCount: 0, newSalesShare: null };
+}
+
+export function ShopVisitsTable({ performance, names, shopColors, logoByName = new Map(), cardCls = "", t }) {
   if (!performance) return null;
   const byName = new Map(performance.shops.map((s) => [s.name, s]));
-  const rows = names.map((name) => byName.get(name)).filter(Boolean);
+  const rows = names.map((name) => byName.get(name) ?? unknownShop(name));
   const omitted = performance.shops.filter((s) => !names.includes(s.name)).map((s) => s.name);
   const companyDelta = performance.sampleCount >= 3 ? performance.delta : null;
   const cell = "px-2 py-2 text-right text-sm tabular-nums";
@@ -134,14 +139,11 @@ export function ShopVisitsTable({ performance, names, shopColors, cardCls = "", 
             {rows.map((s) => (
               <tr key={s.name} className="border-b border-theme-300/30 dark:border-white/[0.07]">
                 <th scope="row" className="px-2 py-2 text-left text-sm">
-                  <span className="flex items-center gap-2 font-bold text-theme-900 dark:text-theme-50">
-                    <span
-                      aria-hidden="true"
-                      className="block h-2.5 w-2.5 rounded-[3px]"
-                      style={{ backgroundColor: shopColors[s.name] ?? FALLBACK_SHOP_COLOR }}
-                    />
-                    {s.name}
-                  </span>
+                  <ShopName
+                    name={s.name}
+                    color={shopColors[s.name] ?? FALLBACK_SHOP_COLOR}
+                    logoUrl={logoByName.get(s.name)}
+                  />
                 </th>
                 <td className={`${cell} font-bold text-theme-900 dark:text-theme-50`}>
                   {s.visit === null ? DASH : fmt(t, s.visit)}
@@ -176,7 +178,7 @@ export function ShopVisitsTable({ performance, names, shopColors, cardCls = "", 
         </table>
       </div>
       <span className={`text-xs ${MUTED}`}>
-        {t(`${NS}.shopTableNote`)}
+        {t(`${NS}.visitsNote`)}
         {omitted.length ? ` · ${t(`${NS}.idleLeftOut`, { names: omitted.join("・") })}` : ""}
       </span>
     </section>

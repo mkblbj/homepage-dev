@@ -2,7 +2,7 @@
 // month and the latest visits sit on top, then one table with every shop on
 // one line. One metric switch drives all of it; a figure that is unknown reads
 // as a dash, never as zero.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DASH, mdLabel, weekdayJp } from "widgets/uoperformance/performance-model.mjs";
 
 import { deltaTone, METRICS, todayVsAverage } from "./daily-check-model.mjs";
@@ -100,8 +100,10 @@ function todaySubLine(model, metric, t) {
   return parts.join(" · ");
 }
 
-function barLabel(metric, value, t) {
-  return metric === "sales" ? `${Math.round(value / 10000)}${t(`${NS}.manUnit`)}` : fmt(t, value);
+// whole 万 once a day passes ¥100,000; one decimal below that, so a quiet day never reads 0万
+export function barLabel(metric, value, t) {
+  if (metric !== "sales") return fmt(t, value);
+  return `${value >= 100000 ? Math.round(value / 10000) : man(value)}${t(`${NS}.manUnit`)}`;
 }
 
 function WeekBars({ model, metric, value, avg, t }) {
@@ -123,12 +125,12 @@ function WeekBars({ model, metric, value, avg, t }) {
         ) : null}
         {series.map((d) => (
           <span key={d.key} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
-            <span className={`whitespace-nowrap text-[11px] tabular-nums ${MUTED}`}>{barLabel(metric, d.v, t)}</span>
+            <span className={`whitespace-nowrap text-xs tabular-nums ${MUTED}`}>{barLabel(metric, d.v, t)}</span>
             <span className="block w-full max-w-[34px] rounded-t bg-[#5F7FAF]" style={{ height: px(d.v) }} />
           </span>
         ))}
         <span className="flex h-full flex-1 flex-col items-center justify-end gap-1">
-          <span className={`whitespace-nowrap text-[11px] font-bold tabular-nums ${ACCENT_TEXT}`}>
+          <span className={`whitespace-nowrap text-xs font-bold tabular-nums ${ACCENT_TEXT}`}>
             {barLabel(metric, value, t)}
           </span>
           <span
@@ -168,7 +170,7 @@ export function TodayCard({ model, metric, shopColors, cardCls = "", t }) {
           {todaySubLine(model, metric, t)}
         </span>
         {value > 0 ? (
-          <span className="flex h-2 overflow-hidden rounded-full bg-theme-300/40 dark:bg-white/10">
+          <span className="flex h-2 overflow-hidden rounded-full bg-theme-300/80 dark:bg-white/10">
             {mix.map((r) => (
               <span
                 key={r.name}
@@ -192,7 +194,7 @@ export function TodayCard({ model, metric, shopColors, cardCls = "", t }) {
                 {Math.round(pct)}%
               </span>
             </span>
-            <span className="block h-2 overflow-hidden rounded-full bg-theme-300/40 dark:bg-white/10">
+            <span className="block h-2 overflow-hidden rounded-full bg-theme-300/80 dark:bg-white/10">
               <span
                 className={`block h-full rounded-full ${NEUTRAL_BAR}`}
                 style={{ width: `${Math.min(100, pct)}%` }}
@@ -238,7 +240,7 @@ export function MonthCard({ monthly, metric, cardCls = "", t }) {
       </span>
       {m.vsPrevPct !== null ? (
         <>
-          <span className="relative mt-1 block h-2 rounded-full bg-theme-300/45 dark:bg-white/10">
+          <span className="relative mt-1 block h-2 rounded-full bg-theme-300/80 dark:bg-white/10">
             <span
               className="absolute inset-y-0 left-0 rounded-full bg-amber-500 dark:bg-[#E8B26A]"
               style={{ width: `${Math.min(100, m.vsPrevPct)}%` }}
@@ -298,20 +300,53 @@ export function VisitCard({ performance, cardCls = "", t }) {
 const TH = "px-2 py-2 text-xs font-semibold text-theme-600 dark:text-theme-300";
 const TD = "px-2 py-2.5 text-sm tabular-nums text-right";
 
-function ShopName({ name, color }) {
+// per-shop logo with a first-char fallback when the URL is empty or fails to load.
+// Rakuten logos vary (some white-bg) → bg-white + object-contain keeps them clean.
+export function ShopLogo({ name, url, size = 18 }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [url]);
+  if (url && !failed) {
+    return (
+      <img
+        src={url}
+        alt=""
+        aria-hidden="true"
+        loading="lazy"
+        onError={() => setFailed(true)}
+        className="shrink-0 rounded-[5px] bg-white object-contain"
+        style={{ width: size, height: size }}
+      />
+    );
+  }
+  return (
+    <span
+      aria-hidden="true"
+      className="inline-flex shrink-0 items-center justify-center rounded-[5px] bg-[rgba(198,54,43,.14)] font-bold text-[#C6362B] dark:text-[#F0857A]"
+      style={{ width: size, height: size, fontSize: size * 0.58 }}
+    >
+      {String(name || "?")
+        .trim()
+        .charAt(0) || "?"}
+    </span>
+  );
+}
+
+// logo, then the shop's colour as a thin bar, then the name — the colour ties
+// the row to the shop's bars elsewhere on the page
+export function ShopName({ name, color, logoUrl }) {
   return (
     <span className="flex items-center gap-2 font-bold text-theme-900 dark:text-theme-50">
-      <span
-        aria-hidden="true"
-        className="block h-2.5 w-2.5 shrink-0 rounded-[3px]"
-        style={{ backgroundColor: color }}
-      />
+      <ShopLogo name={name} url={logoUrl} />
+      <span aria-hidden="true" className="block h-3 w-[3px] shrink-0 rounded-full" style={{ backgroundColor: color }} />
       {name}
     </span>
   );
 }
 
 function TodayCell({ row, metric, maxToday, color, t }) {
+  if (!row.today) {
+    return <td className="px-2 py-2.5 text-sm text-theme-500 dark:text-theme-400">{DASH}</td>;
+  }
   const others = METRICS.filter((m) => m !== metric)
     .map((m) => valueText(m, row.today[m], t))
     .join(" · ");
@@ -324,7 +359,7 @@ function TodayCell({ row, metric, maxToday, color, t }) {
         <span className={`whitespace-nowrap text-xs tabular-nums ${MUTED}`}>{others}</span>
       </span>
       {color ? (
-        <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-theme-300/40 dark:bg-white/10">
+        <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-theme-300/80 dark:bg-white/10">
           <span
             className="block h-full rounded-full"
             style={{ width: `${Math.max(2, (row.today[metric] / maxToday) * 100)}%`, backgroundColor: color }}
@@ -337,14 +372,14 @@ function TodayCell({ row, metric, maxToday, color, t }) {
 
 function AvgRatioCell({ row, metric }) {
   const avg = row.avg?.[metric];
-  const pct = avg > 0 ? (row.today[metric] / avg) * 100 : null;
+  const pct = avg > 0 && row.today ? (row.today[metric] / avg) * 100 : null;
   return (
     <td className="px-2 py-2.5">
       {pct === null ? (
         <span className="block text-right text-sm text-theme-500 dark:text-theme-400">{DASH}</span>
       ) : (
         <span className="flex items-center gap-2">
-          <span className="block h-1.5 flex-1 overflow-hidden rounded-full bg-theme-300/40 dark:bg-white/10">
+          <span className="block h-1.5 flex-1 overflow-hidden rounded-full bg-theme-300/80 dark:bg-white/10">
             <span className={`block h-full ${NEUTRAL_BAR}`} style={{ width: `${Math.min(100, pct)}%` }} />
           </span>
           <span className="w-10 text-right text-sm font-bold tabular-nums text-theme-900 dark:text-theme-50">
@@ -356,8 +391,8 @@ function AvgRatioCell({ row, metric }) {
   );
 }
 
-function ShopRow({ row, metric, total, maxToday, color, t, isTotal = false }) {
-  const share = total > 0 ? `${((row.today[metric] / total) * 100).toFixed(1)}%` : DASH;
+function ShopRow({ row, metric, total, maxToday, color, logoUrl, t, isTotal = false }) {
+  const share = total > 0 && row.today ? `${((row.today[metric] / total) * 100).toFixed(1)}%` : DASH;
   return (
     <tr
       className={
@@ -370,7 +405,7 @@ function ShopRow({ row, metric, total, maxToday, color, t, isTotal = false }) {
         {isTotal ? (
           <span className="font-bold text-theme-900 dark:text-theme-50">{t(`${NS}.total`)}</span>
         ) : (
-          <ShopName name={row.name} color={color} />
+          <ShopName name={row.name} color={color} logoUrl={logoUrl} />
         )}
       </th>
       <TodayCell row={row} metric={metric} maxToday={maxToday} color={isTotal ? null : color} t={t} />
@@ -392,11 +427,11 @@ function ShopRow({ row, metric, total, maxToday, color, t, isTotal = false }) {
   );
 }
 
-function IdleRow({ row, color, t }) {
+function IdleRow({ row, color, logoUrl, t }) {
   return (
     <tr className="border-b border-theme-300/30 text-theme-500 dark:border-white/[0.07] dark:text-theme-400">
       <th scope="row" className="px-2 py-2 text-left text-sm">
-        <ShopName name={row.name} color={color} />
+        <ShopName name={row.name} color={color} logoUrl={logoUrl} />
       </th>
       <td colSpan={7} className="px-2 py-2 text-xs">
         {t(`${NS}.idleNote`)}
@@ -410,10 +445,10 @@ function IdleRow({ row, color, t }) {
 }
 
 // `periods` labels the column groups: { today, week, month, visits }
-export function ShopTable({ table, metric, shopColors, periods = {}, cardCls = "", t }) {
+export function ShopTable({ table, metric, shopColors, logoByName = new Map(), periods = {}, cardCls = "", t }) {
   const [showIdle, setShowIdle] = useState(false);
   const colorOf = (name) => shopColors[name] ?? FALLBACK_SHOP_COLOR;
-  const maxToday = Math.max(1, ...table.rows.map((r) => r.today[metric]));
+  const maxToday = Math.max(1, ...table.rows.map((r) => r.today?.[metric] ?? 0));
   const total = table.total.today[metric];
   const group = (key, span, border) => (
     <th colSpan={span} scope="colgroup" className={`border-b-2 px-2 pb-1.5 text-left text-xs font-bold ${border}`}>
@@ -479,11 +514,20 @@ export function ShopTable({ table, metric, shopColors, periods = {}, cardCls = "
                 total={total}
                 maxToday={maxToday}
                 color={colorOf(row.name)}
+                logoUrl={logoByName.get(row.name)}
                 t={t}
               />
             ))}
             {showIdle
-              ? table.idle.map((row) => <IdleRow key={row.name} row={row} color={colorOf(row.name)} t={t} />)
+              ? table.idle.map((row) => (
+                  <IdleRow
+                    key={row.name}
+                    row={row}
+                    color={colorOf(row.name)}
+                    logoUrl={logoByName.get(row.name)}
+                    t={t}
+                  />
+                ))
               : null}
           </tbody>
           <tfoot>

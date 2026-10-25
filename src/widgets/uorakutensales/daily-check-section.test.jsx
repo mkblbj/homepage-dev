@@ -3,7 +3,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { MetricSwitch, MonthCard, ShopTable, TodayCard, valueText, VisitCard } from "./daily-check-section";
+import { barLabel, MetricSwitch, MonthCard, ShopTable, TodayCard, valueText, VisitCard } from "./daily-check-section";
 import { buildModel } from "./sales-model.mjs";
 
 // the test i18n mock returns keys as-is and numbers as plain strings
@@ -73,6 +73,39 @@ describe("widgets/uorakutensales/daily-check-section", () => {
     const row = screen.getByRole("row", { name: /^B/ });
     expect(within(row).getAllByText("—")).toHaveLength(2);
     expect(within(row).queryByText("0")).not.toBeInTheDocument();
+  });
+
+  it("a shop missing from the live snapshot reads dashes, not ¥0", () => {
+    const missing = { ...table, rows: [...table.rows, shopRow("C", { today: null, avg: null, cvr: null })] };
+    render(<ShopTable table={missing} metric="sales" shopColors={{}} t={t} />);
+
+    const row = screen.getByRole("row", { name: /^C/ });
+    expect(within(row).queryByText("¥0")).not.toBeInTheDocument();
+    expect(within(row).getAllByText("—").length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("each shop's logo sits beside its name", () => {
+    const { container } = render(
+      <ShopTable
+        table={table}
+        metric="sales"
+        shopColors={{}}
+        logoByName={new Map([["A", "https://example.test/a.png"]])}
+        t={t}
+      />,
+    );
+
+    expect(container.querySelector('img[src="https://example.test/a.png"]')).toBeInTheDocument();
+    // no logo → the shop's initial instead of an empty gap
+    expect(
+      within(screen.getByRole("row", { name: /^B/ })).getByText("B", { selector: "[aria-hidden]" }),
+    ).toBeInTheDocument();
+  });
+
+  it("bar labels keep a small day readable", () => {
+    expect(barLabel("sales", 1033368, t)).toBe(`103${NS}.manUnit`);
+    expect(barLabel("sales", 3000, t)).toBe(`0.3${NS}.manUnit`);
+    expect(barLabel("orders", 920, t)).toBe("920");
   });
 
   it("the month card says nothing without the month board", () => {
