@@ -22,6 +22,13 @@ function triple(sales, units, orders) {
   return { sales, units, orders };
 }
 
+// fewer than 3 same-weekday samples means there is no median to compare with
+const MIN_MEDIAN_SAMPLES = 3;
+
+function medianDelta(source) {
+  return source && source.sampleCount >= MIN_MEDIAN_SAMPLES ? source.delta : null;
+}
+
 function isZero(values) {
   return !values || (!(values.sales > 0) && !(values.orders > 0));
 }
@@ -65,10 +72,12 @@ export function buildShopTable({ model, monthly, performance }) {
       cvr: hasHistory ? (live?.cvr ?? 0) : null,
       ...monthOf(monthByName.get(name)),
       visits: visits?.visit ?? null,
-      visitDelta: visits?.delta ?? null,
+      visitDelta: medianDelta(visits),
     };
     const week = live ? { sales: live.h7Total, orders: live.h7Orders } : null;
-    (isZero(row.today) && isZero(week) && isZero(row.month) ? idle : rows).push(row);
+    // "no sales this month" is only said with the month board in hand
+    const isIdle = row.month !== null && isZero(row.today) && isZero(week) && isZero(row.month);
+    (isIdle ? idle : rows).push(row);
   });
 
   const m = monthly?.metrics;
@@ -80,7 +89,7 @@ export function buildShopTable({ model, monthly, performance }) {
     month: m ? triple(m.sales.current, m.units.current, m.orders.current) : null,
     monthDelta: m ? triple(m.sales.paceDeltaPct, m.units.paceDeltaPct, m.orders.paceDeltaPct) : null,
     visits: performance?.visit ?? null,
-    visitDelta: performance?.delta ?? null,
+    visitDelta: medianDelta(performance),
   };
 
   return { rows, idle, total };

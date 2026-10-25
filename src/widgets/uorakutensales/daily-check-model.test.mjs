@@ -65,13 +65,13 @@ function monthlyOf(sales, current, previous) {
   };
 }
 
-function performanceOf(shops) {
+function performanceOf(shops, sampleCount = 4) {
   return {
     ok: true,
-    traffic: { dataDateJST: "2026-10-24", visitCount: 300, visitDeltaPercent: -15.1, sampleCount: 4 },
-    shops: shops.map(([shopName, visitCount, visitDeltaPercent]) => ({
+    traffic: { dataDateJST: "2026-10-24", visitCount: 300, visitDeltaPercent: -15.1, sampleCount },
+    shops: shops.map(([shopName, visitCount, visitDeltaPercent, shopSamples = sampleCount]) => ({
       shopName,
-      traffic: { visitCount, visitDeltaPercent, sampleCount: 4 },
+      traffic: { visitCount, visitDeltaPercent, sampleCount: shopSamples },
     })),
   };
 }
@@ -205,6 +205,34 @@ test("visits are unknown without the performance snapshot", () => {
 test("a shop the performance snapshot does not cover has unknown visits", () => {
   const t = buildShopTable(fixture({ perfShops: [["B", 100, -25]] }));
   assert.equal(t.rows.find((r) => r.name === "A").visits, null);
+});
+
+test("a median comparison needs three same-weekday samples", () => {
+  const f = fixture();
+  const performance = buildPerformanceModel(
+    performanceOf(
+      [
+        ["A", 200, -30, 2],
+        ["B", 100, -25, 4],
+      ],
+      2,
+    ),
+  );
+  const t = buildShopTable({ ...f, performance });
+  assert.equal(t.rows.find((r) => r.name === "A").visits, 200);
+  assert.equal(t.rows.find((r) => r.name === "A").visitDelta, null);
+  assert.equal(t.rows.find((r) => r.name === "B").visitDelta, -25);
+  assert.equal(t.total.visitDelta, null);
+});
+
+test("without the month board no shop is called idle", () => {
+  const f = fixture({
+    salesShops: [shopNow("A", 0), shopNow("B", 50, 5), shopNow("Z", 0)],
+    historyShops: [shopWeek("B", 100)],
+  });
+  const t = buildShopTable({ ...f, monthly: null });
+  assert.deepEqual(t.idle, []);
+  assert.deepEqual(t.rows.map((r) => r.name).sort(), ["A", "B", "Z"]);
 });
 
 test("deltaTone colours only past twenty percent", () => {
