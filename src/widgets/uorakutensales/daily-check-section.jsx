@@ -30,8 +30,9 @@ function fmt(t, value) {
   return t("common.number", { value: Number(value) || 0 });
 }
 
-function valueText(metric, value, t) {
-  if (metric === "sales") return `¥${fmt(t, value)}`;
+// whole yen and whole pieces — a 7-day average must not read ¥752,443.571
+export function valueText(metric, value, t) {
+  if (metric === "sales") return `¥${fmt(t, Math.round(value))}`;
   return `${fmt(t, Math.round(value))}${t(`${NS}.${UNIT_KEY[metric]}`)}`;
 }
 

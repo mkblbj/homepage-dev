@@ -96,7 +96,8 @@ export function ShopVisitsTable({ performance, names, shopColors, cardCls = "", 
   const omitted = performance.shops.filter((s) => !names.includes(s.name)).map((s) => s.name);
   const companyDelta = performance.sampleCount >= 3 ? performance.delta : null;
   const cell = "px-2 py-2 text-right text-sm tabular-nums";
-  const head = "px-2 py-2 text-right text-xs font-semibold text-theme-600 dark:text-theme-300";
+  const headBase = "px-2 py-2 text-xs font-semibold text-theme-600 dark:text-theme-300";
+  const head = `${headBase} text-right`;
   return (
     <section className={`flex min-w-0 flex-col gap-3 p-5 ${cardCls}`}>
       <span className="flex flex-wrap items-baseline gap-x-2">
@@ -109,7 +110,7 @@ export function ShopVisitsTable({ performance, names, shopColors, cardCls = "", 
         <table className="w-full min-w-[520px] border-collapse">
           <thead>
             <tr className="border-b border-theme-300/50 dark:border-white/10">
-              <th scope="col" className={`${head} text-left`}>
+              <th scope="col" className={`${headBase} text-left`}>
                 {t(`${NS}.colShop`)}
               </th>
               <th scope="col" className={head}>

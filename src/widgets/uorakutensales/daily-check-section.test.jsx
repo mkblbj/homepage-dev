@@ -3,7 +3,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { MetricSwitch, MonthCard, ShopTable, TodayCard, VisitCard } from "./daily-check-section";
+import { MetricSwitch, MonthCard, ShopTable, TodayCard, valueText, VisitCard } from "./daily-check-section";
 import { buildModel } from "./sales-model.mjs";
 
 // the test i18n mock returns keys as-is and numbers as plain strings
@@ -83,6 +83,11 @@ describe("widgets/uorakutensales/daily-check-section", () => {
   it("the visit card says nothing without the performance snapshot", () => {
     const { container } = render(<VisitCard performance={null} t={t} />);
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it("whole yen and whole pieces, even for a daily average", () => {
+    expect(valueText("sales", 752443.571, t)).toBe("¥752444");
+    expect(valueText("units", 711.4, t)).toBe(`711${NS}.unitsShort`);
   });
 
   it("the today card shows no 7-day ratio without history", () => {
