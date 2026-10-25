@@ -530,7 +530,7 @@ export function ShopTable({ table, metric, shopColors, logoByName = new Map(), p
   const maxToday = Math.max(1, ...table.rows.map((r) => r.today?.[metric] ?? 0));
   const total = table.total.today[metric];
   const unit = unitOf(metric, t);
-  // a group's header opens its band: the group's colour on top, then its name and period
+  // a group's header opens its band: its name and period, underlined in the group's colour
   const group = (key, firstCol, span) => {
     const { className, ...props } = colProps(firstCol);
     return (
@@ -538,15 +538,16 @@ export function ShopTable({ table, metric, shopColors, logoByName = new Map(), p
         colSpan={span}
         scope="colgroup"
         {...props}
-        className={`${className} px-2 pb-1.5 pt-0 text-left text-xs font-bold`}
+        className={`${className} px-2 pb-1 pt-2 text-left text-xs font-bold`}
       >
-        <span
-          aria-hidden="true"
-          className="mb-1.5 block h-[3px] rounded-full"
-          style={{ backgroundColor: GROUP_BAR[COL_GROUP[firstCol]] }}
-        />
         <span className="text-theme-800 dark:text-theme-100">{t(`${NS}.${key}`)}</span>
         {periods[key] ? <span className={`ml-1.5 font-medium ${MUTED}`}>{periods[key]}</span> : null}
+        <span
+          aria-hidden="true"
+          data-group-line=""
+          className="mt-1.5 block h-[3px] rounded-full"
+          style={{ backgroundColor: GROUP_BAR[COL_GROUP[firstCol]] }}
+        />
       </th>
     );
   };

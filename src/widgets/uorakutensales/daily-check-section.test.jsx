@@ -91,6 +91,16 @@ describe("widgets/uorakutensales/daily-check-section", () => {
     }
   });
 
+  it("each group's colour line underlines its name", () => {
+    render(<ShopTable table={table} metric="sales" shopColors={{}} t={t} />);
+
+    for (const header of screen.getAllByRole("columnheader").filter((h) => h.getAttribute("scope") === "colgroup")) {
+      const label = within(header).getByText(/uorakutensales\.col/);
+      const line = header.querySelector("[data-group-line]");
+      expect(label.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING, header.textContent).toBeTruthy();
+    }
+  });
+
   it("idle shops stay folded until asked", () => {
     render(<ShopTable table={table} metric="sales" shopColors={{}} t={t} />);
 
