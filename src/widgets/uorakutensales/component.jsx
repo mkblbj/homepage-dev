@@ -1078,8 +1078,8 @@ export default function Component({ service }) {
   const { widget } = service;
   const refreshInterval = Math.max(1000, Number(widget.refreshInterval) || DEFAULT_REFRESH_INTERVAL);
   const [chartMode, setChartMode] = useState("line");
-  // the daily check's metric: today, the month, the shop table and the best sellers
-  const [metric, setMetric] = useState("sales");
+  // the daily check's metric: today, the month, the shop table and the best sellers — 件数 first
+  const [metric, setMetric] = useState("orders");
   // read after mount so the server render and the first client render agree
   const [analysisOpen, setAnalysisOpen] = useState(true);
   useEffect(() => {
