@@ -209,6 +209,7 @@ const REQUIRED_KEYS = [
   "shopVisits",
   "idleLeftOut",
   "visitsNote",
+  "manYen",
 ];
 
 function loadNamespace(locale) {

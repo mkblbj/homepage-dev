@@ -1609,7 +1609,8 @@
         "activeShops": "稼働{{count}}店",
         "shopVisits": "店舗別 訪問",
         "idleLeftOut": "{{names}} は実績がないため省略",
-        "visitsNote": "並び順は上の店舗別と同じ · 対中位は ±20% を超えたときだけ色が付きます"
+        "visitsNote": "並び順は上の店舗別と同じ · 対中位は ±20% を超えたときだけ色が付きます",
+        "manYen": "万円"
     },
     "uoshippingdashboard": {
         "allPlatforms": "全部",

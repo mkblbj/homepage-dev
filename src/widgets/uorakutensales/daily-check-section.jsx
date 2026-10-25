@@ -300,6 +300,55 @@ export function VisitCard({ performance, cardCls = "", t }) {
 const TH = "px-2 py-2 text-xs font-semibold text-theme-600 dark:text-theme-300";
 const TD = "px-2 py-2.5 text-sm tabular-nums text-right";
 
+// Ten figures side by side only read as four groups when the groups show:
+// each one opens with a rule, and every other group sits on a faint band.
+const COL_GROUP = [null, "today", "today", "today", "week", "week", "month", "month", "visits", "visits"];
+const GROUP_START = { 1: "today", 4: "week", 6: "month", 8: "visits" };
+const BANDED = new Set(["week", "visits"]);
+// shop, 今日 (takes the rest), share, vs 7-day, avg/day, CVR, to date, vs last month, visits, vs median
+const COL_WIDTHS = [176, null, 76, 140, 112, 84, 120, 100, 104, 100];
+const BAND = "bg-theme-200/40 dark:bg-white/[0.035]";
+const GROUP_BAR = { today: "#F0857A", week: "#7FB2E8", month: "#E8B26A", visits: "#7DDBB0" };
+
+function colProps(i) {
+  const group = COL_GROUP[i];
+  const start = GROUP_START[i];
+  return {
+    "data-group-start": start,
+    className: `${start ? "border-l border-theme-300/60 pl-4 dark:border-white/10" : ""} ${BANDED.has(group) ? BAND : ""}`,
+  };
+}
+
+// the figure only; its unit lives in the column header
+function bareText(metric, value, t) {
+  if (value === null || value === undefined) return DASH;
+  return metric === "sales" ? man(value) : fmt(t, Math.round(value));
+}
+
+function unitOf(metric, t) {
+  return (metric === "sales" ? t(`${NS}.manYen`) : t(`${NS}.${UNIT_KEY[metric]}`)).trim();
+}
+
+function withUnit(label, unit) {
+  return unit ? `${label}（${unit}）` : label;
+}
+
+// a change the reader should notice gets a chip; anything inside ±20% steps back
+function DeltaCell({ value }) {
+  const tone = deltaTone(value);
+  const look = {
+    down: "rounded-md bg-rose-500/15 px-1.5 py-0.5 font-bold text-rose-700 dark:bg-rose-400/15 dark:text-rose-300",
+    up: "rounded-md bg-emerald-500/15 px-1.5 py-0.5 font-bold text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-300",
+    flat: "text-theme-600 dark:text-theme-400",
+    unknown: "text-theme-500 dark:text-theme-400",
+  };
+  return (
+    <span data-tone={tone} className={`tabular-nums ${look[tone]}`}>
+      {signedPct(value)}
+    </span>
+  );
+}
+
 // per-shop logo with a first-char fallback when the URL is empty or fails to load.
 // Rakuten logos vary (some white-bg) → bg-white + object-contain keeps them clean.
 export function ShopLogo({ name, url, size = 18 }) {
@@ -344,28 +393,40 @@ export function ShopName({ name, color, logoUrl }) {
 }
 
 function TodayCell({ row, metric, maxToday, color, t }) {
+  const { className, ...props } = colProps(1);
   if (!row.today) {
-    return <td className="px-2 py-2.5 text-sm text-theme-500 dark:text-theme-400">{DASH}</td>;
+    return (
+      <td {...props} className={`${className} px-2 py-2.5 text-sm text-theme-500 dark:text-theme-400`}>
+        {DASH}
+      </td>
+    );
   }
   const others = METRICS.filter((m) => m !== metric)
     .map((m) => valueText(m, row.today[m], t))
     .join(" · ");
   return (
-    <td className="px-2 py-2.5">
-      <span className="flex items-baseline justify-between gap-3">
-        <span className={`text-base font-extrabold tabular-nums ${ACCENT_TEXT}`}>
-          {valueText(metric, row.today[metric], t)}
-        </span>
-        <span className={`whitespace-nowrap text-xs tabular-nums ${MUTED}`}>{others}</span>
-      </span>
-      {color ? (
-        <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-theme-400/40 dark:bg-white/10">
-          <span
-            className="block h-full rounded-full"
-            style={{ width: `${Math.max(2, (row.today[metric] / maxToday) * 100)}%`, backgroundColor: color }}
-          />
-        </span>
-      ) : null}
+    <td {...props} className={`${className} px-2 py-2.5`}>
+      {/* a narrow column stacks the bar under the figures; a wide one runs it
+          beside them, so the bar fills the gap up to シェア. The figures keep a
+          fixed width there, so every row's bar starts at the same x. */}
+      <div className="@container/today">
+        <div className="flex flex-col gap-1.5 @min-[460px]/today:flex-row @min-[460px]/today:items-center @min-[460px]/today:gap-4">
+          <span className="flex items-baseline gap-2.5 @min-[460px]/today:w-[230px] @min-[460px]/today:shrink-0">
+            <span className={`text-base font-extrabold tabular-nums ${ACCENT_TEXT}`}>
+              {valueText(metric, row.today[metric], t)}
+            </span>
+            <span className={`whitespace-nowrap text-xs tabular-nums ${MUTED}`}>{others}</span>
+          </span>
+          {color ? (
+            <span className="block h-1.5 w-full overflow-hidden rounded-full bg-theme-400/40 @min-[460px]/today:flex-1 dark:bg-white/10">
+              <span
+                className="block h-full rounded-full"
+                style={{ width: `${Math.max(2, (row.today[metric] / maxToday) * 100)}%`, backgroundColor: color }}
+              />
+            </span>
+          ) : null}
+        </div>
+      </div>
     </td>
   );
 }
@@ -374,7 +435,7 @@ function AvgRatioCell({ row, metric }) {
   const avg = row.avg?.[metric];
   const pct = avg > 0 && row.today ? (row.today[metric] / avg) * 100 : null;
   return (
-    <td className="px-2 py-2.5">
+    <td {...colProps(3)} className={`${colProps(3).className} px-2 py-2.5`}>
       {pct === null ? (
         <span className="block text-right text-sm text-theme-500 dark:text-theme-400">{DASH}</span>
       ) : (
@@ -391,6 +452,16 @@ function AvgRatioCell({ row, metric }) {
   );
 }
 
+// one body cell of column `i`, carrying its group's rule and band
+function Cell({ i, className = "", children }) {
+  const { className: groupCls, ...props } = colProps(i);
+  return (
+    <td {...props} className={`${TD} ${groupCls} ${className}`}>
+      {children}
+    </td>
+  );
+}
+
 function ShopRow({ row, metric, total, maxToday, color, logoUrl, t, isTotal = false }) {
   const share = total > 0 && row.today ? `${((row.today[metric] / total) * 100).toFixed(1)}%` : DASH;
   return (
@@ -398,7 +469,7 @@ function ShopRow({ row, metric, total, maxToday, color, logoUrl, t, isTotal = fa
       className={
         isTotal
           ? "border-t-2 border-theme-300/70 font-bold dark:border-white/20"
-          : "border-b border-theme-300/30 dark:border-white/[0.07]"
+          : "border-b border-theme-300/30 transition-colors hover:bg-theme-200/40 dark:border-white/[0.07] dark:hover:bg-white/[0.04]"
       }
     >
       <th scope="row" className="px-2 py-2.5 text-left text-sm">
@@ -409,20 +480,28 @@ function ShopRow({ row, metric, total, maxToday, color, logoUrl, t, isTotal = fa
         )}
       </th>
       <TodayCell row={row} metric={metric} maxToday={maxToday} color={isTotal ? null : color} t={t} />
-      <td className={`${TD} ${MUTED}`}>{share}</td>
+      <Cell i={2} className={MUTED}>
+        {share}
+      </Cell>
       <AvgRatioCell row={row} metric={metric} />
-      <td className={`${TD} text-theme-800 dark:text-theme-100`}>{shortText(metric, row.avg?.[metric], t)}</td>
-      <td className={`${TD} ${MUTED}`}>{row.cvr === null ? DASH : `${row.cvr.toFixed(2)}%`}</td>
-      <td className={`${TD} font-bold text-theme-900 dark:text-theme-50`}>
-        {shortText(metric, row.month?.[metric], t)}
-      </td>
-      <td className={TD}>
-        <Delta value={row.monthDelta?.[metric] ?? null} />
-      </td>
-      <td className={`${TD} text-theme-800 dark:text-theme-100`}>{row.visits === null ? DASH : fmt(t, row.visits)}</td>
-      <td className={TD}>
-        <Delta value={row.visitDelta} />
-      </td>
+      <Cell i={4} className="text-theme-800 dark:text-theme-100">
+        {bareText(metric, row.avg?.[metric], t)}
+      </Cell>
+      <Cell i={5} className={MUTED}>
+        {row.cvr === null ? DASH : `${row.cvr.toFixed(2)}%`}
+      </Cell>
+      <Cell i={6} className="font-bold text-theme-900 dark:text-theme-50">
+        {bareText(metric, row.month?.[metric], t)}
+      </Cell>
+      <Cell i={7}>
+        <DeltaCell value={row.monthDelta?.[metric] ?? null} />
+      </Cell>
+      <Cell i={8} className="text-theme-800 dark:text-theme-100">
+        {row.visits === null ? DASH : fmt(t, row.visits)}
+      </Cell>
+      <Cell i={9} className="pr-3">
+        <DeltaCell value={row.visitDelta} />
+      </Cell>
     </tr>
   );
 }
@@ -433,13 +512,13 @@ function IdleRow({ row, color, logoUrl, t }) {
       <th scope="row" className="px-2 py-2 text-left text-sm">
         <ShopName name={row.name} color={color} logoUrl={logoUrl} />
       </th>
-      <td colSpan={7} className="px-2 py-2 text-xs">
+      <td colSpan={7} {...colProps(1)} className={`${colProps(1).className} px-2 py-2 text-xs`}>
         {t(`${NS}.idleNote`)}
       </td>
-      <td className={TD}>{row.visits === null ? DASH : fmt(t, row.visits)}</td>
-      <td className={TD}>
-        <Delta value={row.visitDelta} />
-      </td>
+      <Cell i={8}>{row.visits === null ? DASH : fmt(t, row.visits)}</Cell>
+      <Cell i={9} className="pr-3">
+        <DeltaCell value={row.visitDelta} />
+      </Cell>
     </tr>
   );
 }
@@ -450,12 +529,35 @@ export function ShopTable({ table, metric, shopColors, logoByName = new Map(), p
   const colorOf = (name) => shopColors[name] ?? FALLBACK_SHOP_COLOR;
   const maxToday = Math.max(1, ...table.rows.map((r) => r.today?.[metric] ?? 0));
   const total = table.total.today[metric];
-  const group = (key, span, border) => (
-    <th colSpan={span} scope="colgroup" className={`border-b-2 px-2 pb-1.5 text-left text-xs font-bold ${border}`}>
-      <span className="text-theme-800 dark:text-theme-100">{t(`${NS}.${key}`)}</span>
-      {periods[key] ? <span className={`ml-1.5 font-medium ${MUTED}`}>{periods[key]}</span> : null}
-    </th>
-  );
+  const unit = unitOf(metric, t);
+  // a group's header opens its band: the group's colour on top, then its name and period
+  const group = (key, firstCol, span) => {
+    const { className, ...props } = colProps(firstCol);
+    return (
+      <th
+        colSpan={span}
+        scope="colgroup"
+        {...props}
+        className={`${className} px-2 pb-1.5 pt-0 text-left text-xs font-bold`}
+      >
+        <span
+          aria-hidden="true"
+          className="mb-1.5 block h-[3px] rounded-full"
+          style={{ backgroundColor: GROUP_BAR[COL_GROUP[firstCol]] }}
+        />
+        <span className="text-theme-800 dark:text-theme-100">{t(`${NS}.${key}`)}</span>
+        {periods[key] ? <span className={`ml-1.5 font-medium ${MUTED}`}>{periods[key]}</span> : null}
+      </th>
+    );
+  };
+  const head = (i, label, align = "text-right") => {
+    const { className, ...props } = colProps(i);
+    return (
+      <th scope="col" {...props} className={`${TH} ${className} ${align}`}>
+        {label}
+      </th>
+    );
+  };
   return (
     <section className={`flex min-w-0 flex-col gap-3 p-5 ${cardCls}`}>
       <span className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -463,46 +565,35 @@ export function ShopTable({ table, metric, shopColors, logoByName = new Map(), p
         <span className={`text-xs ${MUTED}`}>{t(`${NS}.shopTableNote`)}</span>
       </span>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1080px] border-collapse">
+        <table className="w-full min-w-[1040px] table-fixed border-collapse">
+          {/* figure columns keep their width; any spare width goes to 今日, so a
+              group's figures never drift apart on a wide screen */}
+          <colgroup>
+            {COL_WIDTHS.map((width, i) => (
+              <col key={COL_GROUP[i] ? `${COL_GROUP[i]}-${i}` : "shop"} style={width ? { width } : undefined} />
+            ))}
+          </colgroup>
           <thead>
             <tr>
               <th aria-hidden="true" />
-              {group("colToday", 3, "border-rose-400/80")}
-              {group("colWeek", 2, "border-sky-400/70")}
-              {group("colMonth", 2, "border-amber-400/80")}
-              {group("colVisits", 2, "border-emerald-400/70")}
+              {group("colToday", 1, 3)}
+              {group("colWeek", 4, 2)}
+              {group("colMonth", 6, 2)}
+              {group("colVisits", 8, 2)}
             </tr>
             <tr className="border-b border-theme-300/50 dark:border-white/10">
-              <th scope="col" className={`${TH} w-[140px] text-left`}>
+              <th scope="col" className={`${TH} text-left`}>
                 {t(`${NS}.colShop`)}
               </th>
-              <th scope="col" className={`${TH} text-left`}>
-                {t(`${NS}.${METRIC_LABEL[metric]}`)}
-              </th>
-              <th scope="col" className={`${TH} w-[72px] text-right`}>
-                {t(`${NS}.share`)}
-              </th>
-              <th scope="col" className={`${TH} w-[132px] text-left`}>
-                {t(`${NS}.vsAvg`)}
-              </th>
-              <th scope="col" className={`${TH} w-[104px] text-right`}>
-                {t(`${NS}.perDayAvg`)}
-              </th>
-              <th scope="col" className={`${TH} w-[76px] text-right`}>
-                CVR
-              </th>
-              <th scope="col" className={`${TH} w-[116px] text-right`}>
-                {t(`${NS}.cumulative`)}
-              </th>
-              <th scope="col" className={`${TH} w-[96px] text-right`}>
-                {t(`${NS}.vsPrev`)}
-              </th>
-              <th scope="col" className={`${TH} w-[88px] text-right`}>
-                {t(`${NS}.visits`)}
-              </th>
-              <th scope="col" className={`${TH} w-[88px] text-right`}>
-                {t(`${NS}.vsMedian`)}
-              </th>
+              {head(1, t(`${NS}.${METRIC_LABEL[metric]}`), "text-left")}
+              {head(2, t(`${NS}.share`), "text-right")}
+              {head(3, t(`${NS}.vsAvg`), "text-left")}
+              {head(4, withUnit(t(`${NS}.perDayAvg`), unit), "text-right")}
+              {head(5, "CVR", "text-right")}
+              {head(6, withUnit(t(`${NS}.cumulative`), unit), "text-right")}
+              {head(7, t(`${NS}.vsPrev`), "text-right")}
+              {head(8, withUnit(t(`${NS}.visits`), t(`${NS}.peopleUnit`).trim()), "text-right")}
+              {head(9, t(`${NS}.vsMedian`), "text-right pr-3")}
             </tr>
           </thead>
           <tbody>

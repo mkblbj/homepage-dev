@@ -59,6 +59,38 @@ describe("widgets/uorakutensales/daily-check-section", () => {
     expect(within(row).getByText("−8.3%")).toHaveAttribute("data-tone", "flat");
   });
 
+  it("units sit in the headers, so the cells carry bare figures", () => {
+    render(<ShopTable table={table} metric="orders" shopColors={{}} t={t} />);
+
+    expect(screen.getByRole("columnheader", { name: `${NS}.perDayAvg（${NS}.ordersUnit）` })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: `${NS}.cumulative（${NS}.ordersUnit）` })).toBeInTheDocument();
+    const row = screen.getByRole("row", { name: /^A/ });
+    // avg 25 a day, 800 this month, 700 visits — no unit repeated per cell
+    expect(within(row).getByText("25")).toBeInTheDocument();
+    expect(within(row).getByText("800")).toBeInTheDocument();
+    expect(within(row).getByText("700")).toBeInTheDocument();
+    expect(within(row).queryByText(`25${NS}.ordersUnit`)).not.toBeInTheDocument();
+  });
+
+  it("yen columns read in 万円 from the header", () => {
+    render(<ShopTable table={table} metric="sales" shopColors={{}} t={t} />);
+
+    expect(screen.getByRole("columnheader", { name: `${NS}.perDayAvg（${NS}.manYen）` })).toBeInTheDocument();
+    const row = screen.getByRole("row", { name: /^A/ });
+    // ¥3,000 a day and ¥90,000 this month
+    expect(within(row).getByText("0.3")).toBeInTheDocument();
+    expect(within(row).getByText("9.0")).toBeInTheDocument();
+  });
+
+  it("each column group starts with a divider the whole way down", () => {
+    render(<ShopTable table={table} metric="sales" shopColors={{}} t={t} />);
+
+    for (const row of screen.getAllByRole("row").slice(1)) {
+      const starts = [...row.querySelectorAll("[data-group-start]")].map((c) => c.dataset.groupStart);
+      expect(starts, row.textContent).toEqual(["today", "week", "month", "visits"]);
+    }
+  });
+
   it("idle shops stay folded until asked", () => {
     render(<ShopTable table={table} metric="sales" shopColors={{}} t={t} />);
 
