@@ -163,6 +163,46 @@ const REQUIRED_KEYS = [
   "ruleMissingStyle",
   "ruleConflictingHistory",
   "quoted",
+  // 楽天 tab: daily check module
+  "metric",
+  "dailyCheck",
+  "dailyCheckNote",
+  "analysis",
+  "analysisNote",
+  "collapse",
+  "expand",
+  "jumpTo",
+  "todayLabel",
+  "todayNoTimeCorrection",
+  "vsAvgOf",
+  "last7AndToday",
+  "avgLine",
+  "prevPaceDelta",
+  "dailyAvgVsPrev",
+  "reachOfPrev",
+  "monthElapsed",
+  "visitsTitle",
+  "confirmed",
+  "medianDelta",
+  "visitDetail",
+  "peopleUnit",
+  "shopTable",
+  "shopTableNote",
+  "colShop",
+  "colToday",
+  "colWeek",
+  "colMonth",
+  "colVisits",
+  "share",
+  "vsAvg",
+  "perDayAvg",
+  "cumulative",
+  "vsPrev",
+  "visits",
+  "vsMedian",
+  "idleShow",
+  "idleHide",
+  "idleNote",
 ];
 
 function loadNamespace(locale) {
@@ -190,6 +230,24 @@ test("interpolation placeholders are preserved across locales", () => {
     assert.match(ns.vsSevenDayAvg, /\{\{avg\}\}/, `${locale}.vsSevenDayAvg needs {{avg}}`);
     assert.match(ns.monthProgress, /\{\{pct\}\}/, `${locale}.monthProgress needs {{pct}}`);
     assert.match(ns.monthCompleted, /\{\{count\}\}/, `${locale}.monthCompleted needs {{count}}`);
+  }
+});
+
+test("daily check placeholders are preserved across locales", () => {
+  for (const locale of LOCALES) {
+    const ns = loadNamespace(locale);
+    assert.match(ns.vsAvgOf, /\{\{avg\}\}/, `${locale}.vsAvgOf needs {{avg}}`);
+    assert.match(
+      ns.dailyAvgVsPrev,
+      /\{\{pace\}\}.*\{\{prev\}\}/,
+      `${locale}.dailyAvgVsPrev needs {{pace}} then {{prev}}`,
+    );
+    assert.match(ns.reachOfPrev, /\{\{prev\}\}/, `${locale}.reachOfPrev needs {{prev}}`);
+    assert.match(ns.reachOfPrev, /\{\{pct\}\}/, `${locale}.reachOfPrev needs {{pct}}`);
+    assert.match(ns.monthElapsed, /\{\{pct\}\}/, `${locale}.monthElapsed needs {{pct}}`);
+    assert.match(ns.visitDetail, /\{\{median\}\}.*\{\{uu\}\}/, `${locale}.visitDetail needs {{median}} then {{uu}}`);
+    assert.match(ns.idleShow, /\{\{count\}\}/, `${locale}.idleShow needs {{count}}`);
+    assert.match(ns.idleShow, /\{\{names\}\}/, `${locale}.idleShow needs {{names}}`);
   }
 });
 
