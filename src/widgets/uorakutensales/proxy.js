@@ -24,6 +24,7 @@ const EXPECTED_METHOD_BY_ENDPOINT = {
   market: "GET",
   marketEvidence: "GET",
   devicesEvidence: "GET",
+  performance: "GET",
 };
 
 function parseResponseData(data) {

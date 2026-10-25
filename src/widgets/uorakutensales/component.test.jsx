@@ -39,10 +39,13 @@ function rankedItem(mno, shopName) {
 }
 
 // One ranked board. GET /api/item-rankings nests three of these under `rankings`.
+// The overall board leads with `overallMno` and carries seven more, so the
+// collapsed board (six rows) has something left to open.
 function rankingBoard(overallMno, shops) {
+  const overall = [overallMno, ...Array.from({ length: 7 }, (_, i) => `${overallMno}-${i + 2}`)];
   return {
     shopCount: shops.length,
-    overall: { itemCount: 1, items: [rankedItem(overallMno, shops[0].shopName)] },
+    overall: { itemCount: overall.length, items: overall.map((mno) => rankedItem(mno, shops[0].shopName)) },
     shops: shops.map(({ shopName, mno }) => ({
       shopName,
       itemCount: 1,
@@ -65,6 +68,7 @@ function ranking(overallMno, shops) {
 describe("widgets/uorakutensales/component", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
   });
 
   it("falls back to the overall ranking when the selected shop disappears after refresh", () => {
@@ -79,6 +83,7 @@ describe("widgets/uorakutensales/component", () => {
       settings: { hideErrors: false },
     });
 
+    fireEvent.click(screen.getByRole("button", { name: "uorakutensales.showMore" }));
     fireEvent.click(screen.getByRole("button", { name: "shop-a" }));
     expect(screen.getByText("shop-a-item")).toBeInTheDocument();
 
@@ -91,6 +96,45 @@ describe("widgets/uorakutensales/component", () => {
 
     expect(screen.getByText("overall-after")).toBeInTheDocument();
     expect(screen.queryByText("shop-a-item")).not.toBeInTheDocument();
+  });
+
+  it("shows six best sellers until opened, then the shop chips", () => {
+    const rankingData = ranking("overall-item", [{ shopName: "shop-a", mno: "shop-a-item" }]);
+    useWidgetAPI.mockImplementation((_widget, endpoint) => {
+      if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
+      if (endpoint === "ranking") return { data: rankingData, error: undefined, mutate: vi.fn() };
+      return { data: undefined, error: undefined, mutate: vi.fn() };
+    });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+
+    expect(screen.getByText("overall-item-6")).toBeInTheDocument();
+    expect(screen.queryByText("overall-item-7")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "shop-a" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "uorakutensales.showMore" }));
+    expect(screen.getByText("overall-item-7")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "shop-a" })).toBeInTheDocument();
+  });
+
+  it("collapsing the best sellers resets the shop filter", () => {
+    const rankingData = ranking("overall-item", [{ shopName: "shop-a", mno: "shop-a-item" }]);
+    useWidgetAPI.mockImplementation((_widget, endpoint) => {
+      if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
+      if (endpoint === "ranking") return { data: rankingData, error: undefined, mutate: vi.fn() };
+      return { data: undefined, error: undefined, mutate: vi.fn() };
+    });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+
+    fireEvent.click(screen.getByRole("button", { name: "uorakutensales.showMore" }));
+    fireEvent.click(screen.getByRole("button", { name: "shop-a" }));
+    expect(screen.getByText("shop-a-item")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "uorakutensales.showLessTop" }));
+    expect(screen.getByText("overall-item")).toBeInTheDocument();
+    expect(screen.queryByText("shop-a-item")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "shop-a" })).not.toBeInTheDocument();
   });
 
   it("refreshes the ranking together with the sales snapshots", () => {
@@ -114,6 +158,112 @@ describe("widgets/uorakutensales/component", () => {
     expect(mutateSales).toHaveBeenCalledOnce();
     expect(mutateHistory).toHaveBeenCalledOnce();
     expect(mutateRanking).toHaveBeenCalledOnce();
+  });
+
+  it("reads the performance snapshot on the widget's own interval", () => {
+    useWidgetAPI.mockImplementation((_widget, endpoint) => {
+      if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
+      return { data: undefined, error: undefined, mutate: vi.fn() };
+    });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+
+    expect(useWidgetAPI).toHaveBeenCalledWith(service.widget, "performance", { refreshInterval: 60000 });
+  });
+
+  it("refreshes the performance snapshot with everything else", () => {
+    const mutatePerformance = vi.fn();
+    useWidgetAPI.mockImplementation((_widget, endpoint) => {
+      if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
+      if (endpoint === "performance") return { data: undefined, error: undefined, mutate: mutatePerformance };
+      return { data: undefined, error: undefined, mutate: vi.fn() };
+    });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+    fireEvent.click(screen.getByRole("button", { name: "uorakutensales.refresh" }));
+
+    expect(mutatePerformance).toHaveBeenCalledOnce();
+  });
+
+  it("renders the daily check without the performance snapshot", () => {
+    useWidgetAPI.mockImplementation((_widget, endpoint) => {
+      if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
+      return { data: undefined, error: undefined, mutate: vi.fn() };
+    });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+
+    expect(screen.getByRole("heading", { name: "uorakutensales.dailyCheck" })).toBeInTheDocument();
+    expect(screen.queryByText("uorakutensales.visitsTitle")).not.toBeInTheDocument();
+  });
+
+  it("shows the latest visits once the performance snapshot is there", () => {
+    const performance = {
+      ok: true,
+      traffic: {
+        dataDateJST: "2026-10-24",
+        visitCount: 21654,
+        uniqueVisitorCount: 20152,
+        expectedVisitCount: 25494.5,
+        visitDeltaPercent: -15.1,
+        sampleCount: 4,
+      },
+      shops: [],
+    };
+    useWidgetAPI.mockImplementation((_widget, endpoint) => {
+      if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
+      if (endpoint === "performance") return { data: performance, error: undefined, mutate: vi.fn() };
+      return { data: undefined, error: undefined, mutate: vi.fn() };
+    });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+
+    expect(screen.getByText("uorakutensales.visitsTitle")).toBeInTheDocument();
+  });
+
+  it("folds the analysis module and remembers it", () => {
+    useWidgetAPI.mockImplementation((_widget, endpoint) => {
+      if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
+      if (endpoint === "devices") return { data: dailyDeviceSales(), error: undefined, mutate: vi.fn() };
+      if (endpoint === "devicesMonthly") return { data: monthlyDeviceSales(), error: undefined, mutate: vi.fn() };
+      return { data: undefined, error: undefined, mutate: vi.fn() };
+    });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+    expect(screen.getByText("uorakutensales.deviceSales")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "uorakutensales.collapse" }));
+
+    expect(screen.queryByText("uorakutensales.deviceSales")).not.toBeInTheDocument();
+    expect(localStorage.getItem("uorakutensales.analysisOpen")).toBe("false");
+  });
+
+  it("starts folded when the reader folded the analysis module before", () => {
+    localStorage.setItem("uorakutensales.analysisOpen", "false");
+    useWidgetAPI.mockImplementation((_widget, endpoint) => {
+      if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
+      if (endpoint === "devices") return { data: dailyDeviceSales(), error: undefined, mutate: vi.fn() };
+      if (endpoint === "devicesMonthly") return { data: monthlyDeviceSales(), error: undefined, mutate: vi.fn() };
+      return { data: undefined, error: undefined, mutate: vi.fn() };
+    });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+
+    expect(screen.queryByText("uorakutensales.deviceSales")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "uorakutensales.expand" })).toBeInTheDocument();
+  });
+
+  it("jumps between the modules without touching the tab in the URL", () => {
+    window.location.hash = "#楽天";
+    useWidgetAPI.mockImplementation((_widget, endpoint) => {
+      if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
+      return { data: undefined, error: undefined, mutate: vi.fn() };
+    });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+    fireEvent.click(screen.getByRole("button", { name: "uorakutensales.jumpTo uorakutensales.analysis" }));
+
+    expect(decodeURIComponent(window.location.hash)).toBe("#楽天");
   });
 
   it("reads both device boards on the widget's own interval", () => {
@@ -181,7 +331,7 @@ describe("widgets/uorakutensales/component", () => {
 
     expect(screen.queryByText("uorakutensales.deviceSales")).not.toBeInTheDocument();
     // the rest of the widget is untouched
-    expect(screen.getByText("uorakutensales.title")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "uorakutensales.dailyCheck" })).toBeInTheDocument();
   });
   it("offers the 市場 view only when the server has the market reference", () => {
     const notFound = { error: { message: "Rakuten sales service error", data: { error: "Not Found" } } };

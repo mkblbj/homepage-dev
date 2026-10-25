@@ -127,6 +127,15 @@ describe("widgets/uorakutensales/device-sales-section", () => {
     expect(within(se).getByTitle(SE_NAME)).toBeInTheDocument();
   });
 
+  it("states its own basis as a note above the boards, not in a footnote", () => {
+    renderBoard();
+
+    const note = screen.getByRole("note");
+    expect(note).toHaveTextContent("uorakutensales.deviceNote");
+    const firstRow = column("case").getAllByTestId("device-row")[0];
+    expect(note.compareDocumentPosition(firstRow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("reads the same ranking from the bottom for 少ない順, keeping each rank", () => {
     renderBoard();
 

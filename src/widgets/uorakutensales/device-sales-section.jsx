@@ -605,6 +605,14 @@ export default function DeviceSalesSection({
         </div>
       </div>
 
+      {/* this board counts differently from the daily check above: say so up front */}
+      <p
+        role="note"
+        className="rounded-lg border border-amber-400/50 bg-amber-400/10 px-3 py-2 text-xs leading-relaxed text-amber-900 dark:border-amber-300/30 dark:bg-amber-300/10 dark:text-amber-100"
+      >
+        {t(`${NS}.deviceNote`)}
+      </p>
+
       {marketOn ? (
         <MarketView
           reference={market}
@@ -682,7 +690,6 @@ export default function DeviceSalesSection({
         <p className={`text-[10.5px] leading-relaxed ${MUTED}`}>{t(`${NS}.slowingNote`, { min: SLOWING_MIN_UNITS })}</p>
       ) : null}
       {marketOn ? <p className={`text-[10.5px] leading-relaxed ${MUTED}`}>{t(`${NS}.marketNote`)}</p> : null}
-      <p className={`text-[10.5px] leading-relaxed ${MUTED}`}>{t(`${NS}.deviceNote`)}</p>
     </section>
   );
 }

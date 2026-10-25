@@ -22,6 +22,8 @@ const ENDPOINT_PATHS = {
   marketEvidence: "/api/market-rankings/device-models",
   // our own products behind one model, read with that model's scope
   devicesEvidence: "/api/device-sales/evidence",
+  // yesterday's visits and the new / repeat mix (the 経営表現 snapshot)
+  performance: "/api/performance",
 };
 
 export function normalizeSalesServiceUrl(baseUrl = DEFAULT_SALES_SERVICE_URL) {

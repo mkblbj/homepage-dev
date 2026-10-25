@@ -441,7 +441,7 @@ test("buildRanking caps each board at 100 items", () => {
 });
 
 test("RANKING_STEPS reveals progressively and ends at the cap", () => {
-  assert.deepEqual([...RANKING_STEPS], [11, 20, 50, 100]);
+  assert.deepEqual([...RANKING_STEPS], [6, 20, 50, 100]);
   // strictly increasing so each click always reveals more
   RANKING_STEPS.forEach((v, i) => i && assert.ok(v > RANKING_STEPS[i - 1]));
   assert.equal(RANKING_STEPS[RANKING_STEPS.length - 1], RANKING_MAX_COUNT);
