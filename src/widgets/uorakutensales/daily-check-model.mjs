@@ -1,0 +1,98 @@
+// View model for the 楽天 tab's daily check: one row per shop with today, the
+// last 7 days, this month and yesterday's visits side by side. Unknown stays
+// null all the way to the screen — a missing board is never drawn as zero.
+
+export const METRICS = Object.freeze(["sales", "units", "orders"]);
+
+// the item boards key their dimensions by the API's own names
+export const RANKING_DIM_BY_METRIC = Object.freeze({ sales: "sales", units: "units", orders: "orderCount" });
+
+// a change only earns a colour once it passes ±20% — the same thresholds the
+// performance snapshot uses for 増加 / 低下
+const TONE_THRESHOLD = 20;
+
+export function deltaTone(delta) {
+  if (delta === null || delta === undefined || !Number.isFinite(Number(delta))) return "unknown";
+  if (delta <= -TONE_THRESHOLD) return "down";
+  if (delta >= TONE_THRESHOLD) return "up";
+  return "flat";
+}
+
+function triple(sales, units, orders) {
+  return { sales, units, orders };
+}
+
+function isZero(values) {
+  return !values || (!(values.sales > 0) && !(values.orders > 0));
+}
+
+function monthOf(shop) {
+  if (!shop) return { month: null, monthDelta: null };
+  const m = shop.metrics;
+  return {
+    month: triple(m.sales.current, m.units.current, m.orders.current),
+    monthDelta: triple(m.sales.paceDeltaPct, m.units.paceDeltaPct, m.orders.paceDeltaPct),
+  };
+}
+
+// Rows in a fixed order for the whole month — this month's sales, largest
+// first — so a shop keeps its line while today's figures move. Shops the month
+// board does not know yet follow, by today's sales.
+export function buildShopTable({ model, monthly, performance }) {
+  const hasHistory = Boolean(model?.hasHistory);
+  const nDays = model?.nDays || 7;
+  const todayByName = new Map((model?.rows || []).map((r) => [r.name, r]));
+  const monthByName = new Map((monthly?.shops || []).map((s) => [s.name, s]));
+  const visitsByName = new Map((performance?.shops || []).map((s) => [s.name, s]));
+
+  const monthOrder = (monthly?.shops || []).map((s) => s.name);
+  const rest = (model?.rows || [])
+    .filter((r) => !monthByName.has(r.name))
+    .sort((a, b) => b.rtSales - a.rtSales)
+    .map((r) => r.name);
+
+  const rows = [];
+  const idle = [];
+  [...monthOrder, ...rest].forEach((name) => {
+    const live = todayByName.get(name);
+    const visits = visitsByName.get(name);
+    const row = {
+      name,
+      today: triple(live?.rtSales ?? 0, live?.rtUnits ?? 0, live?.rtOrders ?? 0),
+      avg: hasHistory
+        ? triple((live?.h7Total ?? 0) / nDays, (live?.h7Units ?? 0) / nDays, (live?.h7Orders ?? 0) / nDays)
+        : null,
+      cvr: hasHistory ? (live?.cvr ?? 0) : null,
+      ...monthOf(monthByName.get(name)),
+      visits: visits?.visit ?? null,
+      visitDelta: visits?.delta ?? null,
+    };
+    const week = live ? { sales: live.h7Total, orders: live.h7Orders } : null;
+    (isZero(row.today) && isZero(week) && isZero(row.month) ? idle : rows).push(row);
+  });
+
+  const m = monthly?.metrics;
+  const total = {
+    name: null,
+    today: triple(model?.rtTotal ?? 0, model?.rtUnits ?? 0, model?.rtOrders ?? 0),
+    avg: hasHistory ? triple(model.avg, model.avgUnits, model.avgOrders) : null,
+    cvr: hasHistory ? model.grandCvr : null,
+    month: m ? triple(m.sales.current, m.units.current, m.orders.current) : null,
+    monthDelta: m ? triple(m.sales.paceDeltaPct, m.units.paceDeltaPct, m.orders.paceDeltaPct) : null,
+    visits: performance?.visit ?? null,
+    visitDelta: performance?.delta ?? null,
+  };
+
+  return { rows, idle, total };
+}
+
+const TODAY_KEY = { sales: "rtTotal", units: "rtUnits", orders: "rtOrders" };
+const AVG_KEY = { sales: "avg", units: "avgUnits", orders: "avgOrders" };
+
+// today against the trailing 7-day daily average — a raw ratio with no
+// time-of-day correction, so the UI never colours it as good or bad
+export function todayVsAverage(model, metric) {
+  const value = model?.[TODAY_KEY[metric]] ?? 0;
+  const avg = model?.hasHistory ? (model[AVG_KEY[metric]] ?? null) : null;
+  return { value, avg, pct: avg > 0 ? (value / avg) * 100 : null };
+}
