@@ -1609,7 +1609,8 @@
         "activeShops": "{{count}} active",
         "shopVisits": "Visits by shop",
         "idleLeftOut": "{{names}} left out (no sales)",
-        "visitsNote": "Same order as the shop table above · vs median is coloured only beyond ±20%"
+        "visitsNote": "Same order as the shop table above · vs median is coloured only beyond ±20%",
+        "manYen": "¥10k"
     },
     "uoshippingdashboard": {
         "allPlatforms": "All",
