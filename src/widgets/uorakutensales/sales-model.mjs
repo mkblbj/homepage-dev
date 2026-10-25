@@ -484,7 +484,6 @@ export function buildPeaks(peaks) {
 // The month board offers the same three metrics in the same order as the record
 // board, so the two toggles read as one control.
 export const MONTH_DIMS = PEAK_DIMS;
-export const DEFAULT_MONTH_DIM = MONTH_DIMS[0];
 
 // "2026-09" → 30. Day 0 of the next month is the last day of this one; computed
 // in UTC so it never shifts with the runtime's timezone.
@@ -513,7 +512,8 @@ function metricsOf(source) {
   if (!source) return null;
   const out = {};
   MONTH_DIMS.forEach((dim) => {
-    out[dim] = toNumber(source[METRIC_KEY[dim]]);
+    const raw = source[METRIC_KEY[dim]];
+    out[dim] = raw === null || raw === undefined ? null : toNumber(raw);
   });
   return out;
 }
@@ -527,7 +527,7 @@ function metricsOf(source) {
 // corrects itself on the next poll. A total that has fallen *below* today is a
 // real disagreement, though, and reports nothing rather than a negative day.
 function paceOf(monthTotal, todayValue, completedDays) {
-  if (completedDays <= 0) return null;
+  if (completedDays <= 0 || monthTotal === null) return null;
   const completed = monthTotal - (todayValue ?? 0);
   return completed < 0 ? null : completed / completedDays;
 }
@@ -545,7 +545,7 @@ function monthMetrics(current, previous, today, completedDays, prevDays) {
       current: value,
       previous: base,
       // bullet fill: how much of last month this month has already matched
-      vsPrevPct: base > 0 ? (value / base) * 100 : null,
+      vsPrevPct: base > 0 && value !== null ? (value / base) * 100 : null,
       pace,
       prevPace,
       paceDeltaPct: comparable ? (pace / prevPace - 1) * 100 : null,
@@ -610,7 +610,7 @@ export function buildMonthly(monthly, sales) {
         hasPrevious: MONTH_DIMS.some((d) => (metrics[d].previous ?? 0) > 0),
       };
     })
-    .sort((a, b) => b.metrics.sales.current - a.metrics.sales.current);
+    .sort((a, b) => (b.metrics.sales.current ?? -1) - (a.metrics.sales.current ?? -1));
 
   return {
     generatedAt: normalizeText(monthly.generatedAtJST),

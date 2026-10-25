@@ -1588,7 +1588,7 @@
         "visitDetail": "同曜日の中位 {{median}}人 · UU {{uu}}",
         "peopleUnit": "人",
         "shopTable": "店舗別",
-        "shopTableNote": "並び順は今月の規模順で固定 · 色が付くのは ±20% を超えたときだけ",
+        "shopTableNote": "並び順は今月の規模順で固定 · 先月比と対中位は ±20% を超えたときだけ色が付きます",
         "colShop": "店舗",
         "colToday": "今日",
         "colWeek": "直近7日",
@@ -1608,7 +1608,8 @@
         "rankedBy": "{{metric}}順",
         "activeShops": "稼働{{count}}店",
         "shopVisits": "店舗別 訪問",
-        "idleLeftOut": "{{names}} は実績がないため省略"
+        "idleLeftOut": "{{names}} は実績がないため省略",
+        "visitsNote": "並び順は上の店舗別と同じ · 対中位は ±20% を超えたときだけ色が付きます"
     },
     "uoshippingdashboard": {
         "allPlatforms": "全部",

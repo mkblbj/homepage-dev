@@ -125,11 +125,35 @@ test("a shop missing from the month board follows the ranked ones", () => {
 
 test("a shop sold out of the realtime snapshot but active this month is still listed", () => {
   const t = buildShopTable(fixture({ salesShops: [shopNow("B", 50, 5)] }));
+  // Z is missing from the live snapshot too, so it is unknown rather than idle
   assert.deepEqual(
     t.rows.map((r) => r.name),
-    ["A", "B"],
+    ["A", "B", "Z"],
   );
-  assert.deepEqual(t.rows[0].today, { sales: 0, units: 0, orders: 0 });
+  // missing from the live snapshot is unknown today, not a ¥0 day
+  assert.equal(t.rows[0].today, null);
+  assert.equal(t.rows[0].avg, null);
+  assert.equal(t.rows[0].cvr, null);
+});
+
+test("a shop missing from the live snapshot is never called idle", () => {
+  const t = buildShopTable(fixture({ salesShops: [shopNow("B", 50, 5)] }));
+  assert.ok(t.rows.some((r) => r.name === "Z"));
+  assert.deepEqual(t.idle, []);
+});
+
+test("an unknown month figure is not a zero month", () => {
+  const t = buildShopTable(
+    fixture({
+      salesShops: [shopNow("A", 0), shopNow("B", 50, 5)],
+      historyShops: [shopWeek("B", 100)],
+      monthShops: [{ shopName: "A", salesYen: null, orderCount: null, unitsSold: null }, shopNow("B", 1250, 12)],
+    }),
+  );
+  const a = t.rows.find((r) => r.name === "A");
+  assert.ok(a, "A stays in the rows");
+  assert.equal(a.month.sales, null);
+  assert.equal(a.monthDelta.sales, null);
 });
 
 test("a shop quiet today but active this month is not idle", () => {

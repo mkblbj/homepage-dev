@@ -8,7 +8,6 @@ import {
   buildRanking,
   buildShopColors,
   computeFreshness,
-  DEFAULT_MONTH_DIM,
   DEFAULT_RANKING_DIM,
   DEFAULT_REFRESH_INTERVAL,
   man,
@@ -742,7 +741,20 @@ const near = (actual, expected, eps = 0.01) =>
 
 test("MONTH_DIMS matches the record board's toggle so the two read as one control", () => {
   assert.deepEqual([...MONTH_DIMS], ["sales", "units", "orders"]);
-  assert.equal(DEFAULT_MONTH_DIM, "sales");
+});
+
+test("buildMonthly keeps a shop's unknown figure unknown instead of zero", () => {
+  const payload = {
+    ...monthlyPayload,
+    currentMonth: {
+      ...monthlyPayload.currentMonth,
+      shops: [{ shopName: "松武", salesYen: null, orderCount: null, unitsSold: null }],
+    },
+  };
+  const shop = buildMonthly(payload, monthlyToday).shops[0];
+  assert.equal(shop.metrics.sales.current, null);
+  assert.equal(shop.metrics.sales.paceDeltaPct, null);
+  assert.equal(shop.metrics.sales.vsPrevPct, null);
 });
 
 test("buildMonthly withholds anything without this month's own totals", () => {

@@ -29,6 +29,10 @@ function medianDelta(source) {
   return source && source.sampleCount >= MIN_MEDIAN_SAMPLES ? source.delta : null;
 }
 
+function isKnown(values) {
+  return values !== null && values.sales !== null && values.orders !== null;
+}
+
 function isZero(values) {
   return !values || (!(values.sales > 0) && !(values.orders > 0));
 }
@@ -65,18 +69,18 @@ export function buildShopTable({ model, monthly, performance }) {
     const visits = visitsByName.get(name);
     const row = {
       name,
-      today: triple(live?.rtSales ?? 0, live?.rtUnits ?? 0, live?.rtOrders ?? 0),
-      avg: hasHistory
-        ? triple((live?.h7Total ?? 0) / nDays, (live?.h7Units ?? 0) / nDays, (live?.h7Orders ?? 0) / nDays)
-        : null,
-      cvr: hasHistory ? (live?.cvr ?? 0) : null,
+      // a shop missing from the live snapshot is unknown today, not a ¥0 day
+      today: live ? triple(live.rtSales, live.rtUnits, live.rtOrders) : null,
+      avg: hasHistory && live ? triple(live.h7Total / nDays, live.h7Units / nDays, live.h7Orders / nDays) : null,
+      cvr: hasHistory && live ? live.cvr : null,
       ...monthOf(monthByName.get(name)),
       visits: visits?.visit ?? null,
       visitDelta: medianDelta(visits),
     };
     const week = live ? { sales: live.h7Total, orders: live.h7Orders } : null;
-    // "no sales this month" is only said with the month board in hand
-    const isIdle = row.month !== null && isZero(row.today) && isZero(week) && isZero(row.month);
+    // "no sales today, this week or this month" is only said with every figure in hand
+    const isIdle =
+      isKnown(row.today) && isKnown(row.month) && isZero(row.today) && isZero(week) && isZero(row.month);
     (isIdle ? idle : rows).push(row);
   });
 
