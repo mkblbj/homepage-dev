@@ -285,6 +285,20 @@ describe("widgets/uorakutensales/component", () => {
     expect(table.querySelector('img[src="https://example.test/shop-a.png"]')).toBeInTheDocument();
   });
 
+  it("opens the daily check on 件数, best sellers included", () => {
+    const rankingData = ranking("overall-item", [{ shopName: "shop-a", mno: "shop-a-item" }]);
+    useWidgetAPI.mockImplementation((_widget, endpoint) => {
+      if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
+      if (endpoint === "ranking") return { data: rankingData, error: undefined, mutate: vi.fn() };
+      return { data: undefined, error: undefined, mutate: vi.fn() };
+    });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+
+    expect(screen.getByRole("button", { name: "uorakutensales.sortOrders" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "uorakutensales.sortSales" })).toHaveAttribute("aria-pressed", "false");
+  });
+
   it("reads both device boards on the widget's own interval", () => {
     useWidgetAPI.mockImplementation((_widget, endpoint) => {
       if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
