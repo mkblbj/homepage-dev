@@ -1147,6 +1147,11 @@ export default function Component({ service }) {
     () => (model ? buildShopTable({ model, monthly, performance }) : null),
     [model, monthly, performance],
   );
+  // shop logos sit beside the names in both shop tables
+  const logoByName = useMemo(
+    () => new Map((logos?.shops || []).map((shop) => [shop.shopName, shop.logoUrl || null])),
+    [logos],
+  );
   // one palette for the whole widget, built from every shop either board draws —
   // assigning per board would let the two disagree when their shop sets differ
   const shopColors = useMemo(
@@ -1262,7 +1267,15 @@ export default function Component({ service }) {
             </div>
           ) : null}
         </div>
-        <ShopTable table={table} metric={metric} shopColors={shopColors} periods={periods} cardCls={cardCls} t={t} />
+        <ShopTable
+          table={table}
+          metric={metric}
+          shopColors={shopColors}
+          logoByName={logoByName}
+          periods={periods}
+          cardCls={cardCls}
+          t={t}
+        />
         {ranking ? (
           <RankingSection ranking={ranking} dim={RANKING_DIM_BY_METRIC[metric]} cardCls={cardCls} t={t} />
         ) : null}
@@ -1347,6 +1360,7 @@ export default function Component({ service }) {
                   performance={performance}
                   names={table.rows.map((r) => r.name)}
                   shopColors={shopColors}
+                  logoByName={logoByName}
                   cardCls={cardCls}
                   t={t}
                 />

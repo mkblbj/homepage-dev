@@ -1588,7 +1588,7 @@
         "visitDetail": "Same-weekday median {{median}} · UU {{uu}}",
         "peopleUnit": "",
         "shopTable": "By shop",
-        "shopTableNote": "Fixed order by this month's size · coloured only beyond ±20%",
+        "shopTableNote": "Fixed order by this month's size · vs last month and vs median are coloured only beyond ±20%",
         "colShop": "Shop",
         "colToday": "Today",
         "colWeek": "Last 7 days",
@@ -1608,7 +1608,8 @@
         "rankedBy": "by {{metric}}",
         "activeShops": "{{count}} active",
         "shopVisits": "Visits by shop",
-        "idleLeftOut": "{{names}} left out (no sales)"
+        "idleLeftOut": "{{names}} left out (no sales)",
+        "visitsNote": "Same order as the shop table above · vs median is coloured only beyond ±20%"
     },
     "uoshippingdashboard": {
         "allPlatforms": "All",

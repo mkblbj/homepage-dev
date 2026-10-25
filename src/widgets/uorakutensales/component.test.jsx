@@ -266,6 +266,25 @@ describe("widgets/uorakutensales/component", () => {
     expect(decodeURIComponent(window.location.hash)).toBe("#楽天");
   });
 
+  it("shows each shop's logo in the shop table", () => {
+    const liveSales = {
+      generatedAtJST: "2026-07-28 16:41 JST",
+      totals: { salesYen: 1000, orderCount: 1, unitsSold: 1 },
+      shops: [{ shopName: "shop-a", salesYen: 1000, orderCount: 1, unitsSold: 1 }],
+    };
+    const logos = { shops: [{ shopName: "shop-a", logoUrl: "https://example.test/shop-a.png" }] };
+    useWidgetAPI.mockImplementation((_widget, endpoint) => {
+      if (endpoint === "sales") return { data: liveSales, error: undefined, mutate: vi.fn() };
+      if (endpoint === "logos") return { data: logos, error: undefined, mutate: vi.fn() };
+      return { data: undefined, error: undefined, mutate: vi.fn() };
+    });
+
+    const { container } = renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+
+    const table = container.querySelector("table");
+    expect(table.querySelector('img[src="https://example.test/shop-a.png"]')).toBeInTheDocument();
+  });
+
   it("reads both device boards on the widget's own interval", () => {
     useWidgetAPI.mockImplementation((_widget, endpoint) => {
       if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };

@@ -1601,7 +1601,7 @@
         "visitDetail": "同星期中位数 {{median}}人 · UU {{uu}}",
         "peopleUnit": "人",
         "shopTable": "按店铺",
-        "shopTableNote": "按本月规模固定排序 · 超过 ±20% 才上色",
+        "shopTableNote": "按本月规模固定排序 · 比上月和比中位数超过 ±20% 才上色",
         "colShop": "店铺",
         "colToday": "今日",
         "colWeek": "近7日",
@@ -1621,7 +1621,8 @@
         "rankedBy": "按{{metric}}排序",
         "activeShops": "在营 {{count}} 家",
         "shopVisits": "按店铺访问",
-        "idleLeftOut": "{{names}} 无业绩，已省略"
+        "idleLeftOut": "{{names}} 无业绩，已省略",
+        "visitsNote": "排序与上方店铺表相同 · 比中位数超过 ±20% 才上色"
     },
     "uoshippingdashboard": {
         "allPlatforms": "全部",
