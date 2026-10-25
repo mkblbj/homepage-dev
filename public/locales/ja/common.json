@@ -1603,7 +1603,9 @@
         "vsMedian": "対中位",
         "idleShow": "実績のない店舗 {{count}}（{{names}}）を表示",
         "idleHide": "実績のない店舗をたたむ",
-        "idleNote": "今日・直近7日・今月とも実績なし"
+        "idleNote": "今日・直近7日・今月とも実績なし",
+        "showLessTop": "TOP{{count}} に戻す",
+        "rankedBy": "{{metric}}順"
     },
     "uoshippingdashboard": {
         "allPlatforms": "全部",

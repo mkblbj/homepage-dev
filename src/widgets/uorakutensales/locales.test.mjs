@@ -203,6 +203,8 @@ const REQUIRED_KEYS = [
   "idleShow",
   "idleHide",
   "idleNote",
+  "showLessTop",
+  "rankedBy",
 ];
 
 function loadNamespace(locale) {
@@ -248,6 +250,8 @@ test("daily check placeholders are preserved across locales", () => {
     assert.match(ns.visitDetail, /\{\{median\}\}.*\{\{uu\}\}/, `${locale}.visitDetail needs {{median}} then {{uu}}`);
     assert.match(ns.idleShow, /\{\{count\}\}/, `${locale}.idleShow needs {{count}}`);
     assert.match(ns.idleShow, /\{\{names\}\}/, `${locale}.idleShow needs {{names}}`);
+    assert.match(ns.showLessTop, /\{\{count\}\}/, `${locale}.showLessTop needs {{count}}`);
+    assert.match(ns.rankedBy, /\{\{metric\}\}/, `${locale}.rankedBy needs {{metric}}`);
   }
 });
 

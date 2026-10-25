@@ -17,10 +17,10 @@
 // poll cadence when the service config does not set one
 export const DEFAULT_REFRESH_INTERVAL = 60000; // 60s
 
-// Progressive reveal: collapsed shows RANKING_STEPS[0] (3 podium cards + 8 list
-// cards = 4 rows × 2 columns on a wide container); each "show more" click moves
-// to the next step instead of dumping all 100 rows at once.
-export const RANKING_STEPS = Object.freeze([11, 20, 50, 100]);
+// Progressive reveal: collapsed shows RANKING_STEPS[0] (3 rows × 2 columns on a
+// wide container); each "show more" click moves to the next step instead of
+// dumping all 100 rows at once.
+export const RANKING_STEPS = Object.freeze([6, 20, 50, 100]);
 export const RANKING_TOP_COUNT = RANKING_STEPS[0];
 // the API returns at most 100 items per board — that is also our ceiling
 export const RANKING_MAX_COUNT = RANKING_STEPS[RANKING_STEPS.length - 1];

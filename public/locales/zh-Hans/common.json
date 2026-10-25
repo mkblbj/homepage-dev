@@ -1616,7 +1616,9 @@
         "vsMedian": "比中位数",
         "idleShow": "显示无业绩店铺 {{count}}（{{names}}）",
         "idleHide": "收起无业绩店铺",
-        "idleNote": "今日、近7日、本月均无业绩"
+        "idleNote": "今日、近7日、本月均无业绩",
+        "showLessTop": "收回到前 {{count}}",
+        "rankedBy": "按{{metric}}排序"
     },
     "uoshippingdashboard": {
         "allPlatforms": "全部",

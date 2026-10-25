@@ -39,10 +39,13 @@ function rankedItem(mno, shopName) {
 }
 
 // One ranked board. GET /api/item-rankings nests three of these under `rankings`.
+// The overall board leads with `overallMno` and carries seven more, so the
+// collapsed board (six rows) has something left to open.
 function rankingBoard(overallMno, shops) {
+  const overall = [overallMno, ...Array.from({ length: 7 }, (_, i) => `${overallMno}-${i + 2}`)];
   return {
     shopCount: shops.length,
-    overall: { itemCount: 1, items: [rankedItem(overallMno, shops[0].shopName)] },
+    overall: { itemCount: overall.length, items: overall.map((mno) => rankedItem(mno, shops[0].shopName)) },
     shops: shops.map(({ shopName, mno }) => ({
       shopName,
       itemCount: 1,
@@ -79,6 +82,7 @@ describe("widgets/uorakutensales/component", () => {
       settings: { hideErrors: false },
     });
 
+    fireEvent.click(screen.getByRole("button", { name: "uorakutensales.showMore" }));
     fireEvent.click(screen.getByRole("button", { name: "shop-a" }));
     expect(screen.getByText("shop-a-item")).toBeInTheDocument();
 
@@ -91,6 +95,45 @@ describe("widgets/uorakutensales/component", () => {
 
     expect(screen.getByText("overall-after")).toBeInTheDocument();
     expect(screen.queryByText("shop-a-item")).not.toBeInTheDocument();
+  });
+
+  it("shows six best sellers until opened, then the shop chips", () => {
+    const rankingData = ranking("overall-item", [{ shopName: "shop-a", mno: "shop-a-item" }]);
+    useWidgetAPI.mockImplementation((_widget, endpoint) => {
+      if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
+      if (endpoint === "ranking") return { data: rankingData, error: undefined, mutate: vi.fn() };
+      return { data: undefined, error: undefined, mutate: vi.fn() };
+    });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+
+    expect(screen.getByText("overall-item-6")).toBeInTheDocument();
+    expect(screen.queryByText("overall-item-7")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "shop-a" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "uorakutensales.showMore" }));
+    expect(screen.getByText("overall-item-7")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "shop-a" })).toBeInTheDocument();
+  });
+
+  it("collapsing the best sellers resets the shop filter", () => {
+    const rankingData = ranking("overall-item", [{ shopName: "shop-a", mno: "shop-a-item" }]);
+    useWidgetAPI.mockImplementation((_widget, endpoint) => {
+      if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
+      if (endpoint === "ranking") return { data: rankingData, error: undefined, mutate: vi.fn() };
+      return { data: undefined, error: undefined, mutate: vi.fn() };
+    });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+
+    fireEvent.click(screen.getByRole("button", { name: "uorakutensales.showMore" }));
+    fireEvent.click(screen.getByRole("button", { name: "shop-a" }));
+    expect(screen.getByText("shop-a-item")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "uorakutensales.showLessTop" }));
+    expect(screen.getByText("overall-item")).toBeInTheDocument();
+    expect(screen.queryByText("shop-a-item")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "shop-a" })).not.toBeInTheDocument();
   });
 
   it("refreshes the ranking together with the sales snapshots", () => {

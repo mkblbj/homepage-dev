@@ -1603,7 +1603,9 @@
         "vsMedian": "vs median",
         "idleShow": "Show {{count}} shops with no sales ({{names}})",
         "idleHide": "Hide shops with no sales",
-        "idleNote": "No sales today, in the last 7 days or this month"
+        "idleNote": "No sales today, in the last 7 days or this month",
+        "showLessTop": "Back to top {{count}}",
+        "rankedBy": "by {{metric}}"
     },
     "uoshippingdashboard": {
         "allPlatforms": "All",

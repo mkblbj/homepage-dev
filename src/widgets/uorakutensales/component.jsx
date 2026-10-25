@@ -21,6 +21,7 @@ import Container from "components/services/widget/container";
 import { useTranslation } from "next-i18next/pages";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { RANKING_DIM_BY_METRIC } from "./daily-check-model.mjs";
 import { buildDeviceEvidence } from "./device-evidence-model.mjs";
 import { buildMarketEvidence, buildMarketReference, MARKET_REFRESH_INTERVAL } from "./device-market-model.mjs";
 import { buildDeviceSales } from "./device-sales-model.mjs";
@@ -35,7 +36,6 @@ import {
   computeFreshness,
   DEFAULT_MONTH_DIM,
   DEFAULT_PEAK_DIM,
-  DEFAULT_RANKING_DIM,
   DEFAULT_REFRESH_INTERVAL,
   FALLBACK_SHOP_COLOR,
   man,
@@ -548,32 +548,7 @@ function DailyChart({ model, mode, onModeChange, t }) {
   );
 }
 
-// ---- item ranking: podium (top 3) + list, per shop or aggregated ----
-
-// gold / silver / bronze get genuinely different weight, not just a number
-const MEDAL = {
-  1: {
-    card: "border-amber-300/45 bg-gradient-to-br from-amber-400/[0.16] to-[rgba(214,72,61,0.10)] dark:border-amber-300/40",
-    crown: "text-[19px] text-amber-500 dark:text-amber-300",
-    amount: "text-[20px] text-amber-700 dark:text-amber-200",
-    mno: "text-[12px]",
-    img: 76,
-  },
-  2: {
-    card: "border-slate-400/35 bg-slate-400/[0.10] dark:border-slate-300/30 dark:bg-slate-300/[0.09]",
-    crown: "text-[16px] text-slate-500 dark:text-slate-300",
-    amount: "text-[17px] text-slate-700 dark:text-slate-200",
-    mno: "text-[11.5px]",
-    img: 62,
-  },
-  3: {
-    card: "border-orange-700/35 bg-orange-700/[0.10] dark:border-orange-400/30 dark:bg-orange-400/[0.09]",
-    crown: "text-[16px] text-orange-700 dark:text-orange-300",
-    amount: "text-[17px] text-orange-800 dark:text-orange-200",
-    mno: "text-[11.5px]",
-    img: 62,
-  },
-};
+// ---- item ranking: two columns of compact rows, per shop or aggregated ----
 
 const PREVIEW_WIDTH = 186;
 // Horizontal anchors. The widget shell (components/services/widget/container)
@@ -707,52 +682,32 @@ function secondaryMetrics(item, dim, t) {
   return [units, orders, price];
 }
 
-function PodiumCard({ item, showShop, dim, t }) {
-  const m = MEDAL[item.rank] ?? MEDAL[3];
-  return (
-    <ItemLink
-      item={item}
-      className={`relative flex min-w-0 items-center gap-3 rounded-xl border p-3 transition-colors hover:brightness-110 ${m.card}`}
-    >
-      <span className={`absolute right-2.5 top-2 font-extrabold leading-none tabular-nums ${m.crown}`}>
-        {item.rank}
-      </span>
-      <ItemThumb item={item} size={m.img} preview="below" />
-      <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className={`flex min-w-0 items-center pr-4 font-bold ${m.mno}`}>
-          <span className="truncate text-theme-900 dark:text-theme-50">{item.mno}</span>
-          {showShop ? <ShopBadge name={item.shopName} /> : null}
-        </span>
-        <span className={`font-extrabold leading-none tabular-nums ${m.amount}`}>{primaryMetric(item, dim, t)}</span>
-        <span className="text-[9.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
-          {secondaryMetrics(item, dim, t).join(" · ")}
-        </span>
-      </span>
-    </ItemLink>
-  );
-}
-
-// compact card — two of these sit side by side on a wide container
+// compact row — two columns of these on a wide container; the top three keep a
+// warm rank number so the podium still reads without its own row of cards
 function RankRow({ item, showShop, dim, t }) {
   return (
     <ItemLink
       item={item}
-      className="flex items-center gap-2.5 rounded-lg border border-theme-300/25 bg-theme-100/40 p-1.5 transition-colors hover:bg-theme-200/50 dark:border-white/[0.06] dark:bg-white/[0.02] dark:hover:bg-white/[0.06]"
+      className="flex items-center gap-3 border-b border-theme-300/30 py-2 transition-colors hover:bg-theme-200/40 dark:border-white/[0.07] dark:hover:bg-white/[0.05]"
     >
-      <span className="w-[18px] shrink-0 text-center text-[11.5px] font-extrabold tabular-nums text-theme-500 dark:text-theme-400">
+      <span
+        className={`w-6 shrink-0 text-center text-base font-extrabold tabular-nums ${
+          item.rank <= 3 ? "text-amber-600 dark:text-amber-300" : "text-theme-500 dark:text-theme-400"
+        }`}
+      >
         {item.rank}
       </span>
-      <ItemThumb item={item} size={40} preview="above" />
+      <ItemThumb item={item} size={44} preview="above" />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="flex min-w-0 items-center">
-          <span className="truncate text-[11.5px] font-semibold text-theme-900 dark:text-theme-50">{item.mno}</span>
+          <span className="truncate text-sm font-semibold text-theme-900 dark:text-theme-50">{item.mno}</span>
           {showShop ? <ShopBadge name={item.shopName} /> : null}
         </span>
-        <span className="text-[9.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
+        <span className="text-xs tabular-nums text-theme-600 dark:text-theme-300">
           {secondaryMetrics(item, dim, t).join(" · ")}
         </span>
       </span>
-      <span className={`shrink-0 text-[12.5px] font-bold tabular-nums ${ACCENT_TEXT}`}>
+      <span className={`shrink-0 text-base font-extrabold tabular-nums ${ACCENT_TEXT}`}>
         {primaryMetric(item, dim, t)}
       </span>
     </ItemLink>
@@ -761,17 +716,20 @@ function RankRow({ item, showShop, dim, t }) {
 
 const DIM_LABEL = { orderCount: "sortOrders", sales: "sortSales", units: "sortUnits" };
 
-function RankingSection({ ranking, cardCls, t }) {
-  const [dim, setDim] = useState(DEFAULT_RANKING_DIM);
+// The metric comes from the daily check's switch. Six rows until opened; the
+// shop chips only appear once the reader asks for more, and closing the board
+// goes back to every shop.
+function RankingSection({ ranking, dim, cardCls, t }) {
   const [shop, setShop] = useState("__all__");
-  // index into RANKING_STEPS — progressive reveal (11 → 20 → 50 → 100)
+  // index into RANKING_STEPS — progressive reveal (6 → 20 → 50 → 100)
   const [step, setStep] = useState(0);
 
   // a dimension can vanish across refreshes → fall back to the first available
   const activeDim = ranking.dims[dim] ? dim : ranking.available[0];
   const board = ranking.dims[activeDim];
 
-  const active = shop === "__all__" ? null : board.shops.find((s) => s.shopName === shop);
+  const open = step > 0;
+  const active = open && shop !== "__all__" ? board.shops.find((s) => s.shopName === shop) : null;
   // a shop chip can outlive its data across refreshes → fall back to the overall board
   const selectedShop = active ? shop : "__all__";
   const isAll = selectedShop === "__all__";
@@ -785,37 +743,17 @@ function RankingSection({ ranking, cardCls, t }) {
     ? t(`${NS}.shopsAggregated`, { count: board.shopCount })
     : t(`${NS}.itemsCount`, { count: active?.itemCount ?? 0 });
 
-  const dimChip = (key) => (
-    <button
-      key={key}
-      type="button"
-      onClick={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setDim(key);
-        setStep(0);
-      }}
-      className={`rounded px-2 py-0.5 text-[10px] font-bold transition-colors ${
-        activeDim === key
-          ? "bg-theme-700 text-white dark:bg-theme-100 dark:text-theme-900"
-          : "text-theme-600 hover:bg-theme-200/60 dark:text-theme-300 dark:hover:bg-theme-700/60"
-      }`}
-    >
-      {t(`${NS}.${DIM_LABEL[key]}`)}
-    </button>
-  );
-
   const chip = (key, label) => (
     <button
       key={key}
       type="button"
+      aria-pressed={selectedShop === key}
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
         setShop(key);
-        setStep(0);
       }}
-      className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold transition-colors ${
+      className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
         selectedShop === key
           ? "border-theme-700 bg-theme-700 text-white dark:border-theme-100 dark:bg-theme-100 dark:text-theme-900"
           : "border-theme-300/60 text-theme-600 hover:bg-theme-200/50 dark:border-theme-600/60 dark:text-theme-300 dark:hover:bg-theme-700/50"
@@ -825,76 +763,69 @@ function RankingSection({ ranking, cardCls, t }) {
     </button>
   );
 
+  const action =
+    "rounded-lg border border-theme-300/60 px-4 py-1.5 text-xs font-semibold text-theme-600 transition-colors hover:bg-theme-200/50 dark:border-theme-600/60 dark:text-theme-300 dark:hover:bg-theme-700/50";
+
   return (
-    <section className={`flex flex-col gap-3 p-4 ${cardCls}`}>
-      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
-        <span className="text-[12px] font-bold text-theme-700 dark:text-theme-200">{t(`${NS}.bestSellers`)}</span>
-        <span className="text-[10px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
-          {ranking.sourceDate} · {meta}
+    <section className={`flex flex-col gap-3 p-5 ${cardCls}`}>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <span className="text-base font-extrabold text-theme-900 dark:text-theme-50">{t(`${NS}.bestSellers`)}</span>
+        <span className="text-xs tabular-nums text-theme-600 dark:text-theme-300">
+          {ranking.sourceDate} · {meta} · {t(`${NS}.rankedBy`, { metric: t(`${NS}.${DIM_LABEL[activeDim]}`) })}
         </span>
         {ranking.partial || board.failedShopCount > 0 ? (
-          <span className="rounded border border-amber-400/40 bg-amber-500/10 px-1.5 py-px text-[9px] font-bold text-amber-600 dark:text-amber-300">
+          <span className="rounded border border-amber-400/40 bg-amber-500/10 px-1.5 py-px text-xs font-bold text-amber-600 dark:text-amber-300">
             {t(`${NS}.partialData`)}
           </span>
         ) : null}
-        {/* which metric the board is ranked by */}
-        <div className="flex shrink-0 gap-0.5 rounded-md border border-theme-300/60 bg-theme-100/50 p-0.5 dark:border-theme-600/60 dark:bg-theme-900/30">
-          {ranking.available.map(dimChip)}
-        </div>
-        <div className="ml-auto flex flex-wrap gap-1">
-          {chip("__all__", t(`${NS}.allShops`))}
-          {board.shops.map((s) => chip(s.shopName, s.shopName))}
-        </div>
+        {open ? (
+          <div className="ml-auto flex flex-wrap gap-1.5">
+            {chip("__all__", t(`${NS}.allShops`))}
+            {board.shops.map((s) => chip(s.shopName, s.shopName))}
+          </div>
+        ) : null}
       </div>
 
       {shown.length === 0 ? (
-        <span className="py-4 text-center text-[11px] text-theme-500 dark:text-theme-400">{t(`${NS}.noData`)}</span>
+        <span className="py-4 text-center text-xs text-theme-500 dark:text-theme-400">{t(`${NS}.noData`)}</span>
       ) : (
-        <>
-          <div className="grid grid-cols-1 items-end gap-2 @lg:grid-cols-[1.25fr_1fr_1fr]">
-            {shown.slice(0, 3).map((it) => (
-              <PodiumCard key={`${it.rank}-${it.mno}`} item={it} showShop={isAll} dim={activeDim} t={t} />
-            ))}
-          </div>
-          {shown.length > 3 ? (
-            <div className="grid grid-cols-1 gap-1.5 @2xl:grid-cols-2 @2xl:gap-x-3">
-              {shown.slice(3).map((it) => (
-                <RankRow key={`${it.rank}-${it.mno}`} item={it} showShop={isAll} dim={activeDim} t={t} />
-              ))}
-            </div>
-          ) : null}
-          {nextCount > 0 || step > 0 ? (
-            <div className="flex gap-2">
-              {nextCount > 0 ? (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setStep(nextStep);
-                  }}
-                  className="flex-1 rounded-lg border border-theme-300/60 py-1.5 text-[11px] font-semibold text-theme-600 transition-colors hover:bg-theme-200/50 dark:border-theme-600/60 dark:text-theme-300 dark:hover:bg-theme-700/50"
-                >
-                  {t(`${NS}.showMore`, { count: nextCount })}
-                </button>
-              ) : null}
-              {step > 0 ? (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setStep(0);
-                  }}
-                  className="rounded-lg border border-theme-300/60 px-3 py-1.5 text-[11px] font-semibold text-theme-600 transition-colors hover:bg-theme-200/50 dark:border-theme-600/60 dark:text-theme-300 dark:hover:bg-theme-700/50"
-                >
-                  {t(`${NS}.showLess`)}
-                </button>
-              ) : null}
-            </div>
-          ) : null}
-        </>
+        <div className="grid grid-cols-1 gap-x-8 @3xl:grid-cols-2">
+          {shown.map((it) => (
+            <RankRow key={`${it.rank}-${it.mno}`} item={it} showShop={isAll} dim={activeDim} t={t} />
+          ))}
+        </div>
       )}
+      {nextCount > 0 || open ? (
+        <div className="flex justify-center gap-2">
+          {nextCount > 0 ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setStep(nextStep);
+              }}
+              className={action}
+            >
+              {t(`${NS}.showMore`, { count: nextCount })}
+            </button>
+          ) : null}
+          {open ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setStep(0);
+                setShop("__all__");
+              }}
+              className={action}
+            >
+              {t(`${NS}.showLessTop`, { count: RANKING_STEPS[0] })}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -1419,6 +1350,8 @@ export default function Component({ service }) {
   const { widget } = service;
   const refreshInterval = Math.max(1000, Number(widget.refreshInterval) || DEFAULT_REFRESH_INTERVAL);
   const [chartMode, setChartMode] = useState("line");
+  // the daily check's metric: today, the month, the shop table and the best sellers
+  const [metric] = useState("sales");
 
   const { data: sales, error: salesError, mutate: mutateSales } = useWidgetAPI(widget, "sales", { refreshInterval });
   // uo-ec-manager owns the refresh schedule; each board just re-reads its own
@@ -1777,7 +1710,9 @@ export default function Component({ service }) {
           </div>
         </section>
 
-        {ranking ? <RankingSection ranking={ranking} cardCls={cardCls} t={t} /> : null}
+        {ranking ? (
+          <RankingSection ranking={ranking} dim={RANKING_DIM_BY_METRIC[metric]} cardCls={cardCls} t={t} />
+        ) : null}
 
         {/* device-model boards: today, this month and last month in one place */}
         {devices ? (
