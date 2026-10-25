@@ -65,7 +65,7 @@ export function CustomerMixCard({ performance, cardCls = "", t }) {
         {rows.map((r) => (
           <div key={r.key} className="grid grid-cols-[112px_minmax(0,1fr)_96px_52px_60px] items-center gap-3 text-sm">
             <span className="font-semibold text-theme-800 dark:text-theme-100">{r.label}</span>
-            <span className="block h-2 overflow-hidden rounded-full bg-theme-300/80 dark:bg-white/10">
+            <span className="block h-2 overflow-hidden rounded-full bg-theme-400/40 dark:bg-white/10">
               <span
                 className="block h-full rounded-full"
                 style={{ width: `${Math.max(1, ((r.yen || 0) / max) * 100)}%`, backgroundColor: r.color }}

@@ -170,7 +170,7 @@ export function TodayCard({ model, metric, shopColors, cardCls = "", t }) {
           {todaySubLine(model, metric, t)}
         </span>
         {value > 0 ? (
-          <span className="flex h-2 overflow-hidden rounded-full bg-theme-300/80 dark:bg-white/10">
+          <span className="flex h-2 overflow-hidden rounded-full bg-theme-400/40 dark:bg-white/10">
             {mix.map((r) => (
               <span
                 key={r.name}
@@ -194,7 +194,7 @@ export function TodayCard({ model, metric, shopColors, cardCls = "", t }) {
                 {Math.round(pct)}%
               </span>
             </span>
-            <span className="block h-2 overflow-hidden rounded-full bg-theme-300/80 dark:bg-white/10">
+            <span className="block h-2 overflow-hidden rounded-full bg-theme-400/40 dark:bg-white/10">
               <span
                 className={`block h-full rounded-full ${NEUTRAL_BAR}`}
                 style={{ width: `${Math.min(100, pct)}%` }}
@@ -240,7 +240,7 @@ export function MonthCard({ monthly, metric, cardCls = "", t }) {
       </span>
       {m.vsPrevPct !== null ? (
         <>
-          <span className="relative mt-1 block h-2 rounded-full bg-theme-300/80 dark:bg-white/10">
+          <span className="relative mt-1 block h-2 rounded-full bg-theme-400/40 dark:bg-white/10">
             <span
               className="absolute inset-y-0 left-0 rounded-full bg-amber-500 dark:bg-[#E8B26A]"
               style={{ width: `${Math.min(100, m.vsPrevPct)}%` }}
@@ -359,7 +359,7 @@ function TodayCell({ row, metric, maxToday, color, t }) {
         <span className={`whitespace-nowrap text-xs tabular-nums ${MUTED}`}>{others}</span>
       </span>
       {color ? (
-        <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-theme-300/80 dark:bg-white/10">
+        <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-theme-400/40 dark:bg-white/10">
           <span
             className="block h-full rounded-full"
             style={{ width: `${Math.max(2, (row.today[metric] / maxToday) * 100)}%`, backgroundColor: color }}
@@ -379,7 +379,7 @@ function AvgRatioCell({ row, metric }) {
         <span className="block text-right text-sm text-theme-500 dark:text-theme-400">{DASH}</span>
       ) : (
         <span className="flex items-center gap-2">
-          <span className="block h-1.5 flex-1 overflow-hidden rounded-full bg-theme-300/80 dark:bg-white/10">
+          <span className="block h-1.5 flex-1 overflow-hidden rounded-full bg-theme-400/40 dark:bg-white/10">
             <span className={`block h-full ${NEUTRAL_BAR}`} style={{ width: `${Math.min(100, pct)}%` }} />
           </span>
           <span className="w-10 text-right text-sm font-bold tabular-nums text-theme-900 dark:text-theme-50">
