@@ -101,6 +101,18 @@ describe("widgets/uorakutensales/proxy", () => {
     expect(res.body.evidence[0].daily).toBeUndefined();
   });
 
+  it("passes the performance snapshot through unchanged", async () => {
+    const snapshot = { ok: true, traffic: { visitCount: 21654 }, shops: [] };
+    httpProxy.mockResolvedValue([200, "application/json", Buffer.from(JSON.stringify(snapshot))]);
+    const res = createMockRes();
+
+    await uoRakutenSalesProxyHandler(request("performance"), res);
+
+    expect(httpProxy.mock.calls[0][0].toString()).toBe("http://127.0.0.1:3912/api/performance");
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual(snapshot);
+  });
+
   it("answers 400 to a device evidence request it cannot forward, before reading the server", async () => {
     const res = createMockRes();
 

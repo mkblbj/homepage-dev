@@ -39,6 +39,8 @@ test("buildSalesProxyRequest maps every allowed endpoint to its read-only path",
     marketEvidence: "/api/market-rankings/device-models",
     // our own products behind one model, read with that model's scope
     devicesEvidence: "/api/device-sales/evidence",
+    // yesterday's visits and the new / repeat mix, read once a morning
+    performance: "/api/performance",
   };
 
   for (const [endpoint, path] of Object.entries(cases)) {
