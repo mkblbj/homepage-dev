@@ -1618,7 +1618,10 @@
         "idleHide": "收起无业绩店铺",
         "idleNote": "今日、近7日、本月均无业绩",
         "showLessTop": "收回到前 {{count}}",
-        "rankedBy": "按{{metric}}排序"
+        "rankedBy": "按{{metric}}排序",
+        "activeShops": "在营 {{count}} 家",
+        "shopVisits": "按店铺访问",
+        "idleLeftOut": "{{names}} 无业绩，已省略"
     },
     "uoshippingdashboard": {
         "allPlatforms": "全部",

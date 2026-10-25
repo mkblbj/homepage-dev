@@ -21,11 +21,15 @@ import Container from "components/services/widget/container";
 import { useTranslation } from "next-i18next/pages";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { RANKING_DIM_BY_METRIC } from "./daily-check-model.mjs";
+import { buildPerformanceModel } from "widgets/uoperformance/performance-model.mjs";
+
+import { buildShopTable, RANKING_DIM_BY_METRIC } from "./daily-check-model.mjs";
+import { MetricSwitch, MonthCard, ShopTable, TodayCard, VisitCard, visitDayLabel } from "./daily-check-section";
 import { buildDeviceEvidence } from "./device-evidence-model.mjs";
 import { buildMarketEvidence, buildMarketReference, MARKET_REFRESH_INTERVAL } from "./device-market-model.mjs";
 import { buildDeviceSales } from "./device-sales-model.mjs";
 import DeviceSalesSection from "./device-sales-section";
+import { CustomerMixCard, ShopVisitsTable } from "./insight-section";
 import {
   ACCENT,
   buildModel,
@@ -34,12 +38,10 @@ import {
   buildRanking,
   buildShopColors,
   computeFreshness,
-  DEFAULT_MONTH_DIM,
   DEFAULT_PEAK_DIM,
   DEFAULT_REFRESH_INTERVAL,
   FALLBACK_SHOP_COLOR,
   man,
-  MONTH_DIMS,
   PEAK_DIMS,
   RANKING_STEPS,
   spark,
@@ -115,66 +117,6 @@ function FreshnessPill({ freshness, t }) {
         <span className={`relative inline-flex h-1.5 w-1.5 rounded-full ${STATUS_DOT[state]}`} />
       </span>
       {label}
-    </span>
-  );
-}
-
-function ShopIcon() {
-  return (
-    <span
-      className="inline-flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px] border"
-      style={{ color: ACCENT, backgroundColor: "rgba(198,54,43,.12)", borderColor: "rgba(198,54,43,.3)" }}
-    >
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.9}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M3 9.5 5 4h14l2 5.5" />
-        <path d="M4 9.5h16v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5Z" />
-        <path d="M9 13h6" />
-      </svg>
-    </span>
-  );
-}
-
-// per-shop logo with a first-char fallback when the URL is empty or fails to load.
-// Rakuten logos vary (some white-bg) → bg-white + object-contain keeps them clean.
-function ShopLogo({ name, url, size = 16 }) {
-  const [failed, setFailed] = useState(false);
-  useEffect(() => setFailed(false), [url]);
-  if (url && !failed) {
-    return (
-      <img
-        src={url}
-        alt={name}
-        loading="lazy"
-        onError={() => setFailed(true)}
-        className="shrink-0 rounded-[5px] bg-white object-contain"
-        style={{ width: size, height: size }}
-      />
-    );
-  }
-  return (
-    <span
-      aria-hidden="true"
-      className="inline-flex shrink-0 items-center justify-center rounded-[5px] font-bold"
-      style={{
-        width: size,
-        height: size,
-        fontSize: size * 0.58,
-        color: ACCENT,
-        backgroundColor: "rgba(198,54,43,.14)",
-      }}
-    >
-      {String(name || "?")
-        .trim()
-        .charAt(0) || "?"}
     </span>
   );
 }
@@ -1016,318 +958,6 @@ function PeaksSection({ peaks, shopColors, cardCls, t }) {
 // ---- monthly rollup (今月 vs 先月) ----
 
 // solid bar colours matching PEAK_TONE, readable on both the light and dark track
-const MONTH_BAR = { sales: "#D97706", units: "#059669", orders: "#0284C7" };
-
-function monthValueText(dim, value, t) {
-  // 万 already carries one decimal; counts are whole things, so a derived
-  // daily average like 759.33 rounds before it reaches the reader
-  if (dim === "sales") return `¥${man(value)}${t(`${NS}.manUnit`)}`;
-  return peakValueText(dim, Math.round(value), t);
-}
-
-// signed percentage — ahead of last month's pace reads green, behind reads rose
-function Delta({ value, className = "" }) {
-  if (value == null) return <span className={`tabular-nums text-theme-500 dark:text-theme-400 ${className}`}>—</span>;
-  const up = value >= 0;
-  return (
-    <span
-      className={`tabular-nums ${up ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"} ${className}`}
-    >
-      {up ? "+" : "−"}
-      {Math.abs(value).toFixed(1)}%
-    </span>
-  );
-}
-
-// A bullet: the fill is how much of last month this month has already matched,
-// the tick is how far the finished days carry us into the month. Fill reaching
-// past the tick is exactly what "ahead of last month's pace" means, so the
-// comparison is readable without doing any arithmetic.
-function PaceBar({ fillPct, markerPct, color, height = 8 }) {
-  const fill = Math.max(0, Math.min(100, fillPct ?? 0));
-  const marker = Math.max(0, Math.min(100, markerPct ?? 0));
-  return (
-    <span
-      className="relative block w-full overflow-hidden rounded-full bg-theme-300/45 dark:bg-white/10"
-      style={{ height }}
-    >
-      <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${fill}%`, backgroundColor: color }} />
-      <span
-        className="absolute inset-y-0 w-[2px] rounded-full bg-theme-800/70 dark:bg-white/85"
-        style={{ left: `calc(${marker}% - 1px)` }}
-      />
-    </span>
-  );
-}
-
-// The two metrics the toggle is NOT showing. Sales, orders and units are all
-// headline figures; leaving two of the three behind a control the reader may
-// never notice hides most of the board's data.
-function OtherMetrics({ metrics, dim, field, className = "", t }) {
-  const others = MONTH_DIMS.filter((d) => d !== dim && metrics[d] && metrics[d][field] != null);
-  if (!others.length) return null;
-  return (
-    <span className={`tabular-nums ${className}`}>
-      {others.map((d, i) => (
-        <span key={d}>
-          {i > 0 ? " · " : ""}
-          {monthValueText(d, metrics[d][field], t)}
-        </span>
-      ))}
-    </span>
-  );
-}
-
-function MonthShopRow({ shop, dim, markerPct, logoUrl, color, t }) {
-  const m = shop.metrics[dim];
-  // quiet on both sides is dormant, not a −100% collapse
-  const dormant = !shop.hasCurrent && !shop.hasPrevious;
-
-  return (
-    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2 gap-y-1 @md:grid-cols-[minmax(0,116px)_auto_minmax(56px,1fr)_auto]">
-      <span className="col-start-1 row-start-1 flex min-w-0 items-center gap-1.5">
-        <ShopLogo name={shop.name} url={logoUrl} size={14} />
-        <span className="truncate text-[11px] font-semibold text-theme-800 dark:text-theme-100">{shop.name}</span>
-      </span>
-
-      {dormant ? (
-        <span className="col-start-2 row-start-1 shrink-0 text-[9.5px] font-medium text-theme-500 @md:col-span-3 dark:text-theme-400">
-          {t(`${NS}.noActivity`)}
-        </span>
-      ) : (
-        <>
-          <span className="col-start-2 row-start-1 shrink-0 text-right text-[11.5px] font-bold tabular-nums text-theme-900 dark:text-theme-50">
-            {monthValueText(dim, m.current, t)}
-          </span>
-          <span className="col-span-3 row-start-2 @md:col-span-1 @md:col-start-3 @md:row-start-1">
-            {/* a bar with no baseline would read as "sold nothing" rather than
-                "nothing to compare against" — leave the track out entirely */}
-            {m.vsPrevPct != null ? (
-              <PaceBar fillPct={m.vsPrevPct} markerPct={markerPct} color={color} height={6} />
-            ) : null}
-          </span>
-          <span
-            className="col-start-3 row-start-1 w-[50px] shrink-0 text-right text-[11px] font-bold @md:col-start-4"
-            title={t(`${NS}.paceNote`)}
-          >
-            <Delta value={m.paceDeltaPct} />
-          </span>
-          {/* both months in full: the headline carries the toggled metric, this
-              line carries everything the toggle would otherwise have hidden */}
-          <span className="col-span-3 row-start-3 flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5 text-[9px] font-medium tabular-nums text-theme-600 @md:col-span-2 @md:col-start-3 @md:row-start-2 dark:text-theme-300">
-            <OtherMetrics metrics={shop.metrics} dim={dim} field="current" t={t} className="shrink-0" />
-            {m.previous != null ? (
-              <span className="ml-auto shrink-0 text-right">
-                {t(`${NS}.lastMonth`)}{" "}
-                <span className="font-bold text-theme-800 dark:text-theme-100">
-                  {monthValueText(dim, m.previous, t)}
-                </span>
-                <OtherMetrics
-                  metrics={shop.metrics}
-                  dim={dim}
-                  field="previous"
-                  t={t}
-                  className="before:content-['_·_']"
-                />
-              </span>
-            ) : null}
-          </span>
-        </>
-      )}
-    </div>
-  );
-}
-
-// This month against last, in actuals only. No month-end projection: 楽天's
-// campaign days make the intra-month rhythm far too uneven for a straight line
-// through it to be honest.
-function MonthlySection({ monthly, logoByName, shopColors, cardCls, t }) {
-  const [dim, setDim] = useState(DEFAULT_MONTH_DIM);
-  const cur = monthly.current;
-  const m = monthly.metrics[dim];
-  const tone = PEAK_TONE[dim] ?? PEAK_TONE.sales;
-  // the toggle re-ranks the board so the leaders are always the leaders of the
-  // metric on screen
-  const shops = useMemo(
-    () => [...monthly.shops].sort((a, b) => b.metrics[dim].current - a.metrics[dim].current),
-    [monthly, dim],
-  );
-
-  const dimChip = (key) => (
-    <button
-      key={key}
-      type="button"
-      onClick={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setDim(key);
-      }}
-      className={`rounded px-2 py-0.5 text-[10px] font-bold transition-colors ${
-        dim === key
-          ? "bg-theme-700 text-white dark:bg-theme-100 dark:text-theme-900"
-          : "text-theme-600 hover:bg-theme-200/60 dark:text-theme-300 dark:hover:bg-theme-700/60"
-      }`}
-    >
-      {t(`${NS}.${PEAK_DIM_TOGGLE_KEY[key] ?? "sortSales"}`)}
-    </button>
-  );
-
-  return (
-    <section className={`flex flex-col gap-3 p-4 ${cardCls}`}>
-      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-        <span className="text-[12px] font-bold text-theme-700 dark:text-theme-200">{t(`${NS}.monthly`)}</span>
-        <div className="flex shrink-0 gap-0.5 rounded-md border border-theme-300/60 bg-theme-100/50 p-0.5 dark:border-theme-600/60 dark:bg-theme-900/30">
-          {MONTH_DIMS.map(dimChip)}
-        </div>
-        {/* the snapshot says so itself when a day is still landing — never let a
-            running total read as a settled one */}
-        {cur.status === "provisional" || monthly.partial ? (
-          <span className="rounded bg-amber-400/15 px-1.5 py-0.5 text-[9.5px] font-bold text-amber-700 dark:text-amber-300">
-            {t(`${NS}.monthProvisional`)}
-          </span>
-        ) : null}
-      </div>
-
-      <div className="grid grid-cols-1 gap-x-5 gap-y-3.5 @4xl:grid-cols-[minmax(300px,1fr)_2fr]">
-        <div className="flex min-w-0 flex-col gap-2">
-          <div className={`flex min-w-0 flex-col gap-2 rounded-xl border p-3 ${tone.card}`}>
-            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-              <span className={`text-[9.5px] font-extrabold uppercase tracking-[0.1em] ${tone.label}`}>
-                {t(`${NS}.thisMonth`)}
-              </span>
-              <span className="text-[10px] font-semibold tabular-nums text-theme-700 dark:text-theme-200">
-                {cur.month}
-              </span>
-              <span className="ml-auto text-[9.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
-                {t(`${NS}.monthCompleted`, { count: cur.completedDays })}
-                {cur.hasLiveDay ? ` ${t(`${NS}.plusToday`)}` : ""}
-              </span>
-            </div>
-
-            <span className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
-              <span className={`text-[24px] font-extrabold leading-none tabular-nums @6xl:text-[34px] ${tone.value}`}>
-                {monthValueText(dim, m.current, t)}
-              </span>
-              <OtherMetrics
-                metrics={monthly.metrics}
-                dim={dim}
-                field="current"
-                t={t}
-                className="text-[11px] font-bold text-theme-700 dark:text-theme-200"
-              />
-            </span>
-
-            {/* the bullet only means anything against a complete month; without
-                one the row below says so instead of drawing an empty track */}
-            {m.vsPrevPct != null ? (
-              <div className="flex flex-col gap-1">
-                <PaceBar fillPct={m.vsPrevPct} markerPct={cur.progressPct} color={MONTH_BAR[dim]} />
-                <div className="flex items-baseline justify-between gap-2 text-[9.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
-                  <span>{t(`${NS}.monthProgress`, { pct: cur.progressPct.toFixed(1) })}</span>
-                  <span className="font-bold text-theme-800 dark:text-theme-100">{m.vsPrevPct.toFixed(1)}%</span>
-                </div>
-              </div>
-            ) : null}
-
-            {m.pace != null ? (
-              <div
-                className="grid grid-cols-3 gap-x-2 border-t border-theme-300/40 pt-2 dark:border-white/10"
-                title={t(`${NS}.paceNote`)}
-              >
-                <span className="flex min-w-0 flex-col gap-0.5">
-                  <span className="truncate text-[9px] font-bold text-theme-600 dark:text-theme-300">
-                    {t(`${NS}.thisMonth`)} {t(`${NS}.dailyPace`)}
-                  </span>
-                  <span className="text-[13px] font-bold tabular-nums text-theme-900 dark:text-theme-50">
-                    {monthValueText(dim, m.pace, t)}
-                    <span className="text-[9px] font-medium text-theme-600 dark:text-theme-300">
-                      {t(`${NS}.perDay`)}
-                    </span>
-                  </span>
-                </span>
-                {m.prevPace != null ? (
-                  <span className="flex min-w-0 flex-col gap-0.5">
-                    <span className="truncate text-[9px] font-bold text-theme-600 dark:text-theme-300">
-                      {t(`${NS}.lastMonth`)} {t(`${NS}.dailyPace`)}
-                    </span>
-                    <span className="text-[13px] font-bold tabular-nums text-theme-700 dark:text-theme-200">
-                      {monthValueText(dim, m.prevPace, t)}
-                      <span className="text-[9px] font-medium text-theme-600 dark:text-theme-300">
-                        {t(`${NS}.perDay`)}
-                      </span>
-                    </span>
-                  </span>
-                ) : null}
-                {m.paceDeltaPct != null ? (
-                  <span className="flex min-w-0 flex-col items-end gap-0.5">
-                    <span className="truncate text-[9px] font-bold text-theme-600 dark:text-theme-300">
-                      {t(`${NS}.vsLastMonth`)}
-                    </span>
-                    <Delta value={m.paceDeltaPct} className="text-[15px] font-extrabold" />
-                  </span>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-
-          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-xl border border-theme-300/30 bg-theme-100/50 px-3 py-2 dark:border-white/[0.08] dark:bg-white/[0.03]">
-            <span className="text-[9.5px] font-extrabold uppercase tracking-[0.1em] text-theme-600 dark:text-theme-300">
-              {t(`${NS}.lastMonth`)}
-            </span>
-            {monthly.previous ? (
-              <>
-                <span className="text-[10px] font-semibold tabular-nums text-theme-700 dark:text-theme-200">
-                  {monthly.previous.month}
-                </span>
-                <span className="text-[9px] font-medium text-theme-500 dark:text-theme-400">
-                  {t(`${NS}.monthBaseline`)}
-                </span>
-                <span className="ml-auto flex items-baseline gap-x-2">
-                  <span className="text-[14px] font-bold tabular-nums text-theme-900 dark:text-theme-50">
-                    {monthValueText(dim, m.previous, t)}
-                  </span>
-                  <OtherMetrics
-                    metrics={monthly.metrics}
-                    dim={dim}
-                    field="previous"
-                    t={t}
-                    className="text-[10px] font-semibold text-theme-600 dark:text-theme-300"
-                  />
-                </span>
-              </>
-            ) : (
-              // a partial month is never dressed up as a baseline
-              <span className="ml-auto text-[10px] font-medium text-theme-600 dark:text-theme-300">
-                {t(`${NS}.lastMonthPending`)}
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="flex min-w-0 flex-col gap-2.5">
-          <span className="min-w-0 truncate text-[10.5px] font-bold tracking-wide text-theme-600 dark:text-theme-300">
-            {t(`${NS}.monthShops`)}{" "}
-            <span className="text-[9px] font-medium text-theme-500 dark:text-theme-400">· {t(`${NS}.paceNote`)}</span>
-          </span>
-          <div className="grid grid-cols-1 gap-x-8 gap-y-2 @6xl:grid-cols-none @6xl:grid-flow-col @6xl:grid-rows-4 @6xl:auto-cols-fr @6xl:gap-y-4">
-            {shops.map((s) => (
-              <MonthShopRow
-                key={s.name}
-                shop={s}
-                dim={dim}
-                markerPct={cur.progressPct}
-                logoUrl={logoByName.get(s.name) || null}
-                color={shopColors[s.name] ?? FALLBACK_SHOP_COLOR}
-                t={t}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function LoadingSkeleton() {
   return (
     <div className="@container flex w-full min-w-0 flex-col gap-3 p-1.5">
@@ -1345,13 +975,116 @@ function LoadingSkeleton() {
   );
 }
 
+// one shop's last 7 days: total, a mini chart, orders · units · CVR
+function ShopTrendCard({ row: r, mode, t }) {
+  return (
+    <div className="relative flex min-w-0 flex-col rounded-xl border border-theme-300/30 bg-theme-100/60 p-2.5 dark:border-white/[0.06] dark:bg-white/[0.03]">
+      {/* corner-bleed logo watermark — clipped by its OWN layer so the mini-chart
+          hover tooltip can still escape the (unclipped) card */}
+      {r.logoUrl ? (
+        <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl">
+          <img
+            src={r.logoUrl}
+            alt=""
+            aria-hidden="true"
+            loading="lazy"
+            className="absolute -top-2 -right-2 h-[68px] w-[68px] object-contain opacity-[0.12] blur-[4px] dark:opacity-[0.15]"
+          />
+        </span>
+      ) : null}
+      <div className="relative flex min-w-0 flex-col gap-1.5">
+        <span className="truncate text-[11px] font-semibold text-theme-900 dark:text-theme-50">{r.name}</span>
+        <span className="flex items-baseline gap-0.5">
+          <span className="text-[9px] font-bold text-theme-600 dark:text-theme-300">¥</span>
+          <span className="text-[15px] font-bold leading-none tabular-nums text-theme-900 dark:text-theme-50">
+            {man(r.h7Total)}
+          </span>
+          <span className="text-[9px] font-medium text-theme-600 dark:text-theme-300">{t(`${NS}.manUnit`)}</span>
+        </span>
+        <ShopMiniChart points={r.daily} mode={mode} cvr={r.cvr} t={t} />
+        <span className="border-t border-theme-300/30 pt-1.5 text-[9px] font-medium tabular-nums text-theme-600 dark:border-white/10 dark:text-theme-300">
+          {fmt(t, r.h7Orders)}
+          {t(`${NS}.ordersUnit`)} · {fmt(t, r.h7Units)}
+          {t(`${NS}.unitsShort`)} · CVR {r.cvr.toFixed(2)}%
+        </span>
+      </div>
+    </div>
+  );
+}
+
+const ANALYSIS_OPEN_KEY = "uorakutensales.analysisOpen";
+const DAILY_ID = "uorakutensales-daily";
+const ANALYSIS_ID = "uorakutensales-analysis";
+
+// A remembered fold is a per-viewer convenience: storage can be missing or
+// blocked, and the module then simply starts open.
+function readAnalysisOpen() {
+  try {
+    return window.localStorage.getItem(ANALYSIS_OPEN_KEY) !== "false";
+  } catch {
+    return true;
+  }
+}
+
+function writeAnalysisOpen(open) {
+  try {
+    window.localStorage.setItem(ANALYSIS_OPEN_KEY, String(open));
+  } catch {
+    // the fold just won't be remembered
+  }
+}
+
+// The tabs live in the URL hash, so moving between the modules scrolls
+// instead of following a #link that would switch the tab.
+function JumpButton({ target, index, label, t }) {
+  return (
+    <button
+      type="button"
+      aria-label={`${t(`${NS}.jumpTo`)} ${label}`}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        document.getElementById(target)?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+      }}
+      className="inline-flex items-center gap-1.5 rounded-full border border-theme-300/60 px-2.5 py-1 text-xs font-bold text-theme-700 transition-colors hover:bg-theme-200/50 dark:border-theme-600/60 dark:text-theme-200 dark:hover:bg-theme-700/50"
+    >
+      <span aria-hidden="true" className="tabular-nums text-theme-500 dark:text-theme-400">
+        {index}
+      </span>
+      <span aria-hidden="true">{label}</span>
+    </button>
+  );
+}
+
+function ModuleHeader({ id, index, title, note, badge, children }) {
+  return (
+    <div id={id} className="flex scroll-mt-4 flex-wrap items-center gap-x-3 gap-y-2 px-0.5 pt-3">
+      <span
+        aria-hidden="true"
+        className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-sm font-extrabold text-white ${badge}`}
+      >
+        {index}
+      </span>
+      <h2 className="text-lg font-extrabold text-theme-900 dark:text-theme-50">{title}</h2>
+      <span className="text-xs text-theme-600 dark:text-theme-300">{note}</span>
+      <span aria-hidden="true" className="h-px min-w-[24px] flex-1 bg-theme-300/60 dark:bg-white/10" />
+      {children}
+    </div>
+  );
+}
+
 export default function Component({ service }) {
   const { t } = useTranslation();
   const { widget } = service;
   const refreshInterval = Math.max(1000, Number(widget.refreshInterval) || DEFAULT_REFRESH_INTERVAL);
   const [chartMode, setChartMode] = useState("line");
   // the daily check's metric: today, the month, the shop table and the best sellers
-  const [metric] = useState("sales");
+  const [metric, setMetric] = useState("sales");
+  // read after mount so the server render and the first client render agree
+  const [analysisOpen, setAnalysisOpen] = useState(true);
+  useEffect(() => {
+    setAnalysisOpen(readAnalysisOpen());
+  }, []);
 
   const { data: sales, error: salesError, mutate: mutateSales } = useWidgetAPI(widget, "sales", { refreshInterval });
   // uo-ec-manager owns the refresh schedule; each board just re-reads its own
@@ -1366,6 +1099,10 @@ export default function Component({ service }) {
     refreshInterval,
   });
   const { data: peaksData } = useWidgetAPI(widget, "peaks", { refreshInterval });
+  // yesterday's visits and the new / repeat mix — a morning snapshot
+  const { data: performanceData, mutate: mutatePerformance } = useWidgetAPI(widget, "performance", {
+    refreshInterval,
+  });
   // the market reference changes once a day: never read it more than hourly
   const { data: marketData, mutate: mutateMarket } = useWidgetAPI(widget, "market", {
     refreshInterval: Math.max(refreshInterval, MARKET_REFRESH_INTERVAL),
@@ -1401,7 +1138,15 @@ export default function Component({ service }) {
   // the month total still carries today, so the realtime snapshot is what lets
   // the completed-day pace be measured without a half-run day in it
   const monthly = useMemo(() => buildMonthly(monthlyData, sales), [monthlyData, sales]);
-  const logoByName = useMemo(() => new Map((model?.rows || []).map((r) => [r.name, r.logoUrl])), [model]);
+  // an older server answers 404, relayed as { error }: that is no snapshot, not an empty one
+  const performance = useMemo(
+    () => (performanceData && !performanceData.error ? buildPerformanceModel(performanceData, logos) : null),
+    [performanceData, logos],
+  );
+  const table = useMemo(
+    () => (model ? buildShopTable({ model, monthly, performance }) : null),
+    [model, monthly, performance],
+  );
   // one palette for the whole widget, built from every shop either board draws —
   // assigning per board would let the two disagree when their shop sets differ
   const shopColors = useMemo(
@@ -1425,8 +1170,18 @@ export default function Component({ service }) {
       mutateMonthly();
       mutateDevicesMonthly();
       mutateMarket();
+      mutatePerformance();
     },
-    [mutateSales, mutateHistory, mutateRanking, mutateDevices, mutateMonthly, mutateDevicesMonthly, mutateMarket],
+    [
+      mutateSales,
+      mutateHistory,
+      mutateRanking,
+      mutateDevices,
+      mutateMonthly,
+      mutateDevicesMonthly,
+      mutateMarket,
+      mutatePerformance,
+    ],
   );
 
   if (salesError) return <Container service={service} error={salesError} />;
@@ -1439,21 +1194,40 @@ export default function Component({ service }) {
   }
 
   const cardCls = "rounded-2xl border border-theme-300/40 bg-theme-200/30 dark:border-theme-600/40 dark:bg-white/10";
+  const activeNames = new Set(table.rows.map((r) => r.name));
+  const idleNames = table.idle.map((r) => r.name).join("・");
+  const hasSide = Boolean(monthly) || (performance && performance.visit !== null);
+  const periods = {
+    colToday: model.time ? t(`${NS}.asOf`, { time: model.time }) : "",
+    colWeek: model.days.length ? `${model.days[0].md}–${model.days[model.days.length - 1].md}` : "",
+    colMonth: monthly
+      ? `${t(`${NS}.monthCompleted`, { count: monthly.current.completedDays })}${
+          monthly.current.hasLiveDay ? `＋${t(`${NS}.todayLabel`)}` : ""
+        }`
+      : "",
+    colVisits: performance ? visitDayLabel(performance.dataDateJST) : "",
+  };
+  const toggleAnalysis = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const next = !analysisOpen;
+    setAnalysisOpen(next);
+    writeAnalysisOpen(next);
+  };
 
   return (
     <Container service={service}>
       <SparkDefs />
       <div className="@container flex w-full min-w-0 flex-col gap-3 p-1.5">
-        {/* header */}
-        <div className="flex items-center justify-between gap-2 px-0.5">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <ShopIcon />
-            <span className="flex min-w-0 flex-col">
-              <span className="truncate text-sm font-bold text-theme-900 dark:text-theme-50">{t(`${NS}.title`)}</span>
-              <span className="text-[10px] font-semibold uppercase tracking-[0.06em] text-theme-600 dark:text-theme-300">
-                {t(`${NS}.subtitle`, { count: model.rows.length })}
-              </span>
+        {/* header — the service card above already names the widget */}
+        <div className="flex flex-wrap items-center justify-between gap-2 px-0.5">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
+            <span className="text-xs font-semibold text-theme-600 dark:text-theme-300">
+              {t(`${NS}.subtitle`, { count: model.rows.length })} ·{" "}
+              {t(`${NS}.activeShops`, { count: table.rows.length })}
             </span>
+            <JumpButton target={DAILY_ID} index="1" label={t(`${NS}.dailyCheck`)} t={t} />
+            <JumpButton target={ANALYSIS_ID} index="2" label={t(`${NS}.analysis`)} t={t} />
           </div>
           <div className="flex shrink-0 items-center gap-2.5">
             <span className="flex flex-col items-end leading-tight">
@@ -1469,329 +1243,119 @@ export default function Component({ service }) {
           </div>
         </div>
 
-        {/* hero: realtime (main) + today shop breakdown.
-            Two columns only once there's room for BOTH (≥ @4xl); below that the hero
-            takes the full row and the breakdown drops beneath it — no cramped middle zone. */}
-        <section className={`grid grid-cols-1 @4xl:grid-cols-[minmax(360px,1fr)_1.7fr] ${cardCls}`}>
-          <div className="flex min-w-0 flex-col gap-2.5 border-b border-theme-300/30 p-5 @4xl:border-b-0 @4xl:border-r dark:border-white/10">
-            <span className="flex items-center gap-1.5">
-              <span className="text-[11px] font-bold tracking-wide text-theme-600 dark:text-theme-300">
-                {t(`${NS}.todaySales`)}
-              </span>
-              <span className="inline-flex items-center gap-1 text-[9.5px] font-extrabold tracking-wide text-emerald-600 dark:text-emerald-300">
-                <span className="h-[5px] w-[5px] rounded-full bg-emerald-500" />
-                {t(`${NS}.statusLive`)}
-              </span>
-            </span>
-            <span className="flex items-baseline gap-1">
-              <span className="text-[19px] font-bold text-theme-600 dark:text-theme-300">¥</span>
-              <span className="text-[54px] font-extrabold leading-[0.85] tracking-tight tabular-nums text-theme-900 dark:text-theme-50">
-                {fmt(t, model.rtTotal)}
-              </span>
-            </span>
-            <span className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
-              <span className="text-[22px] font-extrabold leading-none tabular-nums text-theme-800 dark:text-theme-100">
-                {fmt(t, model.rtOrders)}
-                <span className="ml-0.5 text-[12px] font-semibold text-theme-600 dark:text-theme-300">
-                  {t(`${NS}.ordersUnit`)}
-                </span>
-              </span>
-              <span className="text-[15px] font-bold leading-none tabular-nums text-theme-700 dark:text-theme-200">
-                {fmt(t, model.rtUnits)}
-                <span className="ml-0.5 text-[10px] font-semibold text-theme-600 dark:text-theme-300">
-                  {t(`${NS}.unitsShort`)}
-                </span>
-              </span>
-              <span className="text-[12.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
-                {t(`${NS}.aov`)} ¥{fmt(t, model.aov)} · {t(`${NS}.unitsPerOrder`)} ×{model.rtUnitsPerOrder.toFixed(2)}
-                {model.time ? ` · ${t(`${NS}.asOf`, { time: model.time })}` : ""}
-              </span>
-            </span>
-            {/* pace vs 7-day avg */}
-            {/* today's shop mix — same hues as the rows beside it and the record
-                board below, so one colour always means one shop */}
-            {model.rtTotal > 0 ? (
-              <span className="mt-0.5 flex h-[7px] overflow-hidden rounded-full bg-theme-300/40 dark:bg-white/10">
-                {model.rows
-                  .filter((r) => r.rtSales > 0)
-                  .map((r) => (
-                    <span
-                      key={r.name}
-                      className="block h-full"
-                      style={{ width: `${r.rtShare}%`, backgroundColor: shopColors[r.name] ?? FALLBACK_SHOP_COLOR }}
-                      title={`${r.name} ${r.rtShare.toFixed(1)}%`}
-                    />
-                  ))}
-              </span>
-            ) : null}
-            <div className="mt-1.5 flex flex-col gap-1.5">
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="text-[11px] font-medium text-theme-600 dark:text-theme-300">
-                  {t(`${NS}.vsSevenDayAvg`, { avg: fmt(t, Math.round(model.avg)) })}
-                </span>
-                <span className={`text-[13px] font-bold tabular-nums ${ACCENT_TEXT}`}>
-                  {model.avg > 0 ? Math.round((model.rtTotal / model.avg) * 100) : 0}%
-                </span>
-              </div>
-              <span className="block h-2 overflow-hidden rounded-full bg-theme-300/40 dark:bg-white/10">
-                <span
-                  className="block h-full rounded-full"
-                  style={{
-                    width: `${model.avg > 0 ? Math.min(100, (model.rtTotal / model.avg) * 100) : 0}%`,
-                    backgroundColor: ACCENT,
-                  }}
-                />
-              </span>
+        {/* 1 毎日のチェック — one basis, one metric switch */}
+        <ModuleHeader
+          id={DAILY_ID}
+          index="1"
+          title={t(`${NS}.dailyCheck`)}
+          note={t(`${NS}.dailyCheckNote`)}
+          badge="bg-[#D9584C]"
+        >
+          <MetricSwitch metric={metric} onChange={setMetric} t={t} />
+        </ModuleHeader>
+        <div className={`grid grid-cols-1 gap-3 ${hasSide ? "@5xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]" : ""}`}>
+          <TodayCard model={model} metric={metric} shopColors={shopColors} cardCls={cardCls} t={t} />
+          {hasSide ? (
+            <div className="flex min-w-0 flex-col gap-3">
+              <MonthCard monthly={monthly} metric={metric} cardCls={cardCls} t={t} />
+              <VisitCard performance={performance} cardCls={cardCls} t={t} />
             </div>
-            {/* 7-day context summary — totals + per-day averages fill the hero's spare height */}
-            {model.hasHistory ? (
-              <div className="mt-auto flex flex-col gap-1.5 border-t border-theme-300/30 pt-3 dark:border-white/10">
-                <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-theme-600 dark:text-theme-300">
-                  {t(`${NS}.sevenDay`)}
-                </span>
-                <div className="grid grid-cols-[max-content_1fr] items-baseline gap-x-3 gap-y-1">
-                  <span className="text-[10px] font-medium text-theme-500 dark:text-theme-400">{t(`${NS}.total`)}</span>
-                  <span className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
-                    <span className="text-[13px] font-bold tabular-nums text-theme-800 dark:text-theme-100">
-                      ¥{fmt(t, model.grandTotal)}
-                    </span>
-                    <span className="text-[11.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
-                      {fmt(t, model.grandOrders)}
-                      {t(`${NS}.ordersUnit`)}
-                    </span>
-                    <span className="text-[11.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
-                      {fmt(t, model.grandUnits)}
-                      {t(`${NS}.unitsShort`)}
-                    </span>
-                    <span className="text-[11.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
-                      ×{model.unitsPerOrder.toFixed(2)}
-                    </span>
-                  </span>
-                  <span className="text-[10px] font-medium text-theme-500 dark:text-theme-400">
-                    {t(`${NS}.avgLabel`)}
-                  </span>
-                  <span className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
-                    <span className="text-[13px] font-bold tabular-nums text-theme-800 dark:text-theme-100">
-                      ¥{fmt(t, Math.round(model.avg))}
-                      <span className="text-[10px] font-medium text-theme-500 dark:text-theme-400">
-                        {t(`${NS}.perDay`)}
-                      </span>
-                    </span>
-                    <span className="text-[11.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
-                      {fmt(t, Math.round(model.avgOrders))}
-                      {t(`${NS}.ordersUnit`)}
-                      {t(`${NS}.perDay`)}
-                    </span>
-                    <span className="text-[11.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
-                      {fmt(t, Math.round(model.avgUnits))}
-                      {t(`${NS}.unitsShort`)}
-                      {t(`${NS}.perDay`)}
-                    </span>
-                    <span className="text-[11.5px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
-                      CVR {model.grandCvr.toFixed(2)}%
-                    </span>
-                  </span>
-                </div>
-              </div>
-            ) : null}
-          </div>
-
-          {/* today shop breakdown — bullet column trails right (today share vs 7-day share) */}
-          <div className="flex min-w-0 flex-col gap-2.5 p-4">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] font-bold text-theme-700 dark:text-theme-200">
-                {t(`${NS}.shopBreakdownLive`)}
-              </span>
-              {model.hasHistory ? (
-                <span className="flex items-center gap-1 text-[9px] font-medium text-theme-500 dark:text-theme-400">
-                  <span className="inline-block h-2.5 w-0.5 rounded-full bg-theme-700 dark:bg-theme-50" />
-                  {t(`${NS}.sevenDayAvgShare`)}
-                </span>
-              ) : null}
-            </div>
-            {/* name + numbers cluster on the left (no cross-row eye travel); bullet trails right */}
-            <div className="@container/shops flex min-w-0 flex-1 flex-col gap-2">
-              {/* grid-flow-col with a fixed row count keeps the sales ranking
-                  readable DOWN each column; row-major would interleave it */}
-              <div className="grid grid-cols-1 gap-x-7 gap-y-2 @2xl/shops:grid-cols-none @2xl/shops:grid-flow-col @2xl/shops:grid-rows-4 @2xl/shops:auto-cols-fr">
-                {model.rows.map((r) => {
-                  const overIndex = r.rtShare >= r.h7Share;
-                  return (
-                    <div
-                      key={r.name}
-                      className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto_auto] @5xl/shops:grid-cols-[minmax(0,120px)_100px_44px_minmax(0,52px)_44px_minmax(56px,1fr)] items-center gap-x-2 gap-y-1"
-                    >
-                      <span className="flex min-w-0 items-center gap-1.5">
-                        <ShopLogo name={r.name} url={r.logoUrl} size={16} />
-                        <span
-                          aria-hidden="true"
-                          className="block h-[9px] w-[3px] shrink-0 rounded-full"
-                          style={{ backgroundColor: shopColors[r.name] ?? FALLBACK_SHOP_COLOR }}
-                        />
-                        <span className="truncate text-[12.5px] font-semibold text-theme-900 dark:text-theme-50">
-                          {r.name}
-                        </span>
-                      </span>
-                      <span
-                        className={`text-right text-[13px] font-bold tabular-nums ${r.rtSales > 0 ? ACCENT_TEXT : "text-theme-400 dark:text-theme-500"}`}
-                      >
-                        {r.rtSales > 0 ? `¥${fmt(t, r.rtSales)}` : "¥0"}
-                      </span>
-                      <span className="text-right text-[11px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
-                        {fmt(t, r.rtOrders)}
-                        {t(`${NS}.ordersUnit`)}
-                      </span>
-                      <span className="flex min-w-0 flex-col items-end leading-tight">
-                        <span className="truncate text-[11px] font-medium tabular-nums text-theme-600 dark:text-theme-300">
-                          {fmt(t, r.rtUnits)}
-                          {t(`${NS}.unitsShort`)}
-                        </span>
-                        {/* pieces per order — a high ratio marks wholesale-style buying */}
-                        {r.rtUnitsPerOrder > 0 ? (
-                          <span
-                            className={`text-[9px] tabular-nums ${
-                              r.rtUnitsPerOrder >= 2
-                                ? "font-bold text-amber-600 dark:text-amber-300"
-                                : "text-theme-500 dark:text-theme-400"
-                            }`}
-                            title={t(`${NS}.unitsPerOrder`)}
-                          >
-                            ×{r.rtUnitsPerOrder.toFixed(2)}
-                          </span>
-                        ) : null}
-                      </span>
-                      <span className="col-start-4 row-start-2 text-right text-[10.5px] font-medium tabular-nums text-theme-500 @5xl/shops:col-start-5 @5xl/shops:row-start-1 dark:text-theme-400">
-                        {r.rtShare.toFixed(1)}%
-                      </span>
-                      {/* bullet: fill = today share, tick = this shop's 7-day share; red when today ≥ normal */}
-                      <span className="relative col-span-3 row-start-2 block h-2 self-center rounded-full bg-theme-300/40 @5xl/shops:col-span-1 @5xl/shops:col-start-6 @5xl/shops:row-start-1 dark:bg-white/10">
-                        <span
-                          className="absolute inset-y-0 left-0 rounded-full"
-                          style={{
-                            width: `${Math.min(100, (r.rtShare / model.shareScale) * 100)}%`,
-                            backgroundColor: shopColors[r.name] ?? FALLBACK_SHOP_COLOR,
-                            // above its own 7-day norm reads solid; below it dims.
-                            // The tick still marks the baseline, so the comparison
-                            // stays readable from the geometry alone.
-                            opacity: overIndex ? 1 : 0.42,
-                          }}
-                        />
-                        {r.h7Share > 0 ? (
-                          <span
-                            className="absolute top-1/2 h-3.5 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-theme-700 dark:bg-theme-50"
-                            style={{ left: `${Math.min(100, (r.h7Share / model.shareScale) * 100)}%` }}
-                          />
-                        ) : null}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-              {/* one child of the same two-column grid lands in the first column
-                  and resolves the same tracks, so the totals keep lining up under
-                  the figures they add up instead of drifting off on an ml-auto */}
-              <div className="mt-auto grid grid-cols-1 gap-x-7 border-t border-theme-300/60 pt-2 @2xl/shops:grid-cols-2 dark:border-white/15">
-                <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto_auto] @5xl/shops:grid-cols-[minmax(0,120px)_100px_44px_minmax(0,52px)_44px_minmax(56px,1fr)] items-center gap-x-2">
-                  <span className="text-[12px] font-bold text-theme-900 dark:text-theme-50">{t(`${NS}.total`)}</span>
-                  <span className={`text-right text-[13px] font-extrabold tabular-nums ${ACCENT_TEXT}`}>
-                    ¥{fmt(t, model.rtTotal)}
-                  </span>
-                  <span className="text-right text-[11px] font-bold tabular-nums text-theme-700 dark:text-theme-200">
-                    {fmt(t, model.rtOrders)}
-                    {t(`${NS}.ordersUnit`)}
-                  </span>
-                  <span className="truncate text-right text-[11px] font-bold tabular-nums text-theme-700 dark:text-theme-200">
-                    {fmt(t, model.rtUnits)}
-                    {t(`${NS}.unitsShort`)}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
+          ) : null}
+        </div>
+        <ShopTable table={table} metric={metric} shopColors={shopColors} periods={periods} cardCls={cardCls} t={t} />
         {ranking ? (
           <RankingSection ranking={ranking} dim={RANKING_DIM_BY_METRIC[metric]} cardCls={cardCls} t={t} />
         ) : null}
 
-        {/* device-model boards: today, this month and last month in one place */}
-        {devices ? (
-          <DeviceSalesSection
-            devices={devices}
-            market={market}
-            evidence={evidence}
-            onEvidence={setEvidenceModel}
-            deviceEvidence={deviceEvidence}
-            onDeviceEvidence={setDeviceEvidenceQuery}
-            shopColors={shopColors}
-            cardCls={cardCls}
-            t={t}
-          />
-        ) : null}
+        {/* 2 分析・深掘り — figures that need not be read every day */}
+        <ModuleHeader
+          id={ANALYSIS_ID}
+          index="2"
+          title={t(`${NS}.analysis`)}
+          note={t(`${NS}.analysisNote`)}
+          badge="bg-[#5F7FAF]"
+        >
+          <button
+            type="button"
+            aria-expanded={analysisOpen}
+            onClick={toggleAnalysis}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-theme-300/60 px-3 py-1 text-xs font-bold text-theme-700 transition-colors hover:bg-theme-200/50 dark:border-theme-600/60 dark:text-theme-200 dark:hover:bg-theme-700/50"
+          >
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2.6}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              className={analysisOpen ? "rotate-180" : ""}
+            >
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+            {analysisOpen ? t(`${NS}.collapse`) : t(`${NS}.expand`)}
+          </button>
+        </ModuleHeader>
 
-        {model.hasHistory ? (
-          <section className={`grid grid-cols-1 gap-x-5 gap-y-4 p-4 @4xl:grid-cols-[300px_1fr] ${cardCls}`}>
-            <div className="min-w-0 @4xl:border-r @4xl:border-theme-300/30 dark:@4xl:border-white/10 @4xl:pr-5">
-              <DailyChart model={model} mode={chartMode} onModeChange={setChartMode} t={t} />
-            </div>
-            <div className="flex min-w-0 flex-col gap-2.5">
-              <span className="min-w-0 truncate text-[10.5px] font-bold tracking-wide text-theme-600 dark:text-theme-300">
-                {t(`${NS}.shopTrend`)}{" "}
-                <span className="text-[9px] font-medium text-theme-500 dark:text-theme-400">
-                  · {t(`${NS}.excludesToday`)}
-                </span>
-              </span>
-              <div className="grid grid-cols-[repeat(auto-fit,minmax(104px,1fr))] gap-2.5">
-                {model.rows.map((r) => (
-                  <div
-                    key={r.name}
-                    className="relative flex min-w-0 flex-col rounded-xl border border-theme-300/30 bg-theme-100/60 p-2.5 dark:border-white/[0.06] dark:bg-white/[0.03]"
-                  >
-                    {/* corner-bleed logo watermark — clipped by its OWN layer so the mini-chart
-                        hover tooltip can still escape the (unclipped) card */}
-                    {r.logoUrl ? (
-                      <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl">
-                        <img
-                          src={r.logoUrl}
-                          alt=""
-                          aria-hidden="true"
-                          loading="lazy"
-                          className="absolute -top-2 -right-2 h-[68px] w-[68px] object-contain opacity-[0.12] blur-[4px] dark:opacity-[0.15]"
-                        />
-                      </span>
-                    ) : null}
-                    <div className="relative flex min-w-0 flex-col gap-1.5">
-                      <span className="truncate text-[11px] font-semibold text-theme-900 dark:text-theme-50">
-                        {r.name}
-                      </span>
-                      <span className="flex items-baseline gap-0.5">
-                        <span className="text-[9px] font-bold text-theme-600 dark:text-theme-300">¥</span>
-                        <span className="text-[15px] font-bold leading-none tabular-nums text-theme-900 dark:text-theme-50">
-                          {man(r.h7Total)}
-                        </span>
-                        <span className="text-[9px] font-medium text-theme-600 dark:text-theme-300">
-                          {t(`${NS}.manUnit`)}
-                        </span>
-                      </span>
-                      <ShopMiniChart points={r.daily} mode={chartMode} cvr={r.cvr} t={t} />
-                      <span className="border-t border-theme-300/30 pt-1.5 text-[9px] font-medium tabular-nums text-theme-600 dark:border-white/10 dark:text-theme-300">
-                        {fmt(t, r.h7Orders)}
-                        {t(`${NS}.ordersUnit`)} · {fmt(t, r.h7Units)}
-                        {t(`${NS}.unitsShort`)} · CVR {r.cvr.toFixed(2)}%
-                      </span>
-                    </div>
+        {analysisOpen ? (
+          <>
+            {/* device-model boards: today, this month and last month in one place */}
+            {devices ? (
+              <DeviceSalesSection
+                devices={devices}
+                market={market}
+                evidence={evidence}
+                onEvidence={setEvidenceModel}
+                deviceEvidence={deviceEvidence}
+                onDeviceEvidence={setDeviceEvidenceQuery}
+                shopColors={shopColors}
+                cardCls={cardCls}
+                t={t}
+              />
+            ) : null}
+
+            {model.hasHistory ? (
+              <section className={`grid grid-cols-1 gap-x-5 gap-y-4 p-4 @4xl:grid-cols-[300px_1fr] ${cardCls}`}>
+                <div className="min-w-0 @4xl:border-r @4xl:border-theme-300/30 dark:@4xl:border-white/10 @4xl:pr-5">
+                  <DailyChart model={model} mode={chartMode} onModeChange={setChartMode} t={t} />
+                </div>
+                <div className="flex min-w-0 flex-col gap-2.5">
+                  <span className="min-w-0 text-xs font-bold tracking-wide text-theme-600 dark:text-theme-300">
+                    {t(`${NS}.shopTrend`)}{" "}
+                    <span className="font-medium text-theme-500 dark:text-theme-400">
+                      · {t(`${NS}.excludesToday`)}
+                      {idleNames ? ` · ${t(`${NS}.idleLeftOut`, { names: idleNames })}` : ""}
+                    </span>
+                  </span>
+                  <div className="grid grid-cols-[repeat(auto-fit,minmax(104px,1fr))] gap-2.5">
+                    {model.rows
+                      .filter((r) => activeNames.has(r.name))
+                      .map((r) => (
+                        <ShopTrendCard key={r.name} row={r} mode={chartMode} t={t} />
+                      ))}
                   </div>
-                ))}
+                </div>
+              </section>
+            ) : null}
+
+            {performance ? (
+              <div className="grid grid-cols-1 gap-3 @5xl:grid-cols-2">
+                <CustomerMixCard performance={performance} cardCls={cardCls} t={t} />
+                <ShopVisitsTable
+                  performance={performance}
+                  names={table.rows.map((r) => r.name)}
+                  shopColors={shopColors}
+                  cardCls={cardCls}
+                  t={t}
+                />
               </div>
-            </div>
-          </section>
-        ) : null}
+            ) : null}
 
-        {monthly ? (
-          <MonthlySection monthly={monthly} logoByName={logoByName} shopColors={shopColors} cardCls={cardCls} t={t} />
+            {peaks ? <PeaksSection peaks={peaks} shopColors={shopColors} cardCls={cardCls} t={t} /> : null}
+          </>
         ) : null}
-
-        {peaks ? <PeaksSection peaks={peaks} shopColors={shopColors} cardCls={cardCls} t={t} /> : null}
       </div>
     </Container>
   );

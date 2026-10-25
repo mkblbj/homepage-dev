@@ -48,7 +48,7 @@ function signedPct(value) {
   return `${sign}${Math.abs(value).toFixed(1)}%`;
 }
 
-function Delta({ value, className = "" }) {
+export function Delta({ value, className = "" }) {
   const tone = deltaTone(value);
   return (
     <span data-tone={tone} className={`tabular-nums ${TONE_CLASS[tone]} ${className}`}>

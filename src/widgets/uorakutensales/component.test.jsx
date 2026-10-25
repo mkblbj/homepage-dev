@@ -68,6 +68,7 @@ function ranking(overallMno, shops) {
 describe("widgets/uorakutensales/component", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
   });
 
   it("falls back to the overall ranking when the selected shop disappears after refresh", () => {
@@ -159,6 +160,112 @@ describe("widgets/uorakutensales/component", () => {
     expect(mutateRanking).toHaveBeenCalledOnce();
   });
 
+  it("reads the performance snapshot on the widget's own interval", () => {
+    useWidgetAPI.mockImplementation((_widget, endpoint) => {
+      if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
+      return { data: undefined, error: undefined, mutate: vi.fn() };
+    });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+
+    expect(useWidgetAPI).toHaveBeenCalledWith(service.widget, "performance", { refreshInterval: 60000 });
+  });
+
+  it("refreshes the performance snapshot with everything else", () => {
+    const mutatePerformance = vi.fn();
+    useWidgetAPI.mockImplementation((_widget, endpoint) => {
+      if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
+      if (endpoint === "performance") return { data: undefined, error: undefined, mutate: mutatePerformance };
+      return { data: undefined, error: undefined, mutate: vi.fn() };
+    });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+    fireEvent.click(screen.getByRole("button", { name: "uorakutensales.refresh" }));
+
+    expect(mutatePerformance).toHaveBeenCalledOnce();
+  });
+
+  it("renders the daily check without the performance snapshot", () => {
+    useWidgetAPI.mockImplementation((_widget, endpoint) => {
+      if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
+      return { data: undefined, error: undefined, mutate: vi.fn() };
+    });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+
+    expect(screen.getByRole("heading", { name: "uorakutensales.dailyCheck" })).toBeInTheDocument();
+    expect(screen.queryByText("uorakutensales.visitsTitle")).not.toBeInTheDocument();
+  });
+
+  it("shows the latest visits once the performance snapshot is there", () => {
+    const performance = {
+      ok: true,
+      traffic: {
+        dataDateJST: "2026-10-24",
+        visitCount: 21654,
+        uniqueVisitorCount: 20152,
+        expectedVisitCount: 25494.5,
+        visitDeltaPercent: -15.1,
+        sampleCount: 4,
+      },
+      shops: [],
+    };
+    useWidgetAPI.mockImplementation((_widget, endpoint) => {
+      if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
+      if (endpoint === "performance") return { data: performance, error: undefined, mutate: vi.fn() };
+      return { data: undefined, error: undefined, mutate: vi.fn() };
+    });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+
+    expect(screen.getByText("uorakutensales.visitsTitle")).toBeInTheDocument();
+  });
+
+  it("folds the analysis module and remembers it", () => {
+    useWidgetAPI.mockImplementation((_widget, endpoint) => {
+      if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
+      if (endpoint === "devices") return { data: dailyDeviceSales(), error: undefined, mutate: vi.fn() };
+      if (endpoint === "devicesMonthly") return { data: monthlyDeviceSales(), error: undefined, mutate: vi.fn() };
+      return { data: undefined, error: undefined, mutate: vi.fn() };
+    });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+    expect(screen.getByText("uorakutensales.deviceSales")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "uorakutensales.collapse" }));
+
+    expect(screen.queryByText("uorakutensales.deviceSales")).not.toBeInTheDocument();
+    expect(localStorage.getItem("uorakutensales.analysisOpen")).toBe("false");
+  });
+
+  it("starts folded when the reader folded the analysis module before", () => {
+    localStorage.setItem("uorakutensales.analysisOpen", "false");
+    useWidgetAPI.mockImplementation((_widget, endpoint) => {
+      if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
+      if (endpoint === "devices") return { data: dailyDeviceSales(), error: undefined, mutate: vi.fn() };
+      if (endpoint === "devicesMonthly") return { data: monthlyDeviceSales(), error: undefined, mutate: vi.fn() };
+      return { data: undefined, error: undefined, mutate: vi.fn() };
+    });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+
+    expect(screen.queryByText("uorakutensales.deviceSales")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "uorakutensales.expand" })).toBeInTheDocument();
+  });
+
+  it("jumps between the modules without touching the tab in the URL", () => {
+    window.location.hash = "#楽天";
+    useWidgetAPI.mockImplementation((_widget, endpoint) => {
+      if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
+      return { data: undefined, error: undefined, mutate: vi.fn() };
+    });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+    fireEvent.click(screen.getByRole("button", { name: "uorakutensales.jumpTo uorakutensales.analysis" }));
+
+    expect(decodeURIComponent(window.location.hash)).toBe("#楽天");
+  });
+
   it("reads both device boards on the widget's own interval", () => {
     useWidgetAPI.mockImplementation((_widget, endpoint) => {
       if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
@@ -224,7 +331,7 @@ describe("widgets/uorakutensales/component", () => {
 
     expect(screen.queryByText("uorakutensales.deviceSales")).not.toBeInTheDocument();
     // the rest of the widget is untouched
-    expect(screen.getByText("uorakutensales.title")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "uorakutensales.dailyCheck" })).toBeInTheDocument();
   });
   it("offers the 市場 view only when the server has the market reference", () => {
     const notFound = { error: { message: "Rakuten sales service error", data: { error: "Not Found" } } };

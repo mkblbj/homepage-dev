@@ -1605,7 +1605,10 @@
         "idleHide": "Hide shops with no sales",
         "idleNote": "No sales today, in the last 7 days or this month",
         "showLessTop": "Back to top {{count}}",
-        "rankedBy": "by {{metric}}"
+        "rankedBy": "by {{metric}}",
+        "activeShops": "{{count}} active",
+        "shopVisits": "Visits by shop",
+        "idleLeftOut": "{{names}} left out (no sales)"
     },
     "uoshippingdashboard": {
         "allPlatforms": "All",

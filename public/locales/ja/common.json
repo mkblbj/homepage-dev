@@ -1605,7 +1605,10 @@
         "idleHide": "実績のない店舗をたたむ",
         "idleNote": "今日・直近7日・今月とも実績なし",
         "showLessTop": "TOP{{count}} に戻す",
-        "rankedBy": "{{metric}}順"
+        "rankedBy": "{{metric}}順",
+        "activeShops": "稼働{{count}}店",
+        "shopVisits": "店舗別 訪問",
+        "idleLeftOut": "{{names}} は実績がないため省略"
     },
     "uoshippingdashboard": {
         "allPlatforms": "全部",
