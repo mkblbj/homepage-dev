@@ -5,7 +5,8 @@
 import { Fragment, useEffect, useState } from "react";
 import { DASH, mdLabel, weekdayJp } from "widgets/uoperformance/performance-model.mjs";
 
-import { deltaTone, historyComparable, METRICS, todayVsAverage } from "./daily-check-model.mjs";
+import { deltaTone, METRICS, todayVsAverage } from "./daily-check-model.mjs";
+import { PlatformMark, PlatformName, PlatformSuffix, ScopeName } from "./platform-mark";
 import { FALLBACK_SHOP_COLOR, man } from "./sales-model.mjs";
 
 const NS = "uorakutensales";
@@ -110,10 +111,10 @@ export function barLabel(metric, value, t) {
   return `${value >= 100000 ? Math.round(value / 10000) : man(value)}${t(`${NS}.manUnit`)}`;
 }
 
-// The days every shop has, then today. Today's bar only stands beside them when
-// both sides count the same way: 売上 history is after coupons, today before.
-function WeekBars({ days, metric, value, avg, t }) {
-  const withToday = historyComparable(metric) && value !== null;
+// The last finished days, then today when today has one figure to stand beside
+// them. `platform` names whose days they are when that is not the whole company.
+function WeekBars({ days, metric, value, avg, platform = null, t }) {
+  const withToday = value !== null;
   const series = days.map((d) => ({ key: d.date, md: d.md, wd: d.wd, v: d[metric] || 0 }));
   const peak = Math.max(1, withToday ? value : 0, ...series.map((d) => d.v));
   const px = (v) => `${Math.max(3, Math.round((v / peak) * CHART_HEIGHT))}px`;
@@ -122,7 +123,12 @@ function WeekBars({ days, metric, value, avg, t }) {
     <div className="flex min-w-0 flex-col gap-2">
       <div className="flex items-baseline justify-between gap-2 text-xs">
         <span className={`font-bold ${MUTED}`}>
-          {withToday ? t(`${NS}.lastDaysAndToday`, { count }) : t(`${NS}.lastDaysAfterCoupon`, { count })}
+          {platform ? (
+            <>
+              <PlatformName platform={platform} label={platformLabel(platform, t)} /> ·{" "}
+            </>
+          ) : null}
+          {withToday ? t(`${NS}.lastDaysAndToday`, { count }) : t(`${NS}.lastDays`, { count })}
         </span>
         {avg ? <span className={MUTED}>{t(`${NS}.avgLine`)}</span> : null}
       </div>
@@ -177,7 +183,9 @@ function PlatformLines({ platforms, metric, t }) {
     <div className="grid grid-cols-[auto_1fr] items-baseline gap-x-3 gap-y-1 text-sm tabular-nums">
       {platforms.map((p) => (
         <Fragment key={p.platform}>
-          <span className="font-bold text-theme-800 dark:text-theme-100">{platformLabel(p.platform, t)}</span>
+          <span className="font-bold text-theme-800 dark:text-theme-100">
+            <PlatformName platform={p.platform} label={platformLabel(p.platform, t)} />
+          </span>
           <span className="text-theme-700 dark:text-theme-200">
             {order.map((m) => valueText(m, p.values[m], t)).join(" · ")}
             {p.aov !== null ? ` · ${t(`${NS}.aov`)} ¥${fmt(t, p.aov)}` : ""}
@@ -215,8 +223,8 @@ export function TodayCard({ view, metric, shopColors, cardCls = "", t }) {
           <span className="flex flex-col gap-1.5">
             {view.platforms.map((p) => (
               <span key={p.platform} className="flex items-baseline gap-3">
-                <span className="w-16 shrink-0 text-sm font-bold text-theme-800 dark:text-theme-100">
-                  {platformLabel(p.platform, t)}
+                <span className="w-20 shrink-0 text-sm font-bold text-theme-800 dark:text-theme-100">
+                  <PlatformName platform={p.platform} label={platformLabel(p.platform, t)} />
                 </span>
                 <span className={`text-[36px] font-extrabold leading-none tracking-tight tabular-nums ${ACCENT_TEXT}`}>
                   {valueText("sales", p.values.sales, t)}
@@ -271,13 +279,11 @@ export function TodayCard({ view, metric, shopColors, cardCls = "", t }) {
           </div>
         ) : null}
         {split ? <span className={`mt-1 text-xs ${MUTED}`}>{t(`${NS}.salesNotSummed`)}</span> : null}
-        {days.length && !historyComparable(metric) ? (
-          <span className={`text-xs ${MUTED}`}>{t(`${NS}.salesBasisNote`)}</span>
-        ) : null}
       </div>
       {days.length ? (
         <div className="min-w-[280px] flex-1 @5xl:max-w-[400px]">
-          <WeekBars days={days} metric={metric} value={value} avg={avg} t={t} />
+          {/* 売上 across platforms: the bars are 楽天's yen alone */}
+          <WeekBars days={days} metric={metric} value={value} avg={avg} platform={split ? "rakuten" : null} t={t} />
         </div>
       ) : null}
     </section>
@@ -348,8 +354,8 @@ export function MonthCard({ monthly, metric, cardCls = "", t }) {
               <span key={platform} className="flex flex-col gap-0.5">
                 <span className="flex flex-wrap items-baseline justify-between gap-x-3">
                   <span className="flex items-baseline gap-3">
-                    <span className="w-16 shrink-0 text-sm font-bold text-theme-800 dark:text-theme-100">
-                      {platformLabel(platform, t)}
+                    <span className="w-20 shrink-0 text-sm font-bold text-theme-800 dark:text-theme-100">
+                      <PlatformName platform={platform} label={platformLabel(platform, t)} />
                     </span>
                     <span className="text-[26px] font-extrabold leading-tight tabular-nums text-theme-900 dark:text-theme-50">
                       {shortText(metric, pm.current, t)}
@@ -359,7 +365,7 @@ export function MonthCard({ monthly, metric, cardCls = "", t }) {
                     {t(`${NS}.prevPaceDelta`)} <Delta value={pm.paceDeltaPct} className="ml-1 text-sm font-extrabold" />
                   </span>
                 </span>
-                <span className="pl-[76px] text-xs tabular-nums text-theme-700 dark:text-theme-200">
+                <span className="pl-[92px] text-xs tabular-nums text-theme-700 dark:text-theme-200">
                   {t(`${NS}.dailyAvgVsPrev`, {
                     pace: shortText(metric, pm.pace, t),
                     prev: shortText(metric, pm.prevPace, t),
@@ -375,16 +381,9 @@ export function MonthCard({ monthly, metric, cardCls = "", t }) {
   );
 }
 
-// What the 7-day figures cannot vouch for: a history that stopped updating, or
-// shops still on an older window than the rest.
+// What the 7-day figures cannot vouch for: a history that stopped updating.
 export function historyNotes(week, t) {
-  if (!week) return [];
-  const notes = [];
-  if (week.behind) notes.push(t(`${NS}.historyStopped`, { md: week.endMd }));
-  if (week.lagging.length) {
-    notes.push(t(`${NS}.historyLagging`, { names: week.lagging.join("・"), md: week.laggingEndMd }));
-  }
-  return notes;
+  return week?.behind ? [t(`${NS}.historyStopped`, { md: week.endMd })] : [];
 }
 
 export function visitDayLabel(dateStr) {
@@ -407,7 +406,7 @@ export function VisitCard({ performance, scope = "", cardCls = "", t }) {
     <section className={`flex min-w-0 flex-col gap-2 p-5 ${cardCls}`}>
       <span className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <span className="text-sm font-bold text-theme-800 dark:text-theme-100">
-          {scope ? `${scope} ` : ""}
+          <ScopeName scope={scope} />
           {t(`${NS}.visitsTitle`)}{" "}
           <span className={`text-xs font-medium ${MUTED}`}>
             {visitDayLabel(performance.dataDateJST)} ·{" "}
@@ -515,25 +514,18 @@ export function ShopLogo({ name, url, size = 18 }) {
   );
 }
 
-// logo, then the shop's colour as a thin bar, then the name — the colour ties
-// the row to the shop's bars elsewhere on the page
-// names a shop's platform beside it in a list that mixes platforms
-export function PlatformTag({ platform, t }) {
-  return (
-    <span className="shrink-0 rounded border border-amber-500/40 bg-amber-500/10 px-1 py-px text-[10px] font-bold leading-none text-amber-700 dark:text-amber-300">
-      {platformLabel(platform, t)}
-    </span>
-  );
-}
-
-// `platform` is named beside a shop that is not 楽天's, so a peer list reads clearly
-export function ShopName({ name, color, logoUrl, platform = "rakuten", t }) {
+// The platform's mark (when the row names one), the shop's logo, then the
+// shop's colour as a thin bar, then the name — the colour ties the row to the
+// shop's bars elsewhere on the page, the mark to its platform.
+export function ShopName({ name, color, logoUrl, platform = null, t }) {
+  const label = platform && t ? platformLabel(platform, t) : null;
   return (
     <span className="flex items-center gap-2 font-bold text-theme-900 dark:text-theme-50">
+      {label ? <PlatformMark platform={platform} /> : null}
       <ShopLogo name={name} url={logoUrl} />
       <span aria-hidden="true" className="block h-3 w-[3px] shrink-0 rounded-full" style={{ backgroundColor: color }} />
       {name}
-      {platform !== "rakuten" && t ? <PlatformTag platform={platform} t={t} /> : null}
+      {label ? <PlatformSuffix label={label} /> : null}
     </span>
   );
 }
@@ -581,8 +573,7 @@ function TodayCell({ row, metric, maxToday, color, t }) {
 function AvgRatioCell({ row, metric }) {
   const avg = row.avg?.[metric];
   const value = row.today?.[metric];
-  const comparable = historyComparable(metric, row.platform ?? "rakuten");
-  const pct = comparable && avg > 0 && value !== null && value !== undefined ? (value / avg) * 100 : null;
+  const pct = avg > 0 && value !== null && value !== undefined ? (value / avg) * 100 : null;
   return (
     <td {...colProps(3)} className={`${colProps(3).className} px-2 py-2.5`}>
       {pct === null ? (
@@ -700,20 +691,17 @@ export function ShopTable({
     multi && metric === "sales" ? (totals.find((r) => r.platform === platform)?.today?.sales ?? null) : companyToday;
   const footerLabel = (row) => {
     if (!multi) return t(`${NS}.total`);
-    return row.platform
-      ? t(`${NS}.platformTotal`, { platform: platformLabel(row.platform, t) })
-      : t(`${NS}.companyTotal`);
+    return row.platform ? (
+      <PlatformName
+        platform={row.platform}
+        label={t(`${NS}.platformTotal`, { platform: platformLabel(row.platform, t) })}
+      />
+    ) : (
+      t(`${NS}.companyTotal`)
+    );
   };
   const unit = unitOf(metric, t);
-  // the 7-day yen are R-Karte's, after coupons: the header says so on a line of its own
-  const weekAvgLabel = historyComparable(metric) ? (
-    withUnit(t(`${NS}.perDayAvg`), unit)
-  ) : (
-    <>
-      {withUnit(t(`${NS}.perDayAvg`), unit)}
-      <span className="block text-[10px] font-medium">{t(`${NS}.afterCouponTag`)}</span>
-    </>
-  );
+
   // a group's header opens its band: its name and period, underlined in the group's colour
   const group = (key, firstCol, span) => {
     const { className, ...props } = colProps(firstCol);
@@ -778,7 +766,7 @@ export function ShopTable({
               {head(1, t(`${NS}.${METRIC_LABEL[metric]}`), "text-left")}
               {head(2, t(`${NS}.share`), "text-right")}
               {head(3, t(`${NS}.vsAvg`), "text-left")}
-              {head(4, weekAvgLabel, "text-right")}
+              {head(4, withUnit(t(`${NS}.perDayAvg`), unit), "text-right")}
               {head(5, "CVR", "text-right")}
               {head(6, withUnit(t(`${NS}.cumulative`), unit), "text-right")}
               {head(7, t(`${NS}.vsPrev`), "text-right")}

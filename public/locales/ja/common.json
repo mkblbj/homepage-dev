@@ -1613,13 +1613,8 @@
         "notFetched": "{{names}} は未取得",
         "shopsAggregatedPartial": "{{covered}}/{{total}}店舗集計",
         "lastDaysAndToday": "直近{{count}}日 + 今日",
-        "lastDaysAfterCoupon": "楽天・直近{{count}}日（クーポン後）",
-        "salesBasisNote": "直近7日の売上はクーポン後の金額なので、今日（クーポン前）とは比べません",
-        "afterCoupon": "売上はクーポン後",
         "historyStopped": "直近7日のデータが {{md}} で止まっています",
-        "historyLagging": "{{names}} の直近7日は {{md}} までで、更新が止まっています",
         "visitsStale": "更新停止中",
-        "afterCouponTag": "楽天はクーポン後",
         "platformRakuten": "楽天",
         "platformAmazon": "Amazon",
         "platformSplit": "楽天{{rakuten}}・Amazon{{amazon}}",
@@ -1627,7 +1622,8 @@
         "companyTotal": "全社 計",
         "salesNotSummed": "売上はモールごとに集計基準が違うため、合算しません",
         "boardLoading": "読み込み中…",
-        "peaksCoverageAmazon": "Amazon は {{date}} から"
+        "peaksCoverageAmazon": "Amazon は {{date}} から",
+        "lastDays": "直近{{count}}日"
     },
     "uoshippingdashboard": {
         "allPlatforms": "全部",

@@ -43,6 +43,7 @@ import {
   SlowingRow,
 } from "./device-sales-row";
 import { buildSlowing, SLOWING_MIN_UNITS, slowingTotals, slowingWindow } from "./device-slowing-model.mjs";
+import { ScopeName } from "./platform-mark";
 import { mdLabel, timeFromJST, weekdayJp } from "./sales-model.mjs";
 
 const ALL = "__all__";
@@ -531,7 +532,7 @@ export default function DeviceSalesSection({
         <div className="flex min-w-0 flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-[13px] font-extrabold text-theme-800 dark:text-theme-100">
-              {scope ? `${scope} ` : ""}
+              <ScopeName scope={scope} />
               {t(`${NS}.deviceSales`)}
             </span>
             {current.shopCount > 0 && current.coveredShopCount < current.shopCount ? (

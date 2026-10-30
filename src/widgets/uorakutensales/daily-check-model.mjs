@@ -44,14 +44,6 @@ function isZero(values) {
 
 const known = (v) => v !== null && v !== undefined;
 
-// The 7-day 売上 only stands against today when both come from one source.
-// 楽天's history is R-Karte's after-coupon yen while today is the order API's,
-// before coupons; Amazon's history and today both come from its Sales API.
-// Counts mean the same on every side.
-export function historyComparable(metric, platform = "rakuten") {
-  return metric !== "sales" || platform === "amazon";
-}
-
 // Counts of several platforms added up: a platform the server could not read
 // at all adds nothing (the coverage says so), and the yen slot stays empty.
 function addCounts(list) {
@@ -148,7 +140,11 @@ export function buildShopTable({ model, monthly, performance, amazon = null }) {
       // a shop missing from the live snapshot, or left out of today's total, is
       // unknown today, not a ¥0 day
       today: isKnown(today) ? today : null,
-      avg: hasHistory && live ? triple(live.h7Total / nDays, live.h7Units / nDays, live.h7Orders / nDays) : null,
+      // a shop whose week the server could not count has no average, not a zero one
+      avg:
+        hasHistory && live && live.h7Total !== null
+          ? triple(live.h7Total / nDays, live.h7Units / nDays, live.h7Orders / nDays)
+          : null,
       cvr: hasHistory && live ? live.cvr : null,
       ...monthOf(monthByName.get(name)),
       visits: visits?.visit ?? null,
@@ -320,6 +316,5 @@ export function buildMonthView(monthly, amazon = null) {
 export function todayVsAverage(view, metric) {
   const value = view?.values?.[metric] ?? null;
   const avg = view?.avg?.[metric] ?? null;
-  const comparable = value !== null && historyComparable(metric);
-  return { value, avg, pct: comparable && avg > 0 ? (value / avg) * 100 : null };
+  return { value, avg, pct: value !== null && avg > 0 ? (value / avg) * 100 : null };
 }

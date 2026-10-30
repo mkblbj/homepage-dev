@@ -1626,13 +1626,8 @@
         "notFetched": "{{names}} 未获取",
         "shopsAggregatedPartial": "{{covered}}/{{total}} 家店铺",
         "lastDaysAndToday": "近{{count}}日 + 今日",
-        "lastDaysAfterCoupon": "乐天・近{{count}}日（扣券后）",
-        "salesBasisNote": "近7日销售额是扣券后的金额，所以不和今天（扣券前）比较",
-        "afterCoupon": "销售额为扣券后",
         "historyStopped": "近7日数据停在 {{md}}",
-        "historyLagging": "{{names}} 的近7日数据只到 {{md}}，已停止更新",
         "visitsStale": "已停止更新",
-        "afterCouponTag": "乐天为扣券后",
         "platformRakuten": "乐天",
         "platformAmazon": "Amazon",
         "platformSplit": "乐天 {{rakuten}}・Amazon {{amazon}}",
@@ -1640,7 +1635,8 @@
         "companyTotal": "全公司合计",
         "salesNotSummed": "各平台销售额口径不同，不合计",
         "boardLoading": "加载中…",
-        "peaksCoverageAmazon": "Amazon 自 {{date}} 起"
+        "peaksCoverageAmazon": "Amazon 自 {{date}} 起",
+        "lastDays": "近{{count}}日"
     },
     "uoshippingdashboard": {
         "allPlatforms": "全部",
