@@ -3,7 +3,7 @@
 // 経営表現 widget's wording, since they show the same figures it did.
 import { DASH, mdLabel } from "widgets/uoperformance/performance-model.mjs";
 
-import { Delta, ShopName, visitDayLabel } from "./daily-check-section";
+import { Delta, ShopName, visitDayLabel, visitsStale } from "./daily-check-section";
 import { FALLBACK_SHOP_COLOR } from "./sales-model.mjs";
 
 const NS = "uorakutensales";
@@ -24,7 +24,8 @@ function pctText(value) {
   return value === null || value === undefined ? DASH : `${Number(value).toFixed(1)}%`;
 }
 
-export function CustomerMixCard({ performance, cardCls = "", t }) {
+// `scope` names the platform the mix belongs to once the board shows several
+export function CustomerMixCard({ performance, scope = "", cardCls = "", t }) {
   const mix = performance?.mix;
   if (!mix || mix.newYen === null) return null;
   const rows = [
@@ -42,7 +43,10 @@ export function CustomerMixCard({ performance, cardCls = "", t }) {
   return (
     <section className={`flex min-w-0 flex-col gap-3 p-5 ${cardCls}`}>
       <span className="flex flex-wrap items-baseline gap-x-2">
-        <span className="text-base font-extrabold text-theme-900 dark:text-theme-50">{t(`${PERF}.mixTitle`)}</span>
+        <span className="text-base font-extrabold text-theme-900 dark:text-theme-50">
+          {scope ? `${scope} ` : ""}
+          {t(`${PERF}.mixTitle`)}
+        </span>
         <span className={`text-xs ${MUTED}`}>
           {periodLabel(mix.period)} · {t(`${NS}.sortSales`)}
         </span>
@@ -94,7 +98,18 @@ function unknownShop(name) {
   return { name, visit: null, uu: null, expected: null, delta: null, sampleCount: 0, newSalesShare: null };
 }
 
-export function ShopVisitsTable({ performance, names, shopColors, logoByName = new Map(), cardCls = "", t }) {
+// `platformByName` marks the shops of other platforms, which have no visits to
+// show; `scope` names whose visits the total is once the board shows several
+export function ShopVisitsTable({
+  performance,
+  names,
+  shopColors,
+  logoByName = new Map(),
+  platformByName = new Map(),
+  scope = "",
+  cardCls = "",
+  t,
+}) {
   if (!performance) return null;
   const byName = new Map(performance.shops.map((s) => [s.name, s]));
   const rows = names.map((name) => byName.get(name) ?? unknownShop(name));
@@ -108,7 +123,12 @@ export function ShopVisitsTable({ performance, names, shopColors, logoByName = n
       <span className="flex flex-wrap items-baseline gap-x-2">
         <span className="text-base font-extrabold text-theme-900 dark:text-theme-50">{t(`${NS}.shopVisits`)}</span>
         <span className={`text-xs ${MUTED}`}>
-          {visitDayLabel(performance.dataDateJST)} · {t(`${NS}.confirmed`)}
+          {visitDayLabel(performance.dataDateJST)} ·{" "}
+          {visitsStale(performance) ? (
+            <span className="text-amber-700 dark:text-amber-300">{t(`${NS}.visitsStale`)}</span>
+          ) : (
+            t(`${NS}.confirmed`)
+          )}
         </span>
       </span>
       <div className="overflow-x-auto">
@@ -143,6 +163,8 @@ export function ShopVisitsTable({ performance, names, shopColors, logoByName = n
                     name={s.name}
                     color={shopColors[s.name] ?? FALLBACK_SHOP_COLOR}
                     logoUrl={logoByName.get(s.name)}
+                    platform={platformByName.get(s.name) ?? "rakuten"}
+                    t={t}
                   />
                 </th>
                 <td className={`${cell} font-bold text-theme-900 dark:text-theme-50`}>
@@ -160,7 +182,7 @@ export function ShopVisitsTable({ performance, names, shopColors, logoByName = n
           <tfoot>
             <tr className="border-t-2 border-theme-300/70 font-bold dark:border-white/20">
               <th scope="row" className="px-2 py-2 text-left text-sm text-theme-900 dark:text-theme-50">
-                {t(`${NS}.total`)}
+                {scope ? t(`${NS}.platformTotal`, { platform: scope }) : t(`${NS}.total`)}
               </th>
               <td className={`${cell} text-theme-900 dark:text-theme-50`}>
                 {performance.visit === null ? DASH : fmt(t, performance.visit)}

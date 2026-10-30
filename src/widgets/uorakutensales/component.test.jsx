@@ -299,6 +299,67 @@ describe("widgets/uorakutensales/component", () => {
     expect(screen.getByRole("button", { name: "uorakutensales.sortSales" })).toHaveAttribute("aria-pressed", "false");
   });
 
+  it("reads the month boards only once 今月 is picked on the best sellers", () => {
+    const monthly = {
+      currentMonth: { month: "2026-07", ...ranking("month-top", [{ shopName: "shop-a", mno: "a" }]) },
+      previousMonth: { month: "2026-06", ...ranking("last-month-top", [{ shopName: "shop-a", mno: "a" }]) },
+    };
+    useWidgetAPI.mockImplementation((_widget, endpoint) => {
+      if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
+      if (endpoint === "ranking") return { data: ranking("today-top", [{ shopName: "shop-a", mno: "a" }]) };
+      if (endpoint === "rankingMonthly") return { data: monthly, error: undefined, mutate: vi.fn() };
+      return { data: undefined, error: undefined, mutate: vi.fn() };
+    });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+    const asked = () => useWidgetAPI.mock.calls.map((call) => call[1]);
+    expect(asked()).not.toContain("rankingMonthly");
+    expect(screen.getByText("today-top")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "uorakutensales.thisMonth" }));
+    expect(asked()).toContain("rankingMonthly");
+    expect(asked()).toContain("amazonRankingMonthly");
+    expect(screen.getByText("month-top")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "uorakutensales.lastMonth" }));
+    expect(screen.getByText("last-month-top")).toBeInTheDocument();
+  });
+
+  it("offers each Amazon shop's board beside 楽天's shops", () => {
+    const amazonRanking = {
+      ok: true,
+      shops: [
+        {
+          shopName: "uoworld",
+          accountId: "acc",
+          marketplaceId: "JP",
+          currency: "JPY",
+          enabled: true,
+          status: "ready",
+          itemCount: 1,
+          rankings: {
+            sales: [{ rank: 1, sku: "amazon-sku", currency: "JPY", salesAmount: 990, unitsSold: 1, orderCount: 1 }],
+            units: [{ rank: 1, sku: "amazon-sku", currency: "JPY", salesAmount: 990, unitsSold: 1, orderCount: 1 }],
+            orderCount: [
+              { rank: 1, sku: "amazon-sku", currency: "JPY", salesAmount: 990, unitsSold: 1, orderCount: 1 },
+            ],
+          },
+        },
+      ],
+    };
+    useWidgetAPI.mockImplementation((_widget, endpoint) => {
+      if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
+      if (endpoint === "ranking") return { data: ranking("today-top", [{ shopName: "shop-a", mno: "a" }]) };
+      if (endpoint === "amazonRanking") return { data: amazonRanking, error: undefined, mutate: vi.fn() };
+      return { data: undefined, error: undefined, mutate: vi.fn() };
+    });
+
+    renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+    fireEvent.click(screen.getByRole("button", { name: /uorakutensales\.showMore/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^uoworld/ }));
+    expect(screen.getByText("amazon-sku")).toBeInTheDocument();
+  });
+
   it("reads both device boards on the widget's own interval", () => {
     useWidgetAPI.mockImplementation((_widget, endpoint) => {
       if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };

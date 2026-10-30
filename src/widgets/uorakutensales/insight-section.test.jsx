@@ -28,6 +28,29 @@ describe("widgets/uorakutensales/insight-section", () => {
     expect(within(row).getAllByText("—")).toHaveLength(5);
   });
 
+  it("an Amazon shop sits in the visits table as dashes, and the total says it is 楽天's", () => {
+    const tl = (key, opts) =>
+      ({
+        "uorakutensales.platformAmazon": "Amazon",
+        "uorakutensales.platformTotal": `${opts?.platform} 計`,
+      })[key] ?? t(key, opts);
+    render(
+      <ShopVisitsTable
+        performance={performance}
+        names={["A", "uoworld"]}
+        platformByName={new Map([["uoworld", "amazon"]])}
+        scope="楽天"
+        shopColors={{}}
+        t={tl}
+      />,
+    );
+
+    const row = screen.getByRole("row", { name: /^uoworld/ });
+    expect(within(row).getByText("Amazon")).toBeInTheDocument();
+    expect(within(row).getAllByText("—")).toHaveLength(5);
+    expect(screen.getByRole("row", { name: /^楽天 計/ })).toBeInTheDocument();
+  });
+
   it("each shop's logo sits beside its name", () => {
     const { container } = render(
       <ShopVisitsTable

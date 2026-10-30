@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { amazonKey, buildAmazon, buildAmazonBoards, jstStamp } from "./amazon-model.mjs";
+import {
+  amazonKey,
+  amazonTrendRow,
+  buildAmazon,
+  buildAmazonBoards,
+  jstStamp,
+  withAmazonPeaks,
+} from "./amazon-model.mjs";
 
 const SOURCE = "2026-10-30T04:55:45.603Z"; // 13:55:45 JST
 
@@ -178,4 +185,67 @@ test("buildAmazonBoards gives each shop a board per dimension in the 楽天 item
   assert.equal(pending.avgPrice, null);
   assert.equal(buildAmazonBoards(null), null);
   assert.equal(buildAmazonBoards({ error: "x" }), null);
+});
+
+test("an Amazon shop's 7-day card has its week and no CVR", () => {
+  const row = amazonTrendRow(buildAmazon(salesOf(), history).shops[0]);
+  assert.equal(row.platform, "amazon");
+  assert.equal(row.h7Total, 70000);
+  assert.equal(row.h7Orders, 63);
+  assert.equal(row.cvr, null);
+  assert.equal(row.daily.length, 7);
+  assert.deepEqual(row.daily[0], {
+    date: "2026-10-23",
+    md: "10/23",
+    wd: "金",
+    sales: 9306,
+    units: 12,
+    orders: 12,
+    cvr: null,
+  });
+});
+
+test("Amazon shops join 楽天's shop bests, ranked by value; the company records stay 楽天's", () => {
+  const peaks = {
+    records: { orders: { value: 1500 } },
+    shopBests: {
+      orders: [
+        { rank: 1, shopName: "3911", value: 600, date: "2025-11-11" },
+        { rank: 2, shopName: "hagumi", value: 40, date: "2025-11-11" },
+      ],
+    },
+    available: ["orders"],
+  };
+  const amazonPeaks = {
+    ok: true,
+    shops: [
+      shop({
+        coverage: { startDate: "2024-10-31" },
+        records: {
+          salesAmount: { value: 246023, date: "2025-09-10" },
+          orderCount: { value: 115, date: "2025-02-22" },
+          unitsSold: { value: 176, date: "2025-01-28" },
+        },
+      }),
+    ],
+  };
+  const merged = withAmazonPeaks(peaks, amazonPeaks);
+  assert.deepEqual(
+    merged.shopBests.orders.map((r) => [r.rank, r.shopName, r.value]),
+    [
+      [1, "3911", 600],
+      [2, "uoworld", 115],
+      [3, "hagumi", 40],
+    ],
+  );
+  const az = merged.shopBests.orders[1];
+  assert.equal(az.platform, "amazon");
+  assert.equal(az.md, "2/22");
+  assert.equal(az.year, 2025);
+  assert.equal(az.onRecordDay, false);
+  assert.equal(merged.records, peaks.records);
+  assert.equal(merged.amazonSince, "2024-10-31");
+  // nothing to add: the 楽天 board as it was
+  assert.equal(withAmazonPeaks(peaks, null), peaks);
+  assert.equal(withAmazonPeaks(null, amazonPeaks), null);
 });

@@ -153,7 +153,14 @@ export function buildAmazon(sales, history) {
           )
         : null,
       daily: week
-        ? (h.daily || []).filter((d) => d?.date).map((d) => ({ date: d.date, ...metricsOf(d.totals, h.currency) }))
+        ? (h.daily || [])
+            .filter((d) => d?.date)
+            .map((d) => ({
+              date: d.date,
+              md: mdLabel(d.date),
+              wd: weekdayJp(d.date),
+              ...metricsOf(d.totals, h.currency),
+            }))
         : [],
       counted: today.get(key)?.includedInTotals === true,
       updatedAt: jstStamp(today.get(key)?.sourceUpdatedAt || month.get(key)?.sourceUpdatedAt),
@@ -208,6 +215,79 @@ export function buildAmazon(sales, history) {
       updatedAt: jstStamp(latest(shops.map((s) => today.get(s.key)?.sourceUpdatedAt))),
     },
   };
+}
+
+// A shop's card for the analysis section's 7-day trend, in the shape the 楽天
+// cards use. Amazon reports no visits, so the CVR is unknown, never 0%.
+export function amazonTrendRow(shop) {
+  return {
+    key: shop.key,
+    name: shop.name,
+    platform: "amazon",
+    h7Total: shop.week?.sales ?? null,
+    h7Orders: shop.week?.orders ?? null,
+    h7Units: shop.week?.units ?? null,
+    cvr: null,
+    daily: shop.daily.map((d) => ({
+      ...d,
+      sales: d.sales ?? 0,
+      orders: d.orders ?? 0,
+      units: d.units ?? 0,
+      cvr: null,
+    })),
+    logoUrl: null,
+  };
+}
+
+// ---- all-time records (GET /api/amazon/history/peaks) ----
+
+// value key per record dimension, in Amazon's names
+const PEAK_KEY = { sales: "salesAmount", units: "unitsSold", orders: "orderCount" };
+
+// Each Amazon shop's own best day joins 楽天's shop bests, ranked by the same
+// value. The company records stay 楽天's: Amazon's history starts later (what
+// its API still serves) and its yen are counted differently, so no record day
+// is shared across platforms. `amazonSince` says where Amazon's records start.
+export function withAmazonPeaks(peaks, amazonPeaks) {
+  if (!peaks || !amazonPeaks || amazonPeaks.error) return peaks;
+  const shops = (amazonPeaks.shops || []).filter((s) => s.enabled !== false && s.status !== "disabled" && s.records);
+  if (!shops.length) return peaks;
+
+  const shopBests = { ...peaks.shopBests };
+  Object.entries(PEAK_KEY).forEach(([dim, key]) => {
+    if (!shopBests[dim]) return;
+    const rows = shops
+      .map((s) => {
+        // another currency's yen are not comparable at all
+        const record = dim === "sales" && s.currency !== "JPY" ? null : s.records[key];
+        const value = numberOrNull(record?.value);
+        if (value === null) return null;
+        const date = String(record.date || "");
+        return {
+          key: amazonKey(s),
+          platform: "amazon",
+          shopName: s.shopName,
+          value,
+          noRecord: value <= 0,
+          date,
+          md: mdLabel(date),
+          wd: weekdayJp(date),
+          year: Number(date.slice(0, 4)) || null,
+          // 楽天's record days say nothing about an Amazon shop
+          onRecordDay: false,
+        };
+      })
+      .filter(Boolean);
+    shopBests[dim] = [...shopBests[dim], ...rows]
+      .sort((a, b) => b.value - a.value)
+      .map((row, i) => ({ ...row, rank: i + 1 }));
+  });
+
+  const since = shops
+    .map((s) => String(s.coverage?.startDate || ""))
+    .filter(Boolean)
+    .sort()[0];
+  return { ...peaks, shopBests, amazonSince: since || null };
 }
 
 // ---- item boards (GET /api/amazon/item-rankings) ----

@@ -420,6 +420,8 @@ export default function DeviceSalesSection({
   onDeviceEvidence = () => {},
   // the widget's colour per shop, shared with its charts
   shopColors = {},
+  // names the platform once the board shows several: these boards are 楽天's
+  scope = "",
   cardCls,
   t,
 }) {
@@ -529,6 +531,7 @@ export default function DeviceSalesSection({
         <div className="flex min-w-0 flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-[13px] font-extrabold text-theme-800 dark:text-theme-100">
+              {scope ? `${scope} ` : ""}
               {t(`${NS}.deviceSales`)}
             </span>
             {current.shopCount > 0 && current.coveredShopCount < current.shopCount ? (
