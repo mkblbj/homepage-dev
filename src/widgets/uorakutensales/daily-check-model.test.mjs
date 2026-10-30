@@ -3,7 +3,13 @@ import test from "node:test";
 
 import { buildPerformanceModel } from "../uoperformance/performance-model.mjs";
 
-import { buildShopTable, deltaTone, RANKING_DIM_BY_METRIC, todayVsAverage } from "./daily-check-model.mjs";
+import {
+  buildShopTable,
+  deltaTone,
+  historyComparable,
+  RANKING_DIM_BY_METRIC,
+  todayVsAverage,
+} from "./daily-check-model.mjs";
 import { buildModel, buildMonthly } from "./sales-model.mjs";
 
 const STAMP = "2026-10-25 10:20 JST";
@@ -271,10 +277,38 @@ test("deltaTone colours only past twenty percent", () => {
   assert.equal(deltaTone(Number.NaN), "unknown");
 });
 
-test("todayVsAverage compares today with the 7-day daily average", () => {
+test("todayVsAverage compares today's counts with the 7-day daily average", () => {
   const { model } = fixture();
-  assert.deepEqual(todayVsAverage(model, "sales"), { value: 60, avg: 200, pct: 30 });
   assert.deepEqual(todayVsAverage(model, "orders"), { value: 6, avg: 2, pct: 300 });
+});
+
+test("todayVsAverage never sets today's yen against the after-coupon history", () => {
+  const { model } = fixture();
+  assert.equal(historyComparable("sales"), false);
+  assert.equal(historyComparable("orders"), true);
+  assert.equal(historyComparable("units"), true);
+  // the average is still there to draw; only the ratio is withheld
+  assert.deepEqual(todayVsAverage(model, "sales"), { value: 60, avg: 200, pct: null });
+});
+
+test("a shop left out of today's total reads unknown today, never zero", () => {
+  const f = fixture({
+    salesShops: [shopNow("A", 10, 1), shopNow("B", 50, 5), { ...shopNow("K", null, null), includedInTotals: false }],
+    monthShops: [shopNow("A", 2410, 24), shopNow("B", 1250, 12), shopNow("K", null, null)],
+  });
+  const t = buildShopTable(f);
+  const k = t.rows.find((r) => r.name === "K");
+  assert.equal(k.today, null);
+  assert.equal(k.unknown, true);
+  assert.equal(t.rows.find((r) => r.name === "A").unknown, false);
+});
+
+test("the total row is unknown when the server has no readable shop today", () => {
+  const f = fixture();
+  const sales = { ok: false, totals: null, generatedAtJST: STAMP, shops: [] };
+  const t = buildShopTable({ ...f, model: buildModel(sales, null) });
+  assert.equal(t.total.today, null);
+  assert.deepEqual(todayVsAverage(buildModel(sales, null), "orders"), { value: null, avg: null, pct: null });
 });
 
 test("todayVsAverage has no ratio without history", () => {

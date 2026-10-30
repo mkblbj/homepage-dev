@@ -3,7 +3,16 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { barLabel, MetricSwitch, MonthCard, ShopTable, TodayCard, valueText, VisitCard } from "./daily-check-section";
+import {
+  barLabel,
+  historyNotes,
+  MetricSwitch,
+  MonthCard,
+  ShopTable,
+  TodayCard,
+  valueText,
+  VisitCard,
+} from "./daily-check-section";
 import { buildModel } from "./sales-model.mjs";
 
 // the test i18n mock returns keys as-is and numbers as plain strings
@@ -26,6 +35,19 @@ function shopRow(name, overrides = {}) {
     visitDelta: -8.3,
     ...overrides,
   };
+}
+
+// today plus a two-day history, both shops on the same window
+function weekModel() {
+  const day = (date, salesYen) => ({ date, salesYen, orderCount: 2, unitsSold: 2 });
+  return buildModel(
+    { generatedAtJST: "2026-10-30 10:20 JST", totals: { salesYen: 500, orderCount: 5, unitsSold: 5 }, shops: [] },
+    {
+      range: { dates: ["2026-10-28", "2026-10-29"] },
+      totals: { salesYen: 4000, orderCount: 4, unitsSold: 4 },
+      shops: [{ shopName: "A", totals: {}, daily: [day("2026-10-28", 1000), day("2026-10-29", 3000)] }],
+    },
+  );
 }
 
 const table = {
@@ -75,7 +97,7 @@ describe("widgets/uorakutensales/daily-check-section", () => {
   it("yen columns read in 万円 from the header", () => {
     render(<ShopTable table={table} metric="sales" shopColors={{}} t={t} />);
 
-    expect(screen.getByRole("columnheader", { name: `${NS}.perDayAvg（${NS}.manYen）` })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: `${NS}.cumulative（${NS}.manYen）` })).toBeInTheDocument();
     const row = screen.getByRole("row", { name: /^A/ });
     // ¥3,000 a day and ¥90,000 this month
     expect(within(row).getByText("0.3")).toBeInTheDocument();
@@ -110,7 +132,7 @@ describe("widgets/uorakutensales/daily-check-section", () => {
   });
 
   it("unknown visits read as a dash, never zero", () => {
-    render(<ShopTable table={table} metric="sales" shopColors={{}} t={t} />);
+    render(<ShopTable table={table} metric="orders" shopColors={{}} t={t} />);
 
     const row = screen.getByRole("row", { name: /^B/ });
     expect(within(row).getAllByText("—")).toHaveLength(2);
@@ -177,6 +199,92 @@ describe("widgets/uorakutensales/daily-check-section", () => {
   it("whole yen and whole pieces, even for a daily average", () => {
     expect(valueText("sales", 752443.571, t)).toBe("¥752444");
     expect(valueText("units", 711.4, t)).toBe(`711${NS}.unitsShort`);
+  });
+
+  it("the today card names its shop coverage when a shop is missing", () => {
+    const model = buildModel(
+      {
+        generatedAtJST: "2026-10-30 13:40:48 JST",
+        sourceUpdatedAtJST: "2026-10-30 13:40:45 JST",
+        shopCount: 2,
+        updatedShopCount: 1,
+        totals: { salesYen: 500, orderCount: 5, unitsSold: 5 },
+        shops: [
+          { shopName: "A", includedInTotals: true, salesYen: 500, orderCount: 5, unitsSold: 5 },
+          { shopName: "K", includedInTotals: false, salesYen: null, orderCount: null, unitsSold: null },
+        ],
+      },
+      null,
+    );
+    const tc = (key, opts) => (key === `${NS}.shopCoverage` ? `${opts.covered}/${opts.total}店舗` : t(key, opts));
+    render(<TodayCard model={model} metric="orders" shopColors={{}} t={tc} />);
+
+    expect(screen.getByText(/1\/2店舗/)).toBeInTheDocument();
+  });
+
+  it("the today card does not set today's yen against the after-coupon week", () => {
+    render(<TodayCard model={weekModel()} metric="sales" shopColors={{}} t={t} />);
+
+    expect(screen.queryByText(`${NS}.todayNoTimeCorrection`)).not.toBeInTheDocument();
+    expect(screen.getByText(`${NS}.salesBasisNote`)).toBeInTheDocument();
+    // the bars show the week alone, labelled as after coupons, with no today bar
+    expect(screen.getByText(`${NS}.lastDaysAfterCoupon`)).toBeInTheDocument();
+    expect(screen.queryByText(`${NS}.todayLabel`, { selector: ".flex-1" })).not.toBeInTheDocument();
+  });
+
+  it("the today card still compares counts with the week", () => {
+    render(<TodayCard model={weekModel()} metric="orders" shopColors={{}} t={t} />);
+
+    expect(screen.getByText(`${NS}.todayNoTimeCorrection`)).toBeInTheDocument();
+    expect(screen.getByText(`${NS}.lastDaysAndToday`)).toBeInTheDocument();
+    expect(screen.queryByText(`${NS}.salesBasisNote`)).not.toBeInTheDocument();
+  });
+
+  it("the shop table shows no 7-day ratio for 売上 and marks the week's yen as after coupons", () => {
+    render(<ShopTable table={table} metric="sales" shopColors={{}} t={t} />);
+
+    expect(
+      screen.getByRole("columnheader", { name: `${NS}.perDayAvg（${NS}.manYen）${NS}.afterCouponTag` }),
+    ).toBeInTheDocument();
+    const row = screen.getByRole("row", { name: /^A/ });
+    expect(within(row).queryByText(/^\d+%$/)).not.toBeInTheDocument();
+  });
+
+  it("the shop table shows its warnings and an unknown company total as dashes", () => {
+    const unknownTotal = { ...table, total: { ...table.total, today: null } };
+    render(<ShopTable table={unknownTotal} metric="orders" shopColors={{}} notes={["history stopped"]} t={t} />);
+
+    expect(screen.getByRole("note")).toHaveTextContent("history stopped");
+    const total = screen.getByRole("row", { name: new RegExp(`^${NS}.total`) });
+    expect(within(total).queryByText(`0${NS}.ordersUnit`)).not.toBeInTheDocument();
+  });
+
+  it("history notes say when the week stopped and which shops lag behind", () => {
+    const tn = (key, opts) => `${key}:${opts?.names ?? ""}:${opts?.md ?? ""}`;
+    expect(historyNotes(null, tn)).toEqual([]);
+    expect(historyNotes({ behind: false, lagging: [], endMd: "10/29" }, tn)).toEqual([]);
+    expect(
+      historyNotes({ behind: true, endMd: "10/27", lagging: ["0406", "松武"], laggingEndMd: "10/25" }, tn),
+    ).toEqual([`${NS}.historyStopped::10/27`, `${NS}.historyLagging:0406・松武:10/25`]);
+  });
+
+  it("the visit card says the visits stopped updating instead of 確定値", () => {
+    const performance = {
+      visit: 22133,
+      uu: 20966,
+      expected: null,
+      delta: null,
+      sampleCount: 0,
+      dataDateJST: "2026-10-27",
+      sources: { traffic: { stale: true } },
+    };
+    const { rerender } = render(<VisitCard performance={performance} t={t} />);
+    expect(screen.getByText(`${NS}.visitsStale`)).toBeInTheDocument();
+    expect(screen.queryByText(new RegExp(`${NS}.confirmed`))).not.toBeInTheDocument();
+
+    rerender(<VisitCard performance={{ ...performance, sources: { traffic: { stale: false } } }} t={t} />);
+    expect(screen.queryByText(`${NS}.visitsStale`)).not.toBeInTheDocument();
+    expect(screen.getByText(new RegExp(`${NS}.confirmed`))).toBeInTheDocument();
   });
 
   it("the today card shows no 7-day ratio without history", () => {

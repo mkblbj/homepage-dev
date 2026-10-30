@@ -14,7 +14,8 @@
  *   "logos"   → GET /api/shops/logos    shop logo urls
  *
  * Realtime has NO conversionRate → per-row CVR comes from the 7-day history.
- * Freshness pill (LIVE / 遅延 / 停止) is derived from sales.generatedAtJST.
+ * Freshness pill (LIVE / 遅延 / 停止) is derived from sales.sourceUpdatedAtJST (the
+ * order-API read time; generatedAtJST moves even when a refresh failed).
  * Pure view-model + geometry helpers live in ./sales-model.mjs.
  */
 import Container from "components/services/widget/container";
@@ -24,7 +25,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildPerformanceModel } from "widgets/uoperformance/performance-model.mjs";
 
 import { buildShopTable, RANKING_DIM_BY_METRIC } from "./daily-check-model.mjs";
-import { MetricSwitch, MonthCard, ShopTable, TodayCard, VisitCard, visitDayLabel } from "./daily-check-section";
+import {
+  historyNotes,
+  MetricSwitch,
+  MonthCard,
+  ShopTable,
+  TodayCard,
+  VisitCard,
+  visitDayLabel,
+  visitsStale,
+} from "./daily-check-section";
 import { buildDeviceEvidence } from "./device-evidence-model.mjs";
 import { buildMarketEvidence, buildMarketReference, MARKET_REFRESH_INTERVAL } from "./device-market-model.mjs";
 import { buildDeviceSales } from "./device-sales-model.mjs";
@@ -345,7 +355,7 @@ function DailyChart({ model, mode, onModeChange, t }) {
   // Suppressed while hovering the ⌀ average tag (mutually exclusive tooltips).
   const hd = hover != null && !avgHover ? model.days[hover] : null;
   const on = hd != null;
-  const tipTx = hover === 0 ? "0%" : hover === model.nDays - 1 ? "-100%" : "-50%";
+  const tipTx = hover === 0 ? "0%" : hover === model.days.length - 1 ? "-100%" : "-50%";
   const avgTopPct = ((5 + (1 - model.avg / model.maxDaily) * 30) / 40) * 100;
 
   return (
@@ -681,9 +691,13 @@ function RankingSection({ ranking, dim, cardCls, t }) {
   const nextStep = step + 1 < RANKING_STEPS.length ? step + 1 : null;
   const nextCount = nextStep === null ? 0 : Math.min(RANKING_STEPS[nextStep], items.length) - shown.length;
 
-  const meta = isAll
-    ? t(`${NS}.shopsAggregated`, { count: board.shopCount })
-    : t(`${NS}.itemsCount`, { count: active?.itemCount ?? 0 });
+  // a shop without the order API is on the list but adds no items
+  const covered = board.updatedShopCount;
+  const aggregated =
+    covered !== null && covered < board.shopCount
+      ? t(`${NS}.shopsAggregatedPartial`, { covered, total: board.shopCount })
+      : t(`${NS}.shopsAggregated`, { count: board.shopCount });
+  const meta = isAll ? aggregated : t(`${NS}.itemsCount`, { count: active?.itemCount ?? 0 });
 
   const chip = (key, label) => (
     <button
@@ -1121,7 +1135,7 @@ export default function Component({ service }) {
     deviceEvidenceSearch,
   );
 
-  const freshness = useFreshness(sales?.generatedAtJST, refreshInterval);
+  const freshness = useFreshness(sales?.sourceUpdatedAtJST || sales?.generatedAtJST, refreshInterval);
   const model = useMemo(() => buildModel(sales, history, logos), [sales, history, logos]);
   const ranking = useMemo(() => buildRanking(rankingData), [rankingData]);
   const peaks = useMemo(() => buildPeaks(peaksData), [peaksData]);
@@ -1202,15 +1216,20 @@ export default function Component({ service }) {
   const activeNames = new Set(table.rows.map((r) => r.name));
   const idleNames = table.idle.map((r) => r.name).join("・");
   const hasSide = Boolean(monthly) || (performance && performance.visit !== null);
+  // a shop on the list whose today and month are both unknown is not counted as 稼働
+  const activeCount = table.rows.filter((r) => !r.unknown).length;
+  const notes = historyNotes(model.week, t);
   const periods = {
     colToday: model.time ? t(`${NS}.asOf`, { time: model.time }) : "",
-    colWeek: model.days.length ? `${model.days[0].md}–${model.days[model.days.length - 1].md}` : "",
+    colWeek: model.week?.label ?? "",
     colMonth: monthly
       ? `${t(`${NS}.monthCompleted`, { count: monthly.current.completedDays })}${
           monthly.current.hasLiveDay ? `＋${t(`${NS}.todayLabel`)}` : ""
         }`
       : "",
-    colVisits: performance ? visitDayLabel(performance.dataDateJST) : "",
+    colVisits: performance
+      ? `${visitDayLabel(performance.dataDateJST)}${visitsStale(performance) ? ` · ${t(`${NS}.visitsStale`)}` : ""}`
+      : "",
   };
   const toggleAnalysis = (e) => {
     e.preventDefault();
@@ -1228,8 +1247,13 @@ export default function Component({ service }) {
         <div className="flex flex-wrap items-center justify-between gap-2 px-0.5">
           <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
             <span className="text-xs font-semibold text-theme-600 dark:text-theme-300">
-              {t(`${NS}.subtitle`, { count: model.rows.length })} ·{" "}
-              {t(`${NS}.activeShops`, { count: table.rows.length })}
+              {t(`${NS}.subtitle`, { count: model.rows.length })} · {t(`${NS}.activeShops`, { count: activeCount })}
+              {model.missing.length ? (
+                <span className="text-amber-700 dark:text-amber-300">
+                  {" "}
+                  · {t(`${NS}.notFetched`, { names: model.missing.join("・") })}
+                </span>
+              ) : null}
             </span>
             <JumpButton target={DAILY_ID} index="1" label={t(`${NS}.dailyCheck`)} t={t} />
             <JumpButton target={ANALYSIS_ID} index="2" label={t(`${NS}.analysis`)} t={t} />
@@ -1240,7 +1264,7 @@ export default function Component({ service }) {
                 {t(`${NS}.updatedAt`)}
               </span>
               <span className="text-[12px] font-semibold tabular-nums text-theme-800 dark:text-theme-100">
-                {model.generatedAtJST || "-"}
+                {model.updatedAtJST || "-"}
               </span>
             </span>
             <FreshnessPill freshness={freshness} t={t} />
@@ -1273,6 +1297,7 @@ export default function Component({ service }) {
           shopColors={shopColors}
           logoByName={logoByName}
           periods={periods}
+          notes={notes}
           cardCls={cardCls}
           t={t}
         />
@@ -1329,7 +1354,7 @@ export default function Component({ service }) {
               />
             ) : null}
 
-            {model.hasHistory ? (
+            {model.hasHistory && model.days.length ? (
               <section className={`grid grid-cols-1 gap-x-5 gap-y-4 p-4 @4xl:grid-cols-[300px_1fr] ${cardCls}`}>
                 <div className="min-w-0 @4xl:border-r @4xl:border-theme-300/30 dark:@4xl:border-white/10 @4xl:pr-5">
                   <DailyChart model={model} mode={chartMode} onModeChange={setChartMode} t={t} />
@@ -1338,10 +1363,15 @@ export default function Component({ service }) {
                   <span className="min-w-0 text-xs font-bold tracking-wide text-theme-600 dark:text-theme-300">
                     {t(`${NS}.shopTrend`)}{" "}
                     <span className="font-medium text-theme-500 dark:text-theme-400">
-                      · {t(`${NS}.excludesToday`)}
+                      · {t(`${NS}.excludesToday`)} · {t(`${NS}.afterCoupon`)}
                       {idleNames ? ` · ${t(`${NS}.idleLeftOut`, { names: idleNames })}` : ""}
                     </span>
                   </span>
+                  {notes.map((note) => (
+                    <span key={note} role="note" className="text-xs font-semibold text-amber-700 dark:text-amber-300">
+                      {note}
+                    </span>
+                  ))}
                   <div className="grid grid-cols-[repeat(auto-fit,minmax(104px,1fr))] gap-2.5">
                     {model.rows
                       .filter((r) => activeNames.has(r.name))

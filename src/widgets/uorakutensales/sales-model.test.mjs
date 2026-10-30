@@ -206,6 +206,121 @@ test("buildModel tolerates a missing history snapshot", () => {
   assert.equal(model.rows[0].h7Total, 0);
 });
 
+// /api/sales since the order-API switch: a shop the server cannot vouch for is
+// left out of the total and carries nulls (unconfigured) or saved figures (stale)
+const salesWithGaps = {
+  ...sales,
+  sourceUpdatedAtJST: "2026-07-07 13:29:58 JST",
+  shopCount: 5,
+  updatedShopCount: 3,
+  shops: [
+    ...sales.shops,
+    { shopName: "kurumu", status: "unconfigured", includedInTotals: false, salesYen: null, orderCount: null },
+    { shopName: "hagumi", status: "stale", includedInTotals: false, salesYen: 900, orderCount: 9 },
+  ],
+};
+
+test("buildModel keeps a shop left out of today's total unknown, never zero", () => {
+  const model = buildModel(salesWithGaps, history);
+  for (const name of ["kurumu", "hagumi"]) {
+    const row = model.rows.find((r) => r.name === name);
+    assert.equal(row.rtSales, null, name);
+    assert.equal(row.rtOrders, null, name);
+    assert.equal(row.rtShare, null, name);
+  }
+  // unknown sorts after a shop that was read and sold nothing
+  assert.deepEqual(
+    model.rows.map((r) => r.name),
+    ["3911", "0406", "allcase", "kurumu", "hagumi"],
+  );
+  assert.deepEqual(model.coverage, { covered: 3, total: 5 });
+  assert.deepEqual(model.missing, ["kurumu", "hagumi"]);
+});
+
+test("buildModel stamps today with the order-API read time, not the build time", () => {
+  const model = buildModel(salesWithGaps, history);
+  assert.equal(model.updatedAtJST, "2026-07-07 13:29:58 JST");
+  assert.equal(model.time, "13:29");
+});
+
+test("buildModel has no company figures when the server has no readable shop", () => {
+  const model = buildModel(
+    {
+      ok: false,
+      totals: null,
+      generatedAtJST: "2026-07-07 13:30 JST",
+      shops: [{ shopName: "3911", status: "not_ready", includedInTotals: false, salesYen: null }],
+    },
+    null,
+  );
+  assert.equal(model.rtTotal, null);
+  assert.equal(model.rtOrders, null);
+  assert.equal(model.aov, null);
+  assert.equal(model.rtUnitsPerOrder, null);
+});
+
+// two shops whose history refreshes stopped on different days
+function windowedHistory() {
+  const day = (date, salesYen) => ({ date, salesYen, orderCount: 1, unitsSold: 1 });
+  return {
+    range: { dates: ["2026-10-25", "2026-10-26", "2026-10-27"] },
+    totals: { salesYen: 660, orderCount: 6, unitsSold: 6 },
+    shops: [
+      {
+        shopName: "3911",
+        totals: { salesYen: 600, orderCount: 3, unitsSold: 3 },
+        daily: [day("2026-10-27", 100), day("2026-10-28", 200), day("2026-10-29", 300)],
+      },
+      {
+        shopName: "0406",
+        totals: { salesYen: 60, orderCount: 3, unitsSold: 3 },
+        daily: [day("2026-10-25", 10), day("2026-10-26", 20), day("2026-10-27", 30)],
+      },
+    ],
+  };
+}
+
+const afternoonSales = { ...sales, sourceDateJST: "2026-10-30", sourceUpdatedAtJST: "2026-10-30 13:40:45 JST" };
+
+test("buildModel matches history days by date when shops hold different windows", () => {
+  const model = buildModel(afternoonSales, windowedHistory());
+  // only 10/27 is in both windows; adding by position would have filed 3911's
+  // 10/27 under 10/25 and 0406's 10/27 under 10/29
+  assert.deepEqual(
+    model.days.map((d) => d.md),
+    ["10/27"],
+  );
+  assert.deepEqual(
+    model.days.map((d) => d.sales),
+    [130],
+  );
+  assert.equal(model.days[0].xPct, 50);
+  // averages still add each shop's own window
+  assert.equal(model.avg, 660 / 3);
+});
+
+test("buildModel names the shops whose history is behind the rest", () => {
+  const { week } = buildModel(afternoonSales, windowedHistory());
+  assert.deepEqual(week, {
+    label: "10/27–10/29",
+    endMd: "10/29",
+    behind: false,
+    lagging: ["0406"],
+    laggingEndMd: "10/27",
+  });
+});
+
+test("buildModel flags a history that stopped before yesterday, but not before the morning rebuild", () => {
+  const h = windowedHistory();
+  h.shops = [h.shops[0]];
+  h.shops[0].daily = h.shops[0].daily.slice(0, 2); // ends 10/28
+  const behindAt = (stamp) =>
+    buildModel({ ...sales, sourceDateJST: stamp.slice(0, 10), sourceUpdatedAtJST: stamp }, h).week.behind;
+  assert.equal(behindAt("2026-10-30 13:40:45 JST"), true); // should have reached 10/29 by now
+  assert.equal(behindAt("2026-10-30 08:00:00 JST"), false); // the morning rebuild may not have run yet
+  assert.equal(behindAt("2026-10-29 13:40:45 JST"), false); // 10/28 is yesterday
+});
+
 test("weekdayJp is timezone-stable (UTC based)", () => {
   assert.equal(weekdayJp("2026-07-07"), "火"); // Tuesday
   assert.equal(weekdayJp("2026-07-05"), "日"); // Sunday
@@ -361,6 +476,18 @@ test("buildRanking returns null without a payload or when every dimension is emp
   assert.equal(buildRanking(null), null);
   assert.equal(buildRanking({ rankings: {} }), null);
   assert.equal(buildRanking({ rankings: { sales: dimBlock([]) } }), null);
+});
+
+test("buildRanking says how many shops a board actually adds up", () => {
+  const board = (extra) => ({
+    shopCount: 9,
+    overall: { items: [{ rank: 1, itemManagementNumber: "case-a", salesYen: 100 }] },
+    shops: [],
+    ...extra,
+  });
+  assert.equal(buildRanking({ rankings: { sales: board({ updatedShopCount: 8 }) } }).dims.sales.updatedShopCount, 8);
+  // an older payload without the count is unknown, not zero
+  assert.equal(buildRanking({ rankings: { sales: board() } }).dims.sales.updatedShopCount, null);
 });
 
 test("buildRanking exposes the three dimensions in UI order", () => {

@@ -39,8 +39,56 @@ function toNumber(value) {
   return Number.isFinite(n) ? n : 0;
 }
 
+// A figure the API may leave out: null when absent, never 0 — "not read" and
+// "read, nothing sold" are different answers.
+function numberOrNull(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+// a / b, unknown when either side is, 0 when there is nothing to divide by
+function ratio(a, b) {
+  if (a === null || b === null) return null;
+  return b > 0 ? a / b : 0;
+}
+
 function normalizeText(value) {
   return String(value ?? "").trim();
+}
+
+// A shop row the server left out of its totals (unconfigured, not read yet, or
+// stale) is never counted or compared alongside the others.
+const countedInTotals = (row) => row?.includedInTotals !== false;
+
+// A shop count the API may omit: null when absent rather than 0.
+function shopCountOf(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(value);
+  return Number.isInteger(n) && n >= 0 ? n : null;
+}
+
+// "2026-10-30", -1 → "2026-10-29"; computed in UTC so it is timezone-stable
+function shiftDate(dateStr, days) {
+  const [y, m, d] = String(dateStr || "")
+    .split("-")
+    .map(Number);
+  if (!y || !m || !d) return "";
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
+
+// uo-ec-manager rebuilds the 7-day history each morning (around 08:15 JST, with
+// retries). Until mid-morning a healthy history may still end the day before
+// yesterday; after that it should reach yesterday. Read off the sales snapshot's
+// own date and time, so the model stays pure.
+const HISTORY_READY_HOUR = 10;
+
+function expectedHistoryEnd(sales) {
+  const stamp = normalizeText(sales?.sourceUpdatedAtJST || sales?.generatedAtJST);
+  const today = normalizeText(sales?.sourceDateJST) || stamp.slice(0, 10);
+  const time = timeFromJST(stamp);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(today) || !time) return "";
+  return shiftDate(today, Number(time.split(":")[0]) >= HISTORY_READY_HOUR ? -1 : -2);
 }
 
 // "2026-07-06" → JP weekday char. Computed in UTC so it is timezone-stable.
@@ -169,6 +217,8 @@ function normalizeRankingDim(block) {
   return {
     partial: Boolean(block?.partial),
     shopCount: toNumber(block?.shopCount ?? shops.length),
+    // shops whose items the board actually adds up; null when the API leaves it out
+    updatedShopCount: shopCountOf(block?.updatedShopCount),
     staleShopCount: toNumber(block?.staleShopCount),
     failedShopCount: toNumber(block?.failedShopCount),
     overall,
@@ -209,27 +259,35 @@ export function buildModel(sales, history, logos) {
   // logos are optional context, merged by shopName (empty → component falls back).
   const logoByName = new Map((logos?.shops || []).map((s) => [s.shopName, s.logoUrl || null]));
 
-  const rtTotal = toNumber(sales?.totals?.salesYen);
-  const rtOrders = toNumber(sales?.totals?.orderCount);
-  const rtUnits = toNumber(sales?.totals?.unitsSold);
-  const rtShops = (sales?.shops || []).map((s) => ({
-    name: s.shopName,
-    sales: toNumber(s.salesYen),
-    orders: toNumber(s.orderCount),
-    units: toNumber(s.unitsSold),
-  }));
+  // Today. A shop the server left out of its total (no API access, a failed
+  // read) is unknown today: its saved figures are not part of the total, so they
+  // are not shown beside it either. With no readable shop at all the server
+  // nulls the total, and so does the model.
+  const totals = sales?.ok === false ? null : sales?.totals;
+  const rtTotal = numberOrNull(totals?.salesYen);
+  const rtOrders = numberOrNull(totals?.orderCount);
+  const rtUnits = numberOrNull(totals?.unitsSold);
+  const rtShops = (sales?.shops || []).map((s) => {
+    const counted = countedInTotals(s);
+    return {
+      name: s.shopName,
+      counted,
+      sales: counted ? numberOrNull(s.salesYen) : null,
+      orders: counted ? numberOrNull(s.orderCount) : null,
+      units: counted ? numberOrNull(s.unitsSold) : null,
+    };
+  });
 
-  // history context, keyed by shopName. Each shop keeps per-day detail so the
-  // per-shop mini charts can show date / 売上 / 件数 on hover.
-  const dates = history?.range?.dates || (history?.shops?.[0]?.daily || []).map((d) => d.date);
+  // History context, keyed by shopName. Each shop keeps per-day detail so the
+  // per-shop mini charts can show date / 売上 / 件数 on hover. Each shop also
+  // keeps its own window: one whose history refresh fails holds on to its last
+  // one (2026-10-30: three shops stuck at 10/27 while the rest reached 10/29),
+  // so days are matched by date, never by position.
   const histByName = new Map();
   (history?.shops || []).forEach((s) => {
-    histByName.set(s.shopName, {
-      total: toNumber(s?.totals?.salesYen),
-      orders: toNumber(s?.totals?.orderCount),
-      units: toNumber(s?.totals?.unitsSold),
-      cvr: toNumber(s?.totals?.conversionRate),
-      daily: (s.daily || []).map((d) => ({
+    const daily = (s.daily || [])
+      .filter((d) => d?.date)
+      .map((d) => ({
         date: d.date,
         md: mdLabel(d.date),
         wd: weekdayJp(d.date),
@@ -238,36 +296,67 @@ export function buildModel(sales, history, logos) {
         units: toNumber(d.unitsSold),
         // per-shop daily CVR is authoritative — it comes straight from the API
         cvr: toNumber(d.conversionRate),
-      })),
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+    histByName.set(s.shopName, {
+      total: toNumber(s?.totals?.salesYen),
+      orders: toNumber(s?.totals?.orderCount),
+      units: toNumber(s?.totals?.unitsSold),
+      cvr: toNumber(s?.totals?.conversionRate),
+      daily,
+      endDate: daily.length ? daily[daily.length - 1].date : "",
     });
   });
+  // The company totals add up each shop's own window, so the averages stay a
+  // sum of per-shop daily averages and agree with the shop rows.
   const grandTotal = toNumber(history?.totals?.salesYen);
   const grandOrders = toNumber(history?.totals?.orderCount);
   const grandUnits = toNumber(history?.totals?.unitsSold);
   const grandCvr = toNumber(history?.totals?.conversionRate);
-  const nDays = dates.length || 7;
+  const nDays = toNumber(history?.range?.days) || (history?.range?.dates || []).length || 7;
   const avg = grandTotal / nDays;
+
+  // The company chart keeps only the days every shop has: a day some shops are
+  // missing from would read as a slump.
+  const withDays = [...histByName.values()].filter((h) => h.daily.length);
+  const dates = withDays.length
+    ? withDays[0].daily.map((d) => d.date).filter((date) => withDays.every((h) => h.daily.some((d) => d.date === date)))
+    : [];
+
+  // the newest window any shop holds, which the shop rows mostly cover, and the
+  // shops still on an older one
+  const latestEnd = withDays.reduce((end, h) => (h.endDate > end ? h.endDate : end), "");
+  const newest = withDays.find((h) => h.endDate === latestEnd);
+  const lagging = [...histByName.entries()].filter(([, h]) => h.daily.length && h.endDate < latestEnd);
+  const laggingEnd = lagging.reduce((end, [, h]) => (!end || h.endDate < end ? h.endDate : end), "");
+  const expectedEnd = expectedHistoryEnd(sales);
+  const week = newest
+    ? {
+        label: `${newest.daily[0].md}–${mdLabel(latestEnd)}`,
+        endMd: mdLabel(latestEnd),
+        // even the newest window is older than a healthy morning refresh leaves
+        behind: Boolean(expectedEnd) && latestEnd < expectedEnd,
+        lagging: lagging.map(([name]) => name),
+        laggingEndMd: mdLabel(laggingEnd),
+      }
+    : null;
 
   // daily totals across shops (for the area chart + hover crosshair).
   // A conversion rate cannot be summed, so the all-shop figure is derived: each
   // shop-day's visits are recovered as orders / (cvr/100), summed, then divided
   // back. Exact within a day; it can drift slightly from the API's own range
   // total, which additionally de-duplicates visitors across days.
-  const dailyTotals = dates.map((date, i) => {
+  const dailyTotals = dates.map((date) => {
     let s = 0;
     let o = 0;
     let u = 0;
     let visits = 0;
-    (history?.shops || []).forEach((sh) => {
-      const d = (sh.daily || [])[i];
-      if (d) {
-        const orders = toNumber(d.orderCount);
-        const cvr = toNumber(d.conversionRate);
-        s += toNumber(d.salesYen);
-        o += orders;
-        u += toNumber(d.unitsSold);
-        if (cvr > 0) visits += (orders * 100) / cvr;
-      }
+    withDays.forEach((h) => {
+      const d = h.daily.find((day) => day.date === date);
+      s += d.sales;
+      o += d.orders;
+      u += d.units;
+      if (d.cvr > 0) visits += (d.orders * 100) / d.cvr;
     });
     return {
       date,
@@ -291,25 +380,26 @@ export function buildModel(sales, history, logos) {
   // the chart, hover zones and axis labels all line up (equal-width flex tracks).
   const days = dailyTotals.map((d, i) => ({
     ...d,
-    xPct: ((i + 0.5) / nDays) * 100,
+    xPct: ((i + 0.5) / dailyTotals.length) * 100,
     yPct: ((5 + (1 - d.sales / maxDaily) * 30) / 40) * 100,
   }));
 
-  // unified rows: realtime-sorted, each carrying its 7-day context
-  const rtMax = Math.max(1, ...rtShops.map((s) => s.sales));
+  // unified rows: realtime-sorted (unknown last), each carrying its 7-day context
+  const rtMax = Math.max(1, ...rtShops.map((s) => s.sales ?? 0));
   const rows = rtShops
     .slice()
-    .sort((a, b) => b.sales - a.sales)
+    .sort((a, b) => (b.sales ?? -1) - (a.sales ?? -1))
     .map((s) => {
       const h = histByName.get(s.name) || { total: 0, orders: 0, cvr: 0, daily: [] };
+      const share = ratio(s.sales, rtTotal);
       return {
         name: s.name,
         rtSales: s.sales,
         rtOrders: s.orders,
         rtUnits: s.units,
-        rtUnitsPerOrder: s.orders > 0 ? s.units / s.orders : 0,
-        rtShare: rtTotal > 0 ? (s.sales / rtTotal) * 100 : 0,
-        rtBarPct: (s.sales / rtMax) * 100,
+        rtUnitsPerOrder: ratio(s.units, s.orders),
+        rtShare: share === null ? null : share * 100,
+        rtBarPct: s.sales === null ? null : (s.sales / rtMax) * 100,
         // this shop's share of the trailing-7d total — the "normal" baseline the
         // bullet compares today's share against (today ≥ baseline = over-indexing).
         h7Share: grandTotal > 0 ? (h.total / grandTotal) * 100 : 0,
@@ -324,18 +414,32 @@ export function buildModel(sales, history, logos) {
 
   // shared 0..max scale for the share bullets so bar lengths stay comparable across
   // rows (preserves the sales ranking) while each row's tick marks its own baseline.
-  const shareScale = Math.max(1, ...rows.map((r) => Math.max(r.rtShare, r.h7Share)));
+  const shareScale = Math.max(1, ...rows.map((r) => Math.max(r.rtShare ?? 0, r.h7Share)));
+
+  // the order-API read time: generatedAtJST is the response's build time and
+  // moves on every rebuild, even when a refresh failed
+  const updatedAtJST = sales?.sourceUpdatedAtJST || sales?.generatedAtJST || "";
+  const aov = ratio(rtTotal, rtOrders);
 
   return {
     generatedAtJST: sales?.generatedAtJST || "",
-    time: timeFromJST(sales?.generatedAtJST),
+    updatedAtJST,
+    time: timeFromJST(updatedAtJST),
     rtTotal,
     rtOrders,
     rtUnits,
-    aov: rtOrders > 0 ? Math.round(rtTotal / rtOrders) : 0,
+    aov: aov === null ? null : Math.round(aov),
     // units per order — how many pieces a single order carries. Separates
     // wholesale-style buying from one-piece shoppers.
-    rtUnitsPerOrder: rtOrders > 0 ? rtUnits / rtOrders : 0,
+    rtUnitsPerOrder: ratio(rtUnits, rtOrders),
+    // how many shops today's total adds up, against every shop on the list
+    coverage: {
+      covered: shopCountOf(sales?.updatedShopCount) ?? rtShops.filter((s) => s.counted).length,
+      total: shopCountOf(sales?.shopCount) ?? rtShops.length,
+    },
+    // shops the total leaves out, named so the header can say which
+    missing: rtShops.filter((s) => !s.counted).map((s) => s.name),
+    week,
     unitsPerOrder: grandOrders > 0 ? grandUnits / grandOrders : 0,
     rows,
     grandTotal,
@@ -553,17 +657,6 @@ function monthMetrics(current, previous, today, completedDays, prevDays) {
     };
   });
   return out;
-}
-
-// A shop row the server left out of a month's totals (unconfigured, not read
-// yet, or stale) still shows its figures, but is never compared with anything.
-const countedInTotals = (row) => row?.includedInTotals !== false;
-
-// A shop count the API may omit: null when absent rather than 0.
-function shopCountOf(value) {
-  if (value === null || value === undefined || value === "") return null;
-  const n = Number(value);
-  return Number.isInteger(n) && n >= 0 ? n : null;
 }
 
 // The names a month's totals actually add up, sorted so two months compare.

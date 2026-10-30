@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import { DASH, mdLabel, weekdayJp } from "widgets/uoperformance/performance-model.mjs";
 
-import { deltaTone, METRICS, todayVsAverage } from "./daily-check-model.mjs";
+import { deltaTone, historyComparable, METRICS, todayVsAverage } from "./daily-check-model.mjs";
 import { FALLBACK_SHOP_COLOR, man } from "./sales-model.mjs";
 
 const NS = "uorakutensales";
@@ -21,6 +21,7 @@ const TONE_CLASS = {
   unknown: "text-theme-500 dark:text-theme-400",
 };
 const MUTED = "text-theme-600 dark:text-theme-300";
+const WARN = "text-amber-700 dark:text-amber-300";
 const ACCENT_TEXT = "text-[#C6362B] dark:text-[#F0857A]";
 // neutral on purpose: a part-day ratio is neither good nor bad
 const NEUTRAL_BAR = "bg-slate-500/70 dark:bg-[#8FA6C6]";
@@ -32,6 +33,7 @@ function fmt(t, value) {
 
 // whole yen and whole pieces — a 7-day average must not read ¥752,443.571
 export function valueText(metric, value, t) {
+  if (value === null || value === undefined) return DASH;
   if (metric === "sales") return `¥${fmt(t, Math.round(value))}`;
   return `${fmt(t, Math.round(value))}${t(`${NS}.${UNIT_KEY[metric]}`)}`;
 }
@@ -95,8 +97,11 @@ export function MetricSwitch({ metric, onChange, t }) {
 // the two metrics the switch is not showing, plus 客単価 / 点数 where they belong
 function todaySubLine(model, metric, t) {
   const parts = METRICS.filter((m) => m !== metric).map((m) => valueText(m, model[TODAY_KEY[m]], t));
-  if (metric !== "units") parts.push(`${t(`${NS}.aov`)} ¥${fmt(t, model.aov)}`);
-  if (metric !== "orders") parts.push(`${t(`${NS}.unitsPerOrder`)} ×${model.rtUnitsPerOrder.toFixed(2)}`);
+  if (metric !== "units") parts.push(`${t(`${NS}.aov`)} ${model.aov === null ? DASH : `¥${fmt(t, model.aov)}`}`);
+  if (metric !== "orders") {
+    const perOrder = model.rtUnitsPerOrder;
+    parts.push(`${t(`${NS}.unitsPerOrder`)} ${perOrder === null ? DASH : `×${perOrder.toFixed(2)}`}`);
+  }
   return parts.join(" · ");
 }
 
@@ -106,14 +111,20 @@ export function barLabel(metric, value, t) {
   return `${value >= 100000 ? Math.round(value / 10000) : man(value)}${t(`${NS}.manUnit`)}`;
 }
 
+// The days every shop has, then today. Today's bar only stands beside them when
+// both sides count the same way: 売上 history is after coupons, today before.
 function WeekBars({ model, metric, value, avg, t }) {
+  const withToday = historyComparable(metric) && value !== null;
   const series = model.days.map((d) => ({ key: d.date, md: d.md, wd: d.wd, v: d[metric] || 0 }));
-  const peak = Math.max(1, value, ...series.map((d) => d.v));
+  const peak = Math.max(1, withToday ? value : 0, ...series.map((d) => d.v));
   const px = (v) => `${Math.max(3, Math.round((v / peak) * CHART_HEIGHT))}px`;
+  const count = series.length;
   return (
     <div className="flex min-w-0 flex-col gap-2">
       <div className="flex items-baseline justify-between gap-2 text-xs">
-        <span className={`font-bold ${MUTED}`}>{t(`${NS}.last7AndToday`)}</span>
+        <span className={`font-bold ${MUTED}`}>
+          {withToday ? t(`${NS}.lastDaysAndToday`, { count }) : t(`${NS}.lastDaysAfterCoupon`, { count })}
+        </span>
         {avg ? <span className={MUTED}>{t(`${NS}.avgLine`)}</span> : null}
       </div>
       <div className="relative flex h-[136px] items-end gap-2 pt-5" aria-hidden="true">
@@ -129,15 +140,17 @@ function WeekBars({ model, metric, value, avg, t }) {
             <span className="block w-full max-w-[34px] rounded-t bg-[#5F7FAF]" style={{ height: px(d.v) }} />
           </span>
         ))}
-        <span className="flex h-full flex-1 flex-col items-center justify-end gap-1">
-          <span className={`whitespace-nowrap text-xs font-bold tabular-nums ${ACCENT_TEXT}`}>
-            {barLabel(metric, value, t)}
+        {withToday ? (
+          <span className="flex h-full flex-1 flex-col items-center justify-end gap-1">
+            <span className={`whitespace-nowrap text-xs font-bold tabular-nums ${ACCENT_TEXT}`}>
+              {barLabel(metric, value, t)}
+            </span>
+            <span
+              className="block w-full max-w-[34px] rounded-t border-2 border-dashed border-[#F0857A] bg-[#F0857A]/20"
+              style={{ height: px(value) }}
+            />
           </span>
-          <span
-            className="block w-full max-w-[34px] rounded-t border-2 border-dashed border-[#F0857A] bg-[#F0857A]/20"
-            style={{ height: px(value) }}
-          />
-        </span>
+        ) : null}
       </div>
       <div className="flex gap-2 text-center text-xs leading-tight">
         {series.map((d) => (
@@ -147,7 +160,7 @@ function WeekBars({ model, metric, value, avg, t }) {
             {d.wd}
           </span>
         ))}
-        <span className={`flex-1 font-bold ${ACCENT_TEXT}`}>{t(`${NS}.todayLabel`)}</span>
+        {withToday ? <span className={`flex-1 font-bold ${ACCENT_TEXT}`}>{t(`${NS}.todayLabel`)}</span> : null}
       </div>
     </div>
   );
@@ -156,12 +169,20 @@ function WeekBars({ model, metric, value, avg, t }) {
 export function TodayCard({ model, metric, shopColors, cardCls = "", t }) {
   const { value, avg, pct } = todayVsAverage(model, metric);
   const mix = model.rows.filter((r) => r[ROW_TODAY_KEY[metric]] > 0);
+  // today's total adds up fewer shops than the list holds — e.g. one without the order API
+  const coverage = model.coverage && model.coverage.covered < model.coverage.total ? model.coverage : null;
   return (
     <section className={`flex min-w-0 flex-wrap justify-between gap-6 p-5 ${cardCls}`}>
       <div className="flex min-w-[260px] flex-1 flex-col gap-3">
         <span className="flex items-baseline gap-2">
           <span className="text-sm font-bold text-theme-800 dark:text-theme-100">{t(`${NS}.todayLabel`)}</span>
-          {model.time ? <span className={`text-xs ${MUTED}`}>{t(`${NS}.asOf`, { time: model.time })}</span> : null}
+          {model.time || coverage ? (
+            <span className={`text-xs ${MUTED}`}>
+              {model.time ? t(`${NS}.asOf`, { time: model.time }) : ""}
+              {model.time && coverage ? " · " : ""}
+              {coverage ? t(`${NS}.shopCoverage`, coverage) : ""}
+            </span>
+          ) : null}
         </span>
         <span className={`text-[52px] font-extrabold leading-none tracking-tight tabular-nums ${ACCENT_TEXT}`}>
           {valueText(metric, value, t)}
@@ -203,8 +224,11 @@ export function TodayCard({ model, metric, shopColors, cardCls = "", t }) {
             <span className={`text-xs ${MUTED}`}>{t(`${NS}.todayNoTimeCorrection`)}</span>
           </div>
         ) : null}
+        {model.hasHistory && !historyComparable(metric) ? (
+          <span className={`mt-1 text-xs ${MUTED}`}>{t(`${NS}.salesBasisNote`)}</span>
+        ) : null}
       </div>
-      {model.hasHistory ? (
+      {model.hasHistory && model.days.length ? (
         <div className="min-w-[280px] flex-1 @5xl:max-w-[400px]">
           <WeekBars model={model} metric={metric} value={value} avg={avg} t={t} />
         </div>
@@ -266,21 +290,41 @@ export function MonthCard({ monthly, metric, cardCls = "", t }) {
   );
 }
 
+// What the 7-day figures cannot vouch for: a history that stopped updating, or
+// shops still on an older window than the rest.
+export function historyNotes(week, t) {
+  if (!week) return [];
+  const notes = [];
+  if (week.behind) notes.push(t(`${NS}.historyStopped`, { md: week.endMd }));
+  if (week.lagging.length) {
+    notes.push(t(`${NS}.historyLagging`, { names: week.lagging.join("・"), md: week.laggingEndMd }));
+  }
+  return notes;
+}
+
 export function visitDayLabel(dateStr) {
   return dateStr ? `${mdLabel(dateStr)}（${weekdayJp(dateStr)}）` : "";
+}
+
+// The server marks the visit source stale when its daily read failed and the
+// figures are an older day's — then they are not 確定値 for yesterday.
+export function visitsStale(performance) {
+  return performance?.sources?.traffic?.stale === true;
 }
 
 export function VisitCard({ performance, cardCls = "", t }) {
   if (!performance || performance.visit === null) return null;
   // fewer than 3 same-weekday samples means there is no median to compare with
   const delta = performance.sampleCount >= 3 ? performance.delta : null;
+  const stale = visitsStale(performance);
   return (
     <section className={`flex min-w-0 flex-col gap-2 p-5 ${cardCls}`}>
       <span className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <span className="text-sm font-bold text-theme-800 dark:text-theme-100">
           {t(`${NS}.visitsTitle`)}{" "}
           <span className={`text-xs font-medium ${MUTED}`}>
-            {visitDayLabel(performance.dataDateJST)} · {t(`${NS}.confirmed`)}
+            {visitDayLabel(performance.dataDateJST)} ·{" "}
+            {stale ? <span className={WARN}>{t(`${NS}.visitsStale`)}</span> : t(`${NS}.confirmed`)}
           </span>
         </span>
         <span className={`text-xs ${MUTED}`}>
@@ -437,7 +481,7 @@ function TodayCell({ row, metric, maxToday, color, t }) {
 
 function AvgRatioCell({ row, metric }) {
   const avg = row.avg?.[metric];
-  const pct = avg > 0 && row.today ? (row.today[metric] / avg) * 100 : null;
+  const pct = historyComparable(metric) && avg > 0 && row.today ? (row.today[metric] / avg) * 100 : null;
   return (
     <td {...colProps(3)} className={`${colProps(3).className} px-2 py-2.5`}>
       {pct === null ? (
@@ -527,13 +571,32 @@ function IdleRow({ row, color, logoUrl, t }) {
   );
 }
 
-// `periods` labels the column groups: { today, week, month, visits }
-export function ShopTable({ table, metric, shopColors, logoByName = new Map(), periods = {}, cardCls = "", t }) {
+// `periods` labels the column groups: { today, week, month, visits };
+// `notes` are warnings shown under the title, e.g. history that stopped updating
+export function ShopTable({
+  table,
+  metric,
+  shopColors,
+  logoByName = new Map(),
+  periods = {},
+  notes = [],
+  cardCls = "",
+  t,
+}) {
   const [showIdle, setShowIdle] = useState(false);
   const colorOf = (name) => shopColors[name] ?? FALLBACK_SHOP_COLOR;
   const maxToday = Math.max(1, ...table.rows.map((r) => r.today?.[metric] ?? 0));
-  const total = table.total.today[metric];
+  const total = table.total.today?.[metric] ?? null;
   const unit = unitOf(metric, t);
+  // the 7-day yen are R-Karte's, after coupons: the header says so on a line of its own
+  const weekAvgLabel = historyComparable(metric) ? (
+    withUnit(t(`${NS}.perDayAvg`), unit)
+  ) : (
+    <>
+      {withUnit(t(`${NS}.perDayAvg`), unit)}
+      <span className="block text-[10px] font-medium">{t(`${NS}.afterCouponTag`)}</span>
+    </>
+  );
   // a group's header opens its band: its name and period, underlined in the group's colour
   const group = (key, firstCol, span) => {
     const { className, ...props } = colProps(firstCol);
@@ -569,6 +632,11 @@ export function ShopTable({ table, metric, shopColors, logoByName = new Map(), p
         <span className="text-base font-extrabold text-theme-900 dark:text-theme-50">{t(`${NS}.shopTable`)}</span>
         <span className={`text-xs ${MUTED}`}>{t(`${NS}.shopTableNote`)}</span>
       </span>
+      {notes.map((note) => (
+        <span key={note} role="note" className={`text-xs font-semibold ${WARN}`}>
+          {note}
+        </span>
+      ))}
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1040px] table-fixed border-collapse">
           {/* figure columns keep their width; any spare width goes to 今日, so a
@@ -593,7 +661,7 @@ export function ShopTable({ table, metric, shopColors, logoByName = new Map(), p
               {head(1, t(`${NS}.${METRIC_LABEL[metric]}`), "text-left")}
               {head(2, t(`${NS}.share`), "text-right")}
               {head(3, t(`${NS}.vsAvg`), "text-left")}
-              {head(4, withUnit(t(`${NS}.perDayAvg`), unit), "text-right")}
+              {head(4, weekAvgLabel, "text-right")}
               {head(5, "CVR", "text-right")}
               {head(6, withUnit(t(`${NS}.cumulative`), unit), "text-right")}
               {head(7, t(`${NS}.vsPrev`), "text-right")}
