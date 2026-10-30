@@ -22,7 +22,8 @@
  * Amazon shops sit beside 楽天's as peers. Counts add up across platforms;
  * yen never do, since each platform measures its amounts its own way.
  *
- * Realtime has NO conversionRate → per-row CVR comes from the 7-day history.
+ * No endpoint carries a conversion rate any more: the order API has no visitors,
+ * so the 7-day history reports it as null and the page shows a dash.
  * Freshness pill (LIVE / 遅延 / 停止) is derived from sales.sourceUpdatedAtJST (the
  * order-API read time; generatedAtJST moves even when a refresh failed).
  * Pure view-model + geometry helpers live in ./sales-model.mjs.
@@ -39,7 +40,6 @@ import {
   historyNotes,
   MetricSwitch,
   MonthCard,
-  PlatformTag,
   ShopTable,
   TodayCard,
   VisitCard,
@@ -51,6 +51,7 @@ import { buildMarketEvidence, buildMarketReference, MARKET_REFRESH_INTERVAL } fr
 import { buildDeviceSales } from "./device-sales-model.mjs";
 import DeviceSalesSection from "./device-sales-section";
 import { CustomerMixCard, ShopVisitsTable } from "./insight-section";
+import { PlatformMark, PlatformName, PlatformSuffix, ScopeName } from "./platform-mark";
 import {
   ACCENT,
   buildModel,
@@ -374,7 +375,7 @@ function DailyChart({ model, mode, onModeChange, scope = "", t }) {
     <div className="flex min-w-0 flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
         <span className="min-w-0 truncate text-[10.5px] font-bold tracking-wide text-theme-600 dark:text-theme-300">
-          {scope ? `${scope} ` : ""}
+          <ScopeName scope={scope} size={12} />
           {t(`${NS}.dailyTrend`)}{" "}
           <span className="text-[9px] font-medium text-theme-500 dark:text-theme-400">
             · {t(`${NS}.excludesToday`)}
@@ -416,7 +417,8 @@ function DailyChart({ model, mode, onModeChange, scope = "", t }) {
               <span className="block text-[8.5px] font-medium tabular-nums text-slate-400">
                 {fmt(t, Math.round(model.avgOrders))}
                 {t(`${NS}.ordersUnit`)}
-                {t(`${NS}.perDay`)} · CVR {model.grandCvr.toFixed(2)}%
+                {t(`${NS}.perDay`)}
+                {model.grandCvr === null ? "" : ` · CVR ${model.grandCvr.toFixed(2)}%`}
               </span>
             </span>
           ) : null}
@@ -771,8 +773,30 @@ function RankingBoards({ ranking, period, onPeriod, dim, cardCls, t }) {
       ? t(`${NS}.shopsAggregatedPartial`, { covered, total: board.shopCount })
       : t(`${NS}.shopsAggregated`, { count: board.shopCount });
   // with Amazon's shop boards on offer, the company board says it is 楽天's
-  const rakutenPrefix = ranking.hasAmazon ? `${t(`${NS}.platformRakuten`)} · ` : "";
-  const meta = isAll ? `${rakutenPrefix}${aggregated}` : t(`${NS}.itemsCount`, { count: active?.itemCount ?? 0 });
+  const rakutenLabel = t(`${NS}.platformRakuten`);
+  const meta = isAll ? (
+    <>
+      {ranking.hasAmazon ? (
+        <>
+          <PlatformName platform="rakuten" label={rakutenLabel} size={12} /> ·{" "}
+        </>
+      ) : null}
+      {aggregated}
+    </>
+  ) : (
+    t(`${NS}.itemsCount`, { count: active?.itemCount ?? 0 })
+  );
+  // beside Amazon's boards every chip carries its platform's mark
+  const shopChip = (platform, label) =>
+    ranking.hasAmazon ? (
+      <span className="inline-flex items-center gap-1">
+        <PlatformMark platform={platform} size={12} />
+        {label}
+        <PlatformSuffix label={t(`${NS}.${platform === "amazon" ? "platformAmazon" : "platformRakuten"}`)} />
+      </span>
+    ) : (
+      label
+    );
 
   const chip = (key, label) => (
     <button
@@ -812,10 +836,8 @@ function RankingBoards({ ranking, period, onPeriod, dim, cardCls, t }) {
         ) : null}
         {open ? (
           <div className="ml-auto flex flex-wrap gap-1.5">
-            {chip("__all__", `${rakutenPrefix ? `${t(`${NS}.platformRakuten`)} ` : ""}${t(`${NS}.allShops`)}`)}
-            {board.shops.map((s) =>
-              chip(keyOf(s), s.platform === "amazon" ? `${s.shopName}（${t(`${NS}.platformAmazon`)}）` : s.shopName),
-            )}
+            {chip("__all__", shopChip("rakuten", t(`${NS}.allShops`)))}
+            {board.shops.map((s) => chip(keyOf(s), shopChip(s.platform ?? "rakuten", s.shopName)))}
           </div>
         ) : null}
       </div>
@@ -902,7 +924,7 @@ function RecordCard({ dim, record, shopColors, sinceYear, scope = "", t }) {
   return (
     <div className={`flex min-w-0 flex-col gap-1 rounded-xl border p-3 ${tone.card}`}>
       <span className={`text-[9.5px] font-extrabold uppercase tracking-[0.1em] ${tone.label}`}>
-        {scope ? `${scope} ` : ""}
+        <ScopeName scope={scope} size={11} />
         {t(`${NS}.${PEAK_LABEL_KEY[dim] ?? "recordSales"}`)}
       </span>
       <span className={`text-[22px] font-extrabold leading-none tabular-nums ${tone.value}`}>
@@ -943,6 +965,8 @@ function PeaksSection({ peaks, scope = "", shopColors, cardCls, t }) {
   // a dimension can disappear across refreshes → fall back to what is present
   const activeDim = peaks.shopBests[dim] ? dim : peaks.available.find((d) => peaks.shopBests[d]);
   const bests = activeDim ? peaks.shopBests[activeDim] : [];
+  // with Amazon's bests among them, each shop shows its platform's mark
+  const mixed = bests.some((b) => b.platform === "amazon");
   const hasRecordDay = bests.some((b) => b.onRecordDay);
 
   const dimChip = (key) => (
@@ -969,7 +993,7 @@ function PeaksSection({ peaks, scope = "", shopColors, cardCls, t }) {
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
         <span className="text-[12px] font-bold text-theme-700 dark:text-theme-200">{t(`${NS}.allTimeRecords`)}</span>
         <span className="text-[10px] font-semibold tabular-nums text-theme-700 dark:text-theme-200">
-          {scope ? `${scope} ` : ""}
+          <ScopeName scope={scope} size={11} />
           {t(`${NS}.peaksCoverage`, { year: peaks.coverage.startYear, count: peaks.coverage.shopCount })}
           {/* Amazon's API only serves the last two years: its bests cover less */}
           {peaks.amazonSince ? ` · ${t(`${NS}.peaksCoverageAmazon`, { date: peaks.amazonSince })}` : ""}
@@ -1017,12 +1041,17 @@ function PeaksSection({ peaks, scope = "", shopColors, cardCls, t }) {
                   key={b.key ?? b.shopName}
                   className="inline-flex min-w-0 items-center gap-1 rounded-full border border-theme-300/70 bg-theme-100/60 px-1.5 py-0.5 text-[10px] tabular-nums dark:border-white/[0.18] dark:bg-white/[0.06]"
                 >
+                  {mixed ? <PlatformMark platform={b.platform ?? "rakuten"} size={12} /> : null}
                   <span
                     className="block h-[7px] w-[7px] shrink-0 rounded-sm"
                     style={{ backgroundColor: shopColors[b.shopName] ?? FALLBACK_SHOP_COLOR }}
                   />
                   <span className="truncate font-semibold text-theme-800 dark:text-theme-100">{b.shopName}</span>
-                  {b.platform === "amazon" ? <PlatformTag platform="amazon" t={t} /> : null}
+                  {mixed ? (
+                    <PlatformSuffix
+                      label={t(`${NS}.${b.platform === "amazon" ? "platformAmazon" : "platformRakuten"}`)}
+                    />
+                  ) : null}
                   {b.noRecord ? (
                     <span className="text-[9.5px] font-medium text-theme-500 dark:text-theme-400">
                       {t(`${NS}.noRecord`)}
@@ -1094,8 +1123,11 @@ function ShopTrendCard({ row: r, mode, t }) {
       ) : null}
       <div className="relative flex min-w-0 flex-col gap-1.5">
         <span className="flex min-w-0 items-center gap-1">
+          {r.platform ? <PlatformMark platform={r.platform} size={12} /> : null}
           <span className="truncate text-[11px] font-semibold text-theme-900 dark:text-theme-50">{r.name}</span>
-          {r.platform === "amazon" ? <PlatformTag platform="amazon" t={t} /> : null}
+          {r.platform ? (
+            <PlatformSuffix label={t(`${NS}.${r.platform === "amazon" ? "platformAmazon" : "platformRakuten"}`)} />
+          ) : null}
         </span>
         <span className="flex items-baseline gap-0.5">
           <span className="text-[9px] font-bold text-theme-600 dark:text-theme-300">¥</span>
@@ -1507,7 +1539,7 @@ export default function Component({ service }) {
                   <span className="min-w-0 text-xs font-bold tracking-wide text-theme-600 dark:text-theme-300">
                     {t(`${NS}.shopTrend`)}{" "}
                     <span className="font-medium text-theme-500 dark:text-theme-400">
-                      · {t(`${NS}.excludesToday`)} · {amazon ? t(`${NS}.afterCouponTag`) : t(`${NS}.afterCoupon`)}
+                      · {t(`${NS}.excludesToday`)}
                       {idleNames ? ` · ${t(`${NS}.idleLeftOut`, { names: idleNames })}` : ""}
                     </span>
                   </span>
@@ -1517,10 +1549,16 @@ export default function Component({ service }) {
                     </span>
                   ))}
                   <div className="grid grid-cols-[repeat(auto-fit,minmax(104px,1fr))] gap-2.5">
+                    {/* a shop whose week the server could not count has no trend to draw */}
                     {model.rows
-                      .filter((r) => activeNames.has(r.name))
+                      .filter((r) => activeNames.has(r.name) && r.h7Total !== null)
                       .map((r) => (
-                        <ShopTrendCard key={r.name} row={r} mode={chartMode} t={t} />
+                        <ShopTrendCard
+                          key={r.name}
+                          row={amazon ? { ...r, platform: "rakuten" } : r}
+                          mode={chartMode}
+                          t={t}
+                        />
                       ))}
                     {(amazon?.shops || [])
                       .filter((s) => activeNames.has(s.name))

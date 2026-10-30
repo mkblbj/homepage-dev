@@ -31,14 +31,21 @@ const sales = {
   ],
 };
 
+// /api/history/sales since 2026-10-30: order-API days, one window for every
+// shop, the company's own day-by-day totals, and no conversion rate
 const history = {
   generatedAtJST: "2026-07-07 06:30 JST",
-  range: { dates: ["2026-06-30", "2026-07-01", "2026-07-02"] },
-  totals: { salesYen: 90000, orderCount: 60, conversionRate: 2.35 },
+  range: { startDate: "2026-06-30", endDate: "2026-07-02", dates: ["2026-06-30", "2026-07-01", "2026-07-02"] },
+  totals: { salesYen: 90000, orderCount: 60, conversionRate: null },
+  daily: [
+    { date: "2026-06-30", salesYen: 15000, orderCount: 9, unitsSold: 9, conversionRate: null },
+    { date: "2026-07-01", salesYen: 30000, orderCount: 21, unitsSold: 21, conversionRate: null },
+    { date: "2026-07-02", salesYen: 45000, orderCount: 30, unitsSold: 30, conversionRate: null },
+  ],
   shops: [
     {
       shopName: "3911",
-      totals: { salesYen: 60000, orderCount: 40, conversionRate: 2.1 },
+      totals: { salesYen: 60000, orderCount: 40, conversionRate: null },
       daily: [
         { date: "2026-06-30", salesYen: 10000, orderCount: 6 },
         { date: "2026-07-01", salesYen: 20000, orderCount: 14 },
@@ -47,7 +54,7 @@ const history = {
     },
     {
       shopName: "0406",
-      totals: { salesYen: 30000, orderCount: 20, conversionRate: 1.8 },
+      totals: { salesYen: 30000, orderCount: 20, conversionRate: null },
       daily: [
         { date: "2026-06-30", salesYen: 5000, orderCount: 3 },
         { date: "2026-07-01", salesYen: 10000, orderCount: 7 },
@@ -84,7 +91,7 @@ test("buildModel sorts rows by today's sales and merges 7-day context", () => {
   assert.equal(Math.round(top.rtShare), 67); // 20000 / 30000
   assert.equal(top.h7Total, 60000);
   assert.equal(top.h7Orders, 40);
-  assert.equal(top.cvr, 2.1);
+  assert.equal(top.cvr, null); // the order API has no visitors to divide by
   // per-shop daily is now enriched with date/md/wd/orders for the hover mini chart
   assert.deepEqual(
     top.daily.map((d) => d.sales),
@@ -132,7 +139,7 @@ test("buildModel merges shop logos by shopName, null when absent", () => {
   assert.equal(buildModel(sales, history).rows[0].logoUrl, null);
 });
 
-test("buildModel aggregates daily totals across shops for the trend chart", () => {
+test("buildModel draws the company days the server added up", () => {
   const model = buildModel(sales, history);
   assert.equal(model.nDays, 3);
   assert.deepEqual(
@@ -147,7 +154,6 @@ test("buildModel aggregates daily totals across shops for the trend chart", () =
   assert.equal(model.avg, 90000 / 3);
   assert.equal(model.avgOrders, 60 / 3); // per-day average orders
   assert.equal(model.grandTotal, 90000);
-  assert.equal(model.grandCvr, 2.35);
   assert.equal(model.hasHistory, true);
   // xPct uses segment centers (i+0.5)/n so the chart, hover zones and axis
   // labels (equal-width flex tracks) all line up. For 3 days: 16.67 / 50 / 83.33.
@@ -156,45 +162,22 @@ test("buildModel aggregates daily totals across shops for the trend chart", () =
   assert.equal(Number(model.days[2].xPct.toFixed(2)), 83.33);
 });
 
-test("buildModel keeps per-shop daily CVR and derives the all-shop one", () => {
-  const withCvr = {
-    range: { dates: ["2026-07-26"] },
-    totals: { salesYen: 0, orderCount: 0, conversionRate: 0 },
-    shops: [
-      // 100 orders at 5% → 2000 visits
-      {
-        shopName: "3911",
-        totals: {},
-        daily: [{ date: "2026-07-26", salesYen: 1000, orderCount: 100, conversionRate: 5 }],
-      },
-      // 20 orders at 2% → 1000 visits
-      {
-        shopName: "0406",
-        totals: {},
-        daily: [{ date: "2026-07-26", salesYen: 500, orderCount: 20, conversionRate: 2 }],
-      },
-    ],
-  };
-  const model = buildModel({ totals: {}, shops: [{ shopName: "3911" }, { shopName: "0406" }] }, withCvr);
-
-  // per-shop rows carry the API's own rate verbatim
-  assert.equal(model.rows.find((r) => r.name === "3911").daily[0].cvr, 5);
-  assert.equal(model.rows.find((r) => r.name === "0406").daily[0].cvr, 2);
-
-  // all-shop day: 120 orders over 3000 derived visits = 4.00%, not (5+2)/2
-  assert.equal(model.days[0].orders, 120);
-  assert.equal(Number(model.days[0].cvr.toFixed(2)), 4);
+test("buildModel keeps a missing conversion rate unknown, never 0%", () => {
+  const model = buildModel(sales, history);
+  assert.equal(model.grandCvr, null);
+  assert.equal(model.days[0].cvr, null);
+  assert.equal(model.rows[0].cvr, null);
+  // a rate the API does report still passes through
+  const rated = { ...history, totals: { ...history.totals, conversionRate: 2.35 } };
+  assert.equal(buildModel(sales, rated).grandCvr, 2.35);
 });
 
-test("buildModel reports a zero all-shop CVR when no day has one", () => {
-  const noCvr = {
-    range: { dates: ["2026-07-26"] },
-    totals: {},
-    shops: [{ shopName: "3911", totals: {}, daily: [{ date: "2026-07-26", salesYen: 100, orderCount: 5 }] }],
-  };
-  const model = buildModel({ totals: {}, shops: [{ shopName: "3911" }] }, noCvr);
-  assert.equal(model.days[0].cvr, 0); // component hides the CVR segment
-  assert.equal(model.rows[0].daily[0].cvr, 0);
+test("buildModel leaves out a company day the server could not add up", () => {
+  const gap = { ...history, daily: history.daily.map((d, i) => (i === 1 ? { ...d, salesYen: null } : d)) };
+  assert.deepEqual(
+    buildModel(sales, gap).days.map((d) => d.md),
+    ["6/30", "7/2"],
+  );
 });
 
 test("buildModel tolerates a missing history snapshot", () => {
@@ -203,7 +186,9 @@ test("buildModel tolerates a missing history snapshot", () => {
   assert.equal(model.grandTotal, 0);
   assert.equal(model.nDays, 7); // falls back to a week when no dates
   assert.equal(model.rows.length, 3);
-  assert.equal(model.rows[0].h7Total, 0);
+  assert.equal(model.rows[0].h7Total, null);
+  // with no fresh shop the server nulls the totals: that is no week either
+  assert.equal(buildModel(sales, { ...history, ok: false, totals: null, daily: [] }).hasHistory, false);
 });
 
 // /api/sales since the order-API switch: a shop the server cannot vouch for is
@@ -259,65 +244,37 @@ test("buildModel has no company figures when the server has no readable shop", (
   assert.equal(model.rtUnitsPerOrder, null);
 });
 
-// two shops whose history refreshes stopped on different days
-function windowedHistory() {
-  const day = (date, salesYen) => ({ date, salesYen, orderCount: 1, unitsSold: 1 });
-  return {
-    range: { dates: ["2026-10-25", "2026-10-26", "2026-10-27"] },
-    totals: { salesYen: 660, orderCount: 6, unitsSold: 6 },
+test("buildModel gives a shop left out of the week's totals no week, never a zero one", () => {
+  const h = {
+    ...history,
     shops: [
+      ...history.shops,
       {
-        shopName: "3911",
-        totals: { salesYen: 600, orderCount: 3, unitsSold: 3 },
-        daily: [day("2026-10-27", 100), day("2026-10-28", 200), day("2026-10-29", 300)],
-      },
-      {
-        shopName: "0406",
-        totals: { salesYen: 60, orderCount: 3, unitsSold: 3 },
-        daily: [day("2026-10-25", 10), day("2026-10-26", 20), day("2026-10-27", 30)],
+        shopName: "allcase",
+        status: "unconfigured",
+        includedInTotals: false,
+        totals: { salesYen: null, orderCount: null, unitsSold: null, conversionRate: null },
+        daily: [{ date: "2026-06-30", salesYen: null, orderCount: null, unitsSold: null, conversionRate: null }],
       },
     ],
   };
-}
-
-const afternoonSales = { ...sales, sourceDateJST: "2026-10-30", sourceUpdatedAtJST: "2026-10-30 13:40:45 JST" };
-
-test("buildModel matches history days by date when shops hold different windows", () => {
-  const model = buildModel(afternoonSales, windowedHistory());
-  // only 10/27 is in both windows; adding by position would have filed 3911's
-  // 10/27 under 10/25 and 0406's 10/27 under 10/29
-  assert.deepEqual(
-    model.days.map((d) => d.md),
-    ["10/27"],
-  );
-  assert.deepEqual(
-    model.days.map((d) => d.sales),
-    [130],
-  );
-  assert.equal(model.days[0].xPct, 50);
-  // averages still add each shop's own window
-  assert.equal(model.avg, 660 / 3);
+  const allcase = buildModel(sales, h).rows.find((r) => r.name === "allcase");
+  assert.equal(allcase.h7Total, null);
+  assert.equal(allcase.h7Orders, null);
+  assert.deepEqual(allcase.daily, []);
 });
 
-test("buildModel names the shops whose history is behind the rest", () => {
-  const { week } = buildModel(afternoonSales, windowedHistory());
-  assert.deepEqual(week, {
-    label: "10/27–10/29",
-    endMd: "10/29",
-    behind: false,
-    lagging: ["0406"],
-    laggingEndMd: "10/27",
-  });
+test("buildModel labels the week by the server's range", () => {
+  const nextAfternoon = { ...sales, sourceDateJST: "2026-07-03", sourceUpdatedAtJST: "2026-07-03 13:30:00 JST" };
+  assert.deepEqual(buildModel(nextAfternoon, history).week, { label: "6/30–7/2", endMd: "7/2", behind: false });
 });
 
-test("buildModel flags a history that stopped before yesterday, but not before the morning rebuild", () => {
-  const h = windowedHistory();
-  h.shops = [h.shops[0]];
-  h.shops[0].daily = h.shops[0].daily.slice(0, 2); // ends 10/28
+test("buildModel flags a history that stopped before yesterday, but not before the day's correction is due", () => {
+  const h = { ...history, range: { ...history.range, startDate: "2026-10-22", endDate: "2026-10-28" } };
   const behindAt = (stamp) =>
     buildModel({ ...sales, sourceDateJST: stamp.slice(0, 10), sourceUpdatedAtJST: stamp }, h).week.behind;
   assert.equal(behindAt("2026-10-30 13:40:45 JST"), true); // should have reached 10/29 by now
-  assert.equal(behindAt("2026-10-30 08:00:00 JST"), false); // the morning rebuild may not have run yet
+  assert.equal(behindAt("2026-10-30 08:00:00 JST"), false); // the correction may still be retrying
   assert.equal(behindAt("2026-10-29 13:40:45 JST"), false); // 10/28 is yesterday
 });
 
@@ -671,6 +628,7 @@ test("buildModel surfaces unitsSold at every level", () => {
   const h = {
     range: { dates: ["2026-08-31"] },
     totals: { salesYen: 1000, orderCount: 10, unitsSold: 25 },
+    daily: [{ date: "2026-08-31", salesYen: 1000, orderCount: 10, unitsSold: 25 }],
     shops: [
       {
         shopName: "3911",

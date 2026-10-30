@@ -1613,13 +1613,8 @@
         "notFetched": "{{names}} not fetched",
         "shopsAggregatedPartial": "{{covered}} of {{total}} shops combined",
         "lastDaysAndToday": "Last {{count}} days + today",
-        "lastDaysAfterCoupon": "Rakuten, last {{count}} days (after coupons)",
-        "salesBasisNote": "The 7-day sales are after coupons, so today (before coupons) is not compared with them",
-        "afterCoupon": "sales after coupons",
         "historyStopped": "7-day data stopped at {{md}}",
-        "historyLagging": "{{names}}: 7-day data only runs to {{md}} and has stopped updating",
         "visitsStale": "not updating",
-        "afterCouponTag": "Rakuten after coupons",
         "platformRakuten": "Rakuten",
         "platformAmazon": "Amazon",
         "platformSplit": "Rakuten {{rakuten}} · Amazon {{amazon}}",
@@ -1627,7 +1622,8 @@
         "companyTotal": "Company total",
         "salesNotSummed": "Each marketplace measures sales its own way, so they are not added up",
         "boardLoading": "Loading…",
-        "peaksCoverageAmazon": "Amazon since {{date}}"
+        "peaksCoverageAmazon": "Amazon since {{date}}",
+        "lastDays": "Last {{count}} days"
     },
     "uoshippingdashboard": {
         "allPlatforms": "All",

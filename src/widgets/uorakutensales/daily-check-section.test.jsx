@@ -38,15 +38,17 @@ function shopRow(name, overrides = {}) {
   };
 }
 
-// today plus a two-day history, both shops on the same window
+// today plus a two-day history, with the company days the server adds up
 function weekModel() {
-  const day = (date, salesYen) => ({ date, salesYen, orderCount: 2, unitsSold: 2 });
+  const day = (date, salesYen) => ({ date, salesYen, orderCount: 2, unitsSold: 2, conversionRate: null });
+  const days = [day("2026-10-28", 1000), day("2026-10-29", 3000)];
   return buildModel(
     { generatedAtJST: "2026-10-30 10:20 JST", totals: { salesYen: 500, orderCount: 5, unitsSold: 5 }, shops: [] },
     {
-      range: { dates: ["2026-10-28", "2026-10-29"] },
-      totals: { salesYen: 4000, orderCount: 4, unitsSold: 4 },
-      shops: [{ shopName: "A", totals: {}, daily: [day("2026-10-28", 1000), day("2026-10-29", 3000)] }],
+      range: { startDate: "2026-10-28", endDate: "2026-10-29", days: 2 },
+      totals: { salesYen: 4000, orderCount: 4, unitsSold: 4, conversionRate: null },
+      daily: days,
+      shops: [{ shopName: "A", includedInTotals: true, totals: {}, daily: days }],
     },
   );
 }
@@ -223,32 +225,28 @@ describe("widgets/uorakutensales/daily-check-section", () => {
     expect(screen.getByText(/1\/2店舗/)).toBeInTheDocument();
   });
 
-  it("the today card does not set today's yen against the after-coupon week", () => {
-    render(<TodayCard view={buildTodayView(weekModel())} metric="sales" shopColors={{}} t={t} />);
+  // since 2026-10-30 the week comes from the order API too: one yen basis
+  it("the today card sets today's yen against the week, as it does the counts", () => {
+    for (const metric of ["sales", "orders"]) {
+      const { unmount } = render(
+        <TodayCard view={buildTodayView(weekModel())} metric={metric} shopColors={{}} t={t} />,
+      );
 
-    expect(screen.queryByText(`${NS}.todayNoTimeCorrection`)).not.toBeInTheDocument();
-    expect(screen.getByText(`${NS}.salesBasisNote`)).toBeInTheDocument();
-    // the bars show the week alone, labelled as after coupons, with no today bar
-    expect(screen.getByText(`${NS}.lastDaysAfterCoupon`)).toBeInTheDocument();
-    expect(screen.queryByText(`${NS}.todayLabel`, { selector: ".flex-1" })).not.toBeInTheDocument();
+      expect(screen.getByText(`${NS}.todayNoTimeCorrection`), metric).toBeInTheDocument();
+      expect(screen.getByText(`${NS}.lastDaysAndToday`), metric).toBeInTheDocument();
+      // ¥500 today against a ¥2,000 daily average
+      if (metric === "sales") expect(screen.getByText("25%")).toBeInTheDocument();
+      unmount();
+    }
   });
 
-  it("the today card still compares counts with the week", () => {
-    render(<TodayCard view={buildTodayView(weekModel())} metric="orders" shopColors={{}} t={t} />);
-
-    expect(screen.getByText(`${NS}.todayNoTimeCorrection`)).toBeInTheDocument();
-    expect(screen.getByText(`${NS}.lastDaysAndToday`)).toBeInTheDocument();
-    expect(screen.queryByText(`${NS}.salesBasisNote`)).not.toBeInTheDocument();
-  });
-
-  it("the shop table shows no 7-day ratio for 売上 and marks the week's yen as after coupons", () => {
+  it("the shop table sets each shop's yen today against its 7-day average", () => {
     render(<ShopTable table={table} metric="sales" shopColors={{}} t={t} />);
 
-    expect(
-      screen.getByRole("columnheader", { name: `${NS}.perDayAvg（${NS}.manYen）${NS}.afterCouponTag` }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: `${NS}.perDayAvg（${NS}.manYen）` })).toBeInTheDocument();
+    // ¥1,200 today against ¥3,000 a day
     const row = screen.getByRole("row", { name: /^A/ });
-    expect(within(row).queryByText(/^\d+%$/)).not.toBeInTheDocument();
+    expect(within(row).getByText("40%")).toBeInTheDocument();
   });
 
   it("the shop table shows its warnings and an unknown company total as dashes", () => {
@@ -260,13 +258,11 @@ describe("widgets/uorakutensales/daily-check-section", () => {
     expect(within(total).queryByText(`0${NS}.ordersUnit`)).not.toBeInTheDocument();
   });
 
-  it("history notes say when the week stopped and which shops lag behind", () => {
-    const tn = (key, opts) => `${key}:${opts?.names ?? ""}:${opts?.md ?? ""}`;
+  it("history notes say when the week stopped updating", () => {
+    const tn = (key, opts) => `${key}:${opts?.md ?? ""}`;
     expect(historyNotes(null, tn)).toEqual([]);
-    expect(historyNotes({ behind: false, lagging: [], endMd: "10/29" }, tn)).toEqual([]);
-    expect(
-      historyNotes({ behind: true, endMd: "10/27", lagging: ["0406", "松武"], laggingEndMd: "10/25" }, tn),
-    ).toEqual([`${NS}.historyStopped::10/27`, `${NS}.historyLagging:0406・松武:10/25`]);
+    expect(historyNotes({ behind: false, endMd: "10/29" }, tn)).toEqual([]);
+    expect(historyNotes({ behind: true, endMd: "10/27" }, tn)).toEqual([`${NS}.historyStopped:10/27`]);
   });
 
   it("the visit card says the visits stopped updating instead of 確定値", () => {
@@ -309,6 +305,27 @@ describe("widgets/uorakutensales/daily-check-section", () => {
   };
   multiTable.total = multiTable.totals[2];
 
+  it("each shop and each platform total carries its platform's mark; the company total does not", () => {
+    render(<ShopTable table={multiTable} metric="orders" shopColors={{}} t={tl} />);
+
+    const markOf = (row) => row.querySelector("[data-platform]")?.dataset.platform ?? null;
+    expect(markOf(screen.getByRole("row", { name: /^uoworld/ }))).toBe("amazon");
+    expect(markOf(screen.getByRole("row", { name: /^A(?!mazon)/ }))).toBe("rakuten");
+    expect(markOf(screen.getByRole("row", { name: /^楽天 計/ }))).toBe("rakuten");
+    expect(markOf(screen.getByRole("row", { name: /^Amazon 計/ }))).toBe("amazon");
+    expect(markOf(screen.getByRole("row", { name: /^全社 計/ }))).toBe(null);
+    // the mark is drawn, the platform's name is what a screen reader hears
+    expect(screen.getByRole("row", { name: /^uoworld/ }).querySelector("[data-platform]")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+  });
+
+  it("a shop row that names no platform draws no mark", () => {
+    render(<ShopTable table={table} metric="orders" shopColors={{}} t={t} />);
+    expect(screen.getByRole("row", { name: /^A/ }).querySelector("[data-platform]")).toBeNull();
+  });
+
   it("the shop table names Amazon shops and closes with a line per platform and the company", () => {
     render(<ShopTable table={multiTable} metric="orders" shopColors={{}} t={tl} />);
 
@@ -333,12 +350,12 @@ describe("widgets/uorakutensales/daily-check-section", () => {
     expect(within(company).getAllByRole("cell")[1]).toHaveTextContent(/^—$/);
   });
 
-  it("an Amazon shop's 売上 still stands against its own week; 楽天's does not", () => {
+  it("every shop's 売上 stands against its own week, on either platform", () => {
     render(<ShopTable table={multiTable} metric="sales" shopColors={{}} t={tl} />);
 
     // ¥1,200 today against ¥3,000 a day
     expect(within(screen.getByRole("row", { name: /^uoworld/ })).getByText("40%")).toBeInTheDocument();
-    expect(within(screen.getByRole("row", { name: /^A(?!mazon)/ })).queryByText("40%")).not.toBeInTheDocument();
+    expect(within(screen.getByRole("row", { name: /^A(?!mazon)/ })).getByText("40%")).toBeInTheDocument();
   });
 
   const multiView = {

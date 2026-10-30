@@ -176,8 +176,7 @@ const REQUIRED_KEYS = [
   "todayNoTimeCorrection",
   "vsAvgOf",
   "lastDaysAndToday",
-  "lastDaysAfterCoupon",
-  "salesBasisNote",
+  "lastDays",
   "avgLine",
   "prevPaceDelta",
   "dailyAvgVsPrev",
@@ -212,13 +211,10 @@ const REQUIRED_KEYS = [
   "idleLeftOut",
   "visitsNote",
   "manYen",
-  // what the page cannot vouch for: missing shops, the coupon basis, stopped history
+  // what the page cannot vouch for: missing shops and stopped history
   "notFetched",
   "shopsAggregatedPartial",
-  "afterCouponTag",
-  "afterCoupon",
   "historyStopped",
-  "historyLagging",
   "visitsStale",
   // Amazon beside 楽天
   "platformRakuten",

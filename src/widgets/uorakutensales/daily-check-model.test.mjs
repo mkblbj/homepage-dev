@@ -9,7 +9,6 @@ import {
   buildShopTable,
   buildTodayView,
   deltaTone,
-  historyComparable,
   RANKING_DIM_BY_METRIC,
   todayVsAverage,
 } from "./daily-check-model.mjs";
@@ -40,15 +39,24 @@ function salesOf(shops) {
   };
 }
 
+// the company's days are the server's own sums, as /api/history/sales sends them
 function historyOf(shops) {
+  const sumOn = (date, key) => shops.reduce((a, s) => a + (s.daily.find((d) => d.date === date)?.[key] ?? 0), 0);
   return {
-    range: { dates: DATES },
+    range: { startDate: DATES[0], endDate: DATES[DATES.length - 1], dates: DATES },
     totals: {
       salesYen: shops.reduce((a, s) => a + s.totals.salesYen, 0),
       orderCount: 14,
       unitsSold: 14,
-      conversionRate: 1.9,
+      conversionRate: null,
     },
+    daily: DATES.map((date) => ({
+      date,
+      salesYen: sumOn(date, "salesYen"),
+      orderCount: sumOn(date, "orderCount"),
+      unitsSold: sumOn(date, "unitsSold"),
+      conversionRate: null,
+    })),
     shops,
   };
 }
@@ -285,13 +293,10 @@ test("todayVsAverage compares today's counts with the 7-day daily average", () =
   assert.deepEqual(todayVsAverage(buildTodayView(model), "orders"), { value: 6, avg: 2, pct: 300 });
 });
 
-test("todayVsAverage never sets today's yen against the after-coupon history", () => {
+// since 2026-10-30 楽天's week comes from the order API, like today: one yen basis
+test("todayVsAverage sets today's yen against the 7-day average too", () => {
   const { model } = fixture();
-  assert.equal(historyComparable("sales"), false);
-  assert.equal(historyComparable("orders"), true);
-  assert.equal(historyComparable("units"), true);
-  // the average is still there to draw; only the ratio is withheld
-  assert.deepEqual(todayVsAverage(buildTodayView(model), "sales"), { value: 60, avg: 200, pct: null });
+  assert.deepEqual(todayVsAverage(buildTodayView(model), "sales"), { value: 60, avg: 200, pct: 30 });
 });
 
 test("a shop left out of today's total reads unknown today, never zero", () => {
@@ -463,9 +468,4 @@ test("the month view adds counts and lists each platform's yen", () => {
   const alone = buildMonthView(monthly, null);
   assert.equal(alone.multi, false);
   assert.equal(alone.metrics, monthly.metrics);
-});
-
-test("Amazon's week stands against today even for 売上: both come from its Sales API", () => {
-  assert.equal(historyComparable("sales", "amazon"), true);
-  assert.equal(historyComparable("sales", "rakuten"), false);
 });

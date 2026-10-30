@@ -4,6 +4,7 @@
 import { DASH, mdLabel } from "widgets/uoperformance/performance-model.mjs";
 
 import { Delta, ShopName, visitDayLabel, visitsStale } from "./daily-check-section";
+import { PlatformName, ScopeName } from "./platform-mark";
 import { FALLBACK_SHOP_COLOR } from "./sales-model.mjs";
 
 const NS = "uorakutensales";
@@ -44,7 +45,7 @@ export function CustomerMixCard({ performance, scope = "", cardCls = "", t }) {
     <section className={`flex min-w-0 flex-col gap-3 p-5 ${cardCls}`}>
       <span className="flex flex-wrap items-baseline gap-x-2">
         <span className="text-base font-extrabold text-theme-900 dark:text-theme-50">
-          {scope ? `${scope} ` : ""}
+          <ScopeName scope={scope} />
           {t(`${PERF}.mixTitle`)}
         </span>
         <span className={`text-xs ${MUTED}`}>
@@ -182,7 +183,11 @@ export function ShopVisitsTable({
           <tfoot>
             <tr className="border-t-2 border-theme-300/70 font-bold dark:border-white/20">
               <th scope="row" className="px-2 py-2 text-left text-sm text-theme-900 dark:text-theme-50">
-                {scope ? t(`${NS}.platformTotal`, { platform: scope }) : t(`${NS}.total`)}
+                {scope ? (
+                  <PlatformName platform="rakuten" label={t(`${NS}.platformTotal`, { platform: scope })} />
+                ) : (
+                  t(`${NS}.total`)
+                )}
               </th>
               <td className={`${cell} text-theme-900 dark:text-theme-50`}>
                 {performance.visit === null ? DASH : fmt(t, performance.visit)}

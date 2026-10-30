@@ -77,10 +77,10 @@ function shiftDate(dateStr, days) {
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 }
 
-// uo-ec-manager rebuilds the 7-day history each morning (around 08:15 JST, with
-// retries). Until mid-morning a healthy history may still end the day before
-// yesterday; after that it should reach yesterday. Read off the sales snapshot's
-// own date and time, so the model stays pure.
+// uo-ec-manager closes yesterday into the 7-day history in its daily correction
+// just after midnight JST. The morning is left for retries: until then a healthy
+// history may still end the day before yesterday; after that it should reach
+// yesterday. Read off the sales snapshot's own date and time, so the model stays pure.
 const HISTORY_READY_HOUR = 10;
 
 function expectedHistoryEnd(sales) {
@@ -282,96 +282,64 @@ export function buildModel(sales, history, logos) {
     };
   });
 
-  // History context, keyed by shopName. Each shop keeps per-day detail so the
-  // per-shop mini charts can show date / 売上 / 件数 on hover. Each shop also
-  // keeps its own window: one whose history refresh fails holds on to its last
-  // one (2026-10-30: three shops stuck at 10/27 while the rest reached 10/29),
-  // so days are matched by date, never by position.
+  // The last 7 finished days (GET /api/history/sales). Since 2026-10-30 they come
+  // from the same order API as today, with the same yen (before coupons), one
+  // window for every shop, and the company's own day-by-day totals. The order
+  // API has no visitors, so every conversion rate is null: unknown, not 0%.
+  const day = (d) => ({
+    date: d.date,
+    md: mdLabel(d.date),
+    wd: weekdayJp(d.date),
+    sales: numberOrNull(d.salesYen),
+    orders: numberOrNull(d.orderCount),
+    units: numberOrNull(d.unitsSold),
+    cvr: numberOrNull(d.conversionRate),
+  });
+  // Per shop, for the rows and the mini charts. A shop the server left out of
+  // the totals (no API access, a stale read) is unknown for the week, as it is
+  // for today.
   const histByName = new Map();
   (history?.shops || []).forEach((s) => {
-    const daily = (s.daily || [])
-      .filter((d) => d?.date)
-      .map((d) => ({
-        date: d.date,
-        md: mdLabel(d.date),
-        wd: weekdayJp(d.date),
-        sales: toNumber(d.salesYen),
-        orders: toNumber(d.orderCount),
-        units: toNumber(d.unitsSold),
-        // per-shop daily CVR is authoritative — it comes straight from the API
-        cvr: toNumber(d.conversionRate),
-      }))
-      .sort((a, b) => a.date.localeCompare(b.date));
+    const counted = countedInTotals(s);
     histByName.set(s.shopName, {
-      total: toNumber(s?.totals?.salesYen),
-      orders: toNumber(s?.totals?.orderCount),
-      units: toNumber(s?.totals?.unitsSold),
-      cvr: toNumber(s?.totals?.conversionRate),
-      daily,
-      endDate: daily.length ? daily[daily.length - 1].date : "",
+      total: counted ? numberOrNull(s?.totals?.salesYen) : null,
+      orders: counted ? numberOrNull(s?.totals?.orderCount) : null,
+      units: counted ? numberOrNull(s?.totals?.unitsSold) : null,
+      cvr: counted ? numberOrNull(s?.totals?.conversionRate) : null,
+      daily: counted ? (s.daily || []).filter((d) => d?.date).map(day) : [],
     });
   });
-  // The company totals add up each shop's own window, so the averages stay a
-  // sum of per-shop daily averages and agree with the shop rows.
-  const grandTotal = toNumber(history?.totals?.salesYen);
-  const grandOrders = toNumber(history?.totals?.orderCount);
-  const grandUnits = toNumber(history?.totals?.unitsSold);
-  const grandCvr = toNumber(history?.totals?.conversionRate);
+  // With no fresh shop at all the server nulls the totals: there is no week.
+  const histTotals = history?.ok === false ? null : history?.totals;
+  const hasHistory = numberOrNull(histTotals?.salesYen) !== null;
+  const grandTotal = hasHistory ? toNumber(histTotals.salesYen) : 0;
+  const grandOrders = hasHistory ? toNumber(histTotals.orderCount) : 0;
+  const grandUnits = hasHistory ? toNumber(histTotals.unitsSold) : 0;
+  const grandCvr = hasHistory ? numberOrNull(histTotals.conversionRate) : null;
   const nDays = toNumber(history?.range?.days) || (history?.range?.dates || []).length || 7;
   const avg = grandTotal / nDays;
 
-  // The company chart keeps only the days every shop has: a day some shops are
-  // missing from would read as a slump.
-  const withDays = [...histByName.values()].filter((h) => h.daily.length);
-  const dates = withDays.length
-    ? withDays[0].daily.map((d) => d.date).filter((date) => withDays.every((h) => h.daily.some((d) => d.date === date)))
-    : [];
-
-  // the newest window any shop holds, which the shop rows mostly cover, and the
-  // shops still on an older one
-  const latestEnd = withDays.reduce((end, h) => (h.endDate > end ? h.endDate : end), "");
-  const newest = withDays.find((h) => h.endDate === latestEnd);
-  const lagging = [...histByName.entries()].filter(([, h]) => h.daily.length && h.endDate < latestEnd);
-  const laggingEnd = lagging.reduce((end, [, h]) => (!end || h.endDate < end ? h.endDate : end), "");
+  const startDate = normalizeText(history?.range?.startDate);
+  const endDate = normalizeText(history?.range?.endDate);
   const expectedEnd = expectedHistoryEnd(sales);
-  const week = newest
-    ? {
-        label: `${newest.daily[0].md}–${mdLabel(latestEnd)}`,
-        endMd: mdLabel(latestEnd),
-        // even the newest window is older than a healthy morning refresh leaves
-        behind: Boolean(expectedEnd) && latestEnd < expectedEnd,
-        lagging: lagging.map(([name]) => name),
-        laggingEndMd: mdLabel(laggingEnd),
-      }
-    : null;
+  const week =
+    hasHistory && startDate && endDate
+      ? {
+          label: `${mdLabel(startDate)}–${mdLabel(endDate)}`,
+          endMd: mdLabel(endDate),
+          // the window is older than a healthy daily correction leaves it
+          behind: Boolean(expectedEnd) && endDate < expectedEnd,
+        }
+      : null;
 
-  // daily totals across shops (for the area chart + hover crosshair).
-  // A conversion rate cannot be summed, so the all-shop figure is derived: each
-  // shop-day's visits are recovered as orders / (cvr/100), summed, then divided
-  // back. Exact within a day; it can drift slightly from the API's own range
-  // total, which additionally de-duplicates visitors across days.
-  const dailyTotals = dates.map((date) => {
-    let s = 0;
-    let o = 0;
-    let u = 0;
-    let visits = 0;
-    withDays.forEach((h) => {
-      const d = h.daily.find((day) => day.date === date);
-      s += d.sales;
-      o += d.orders;
-      u += d.units;
-      if (d.cvr > 0) visits += (d.orders * 100) / d.cvr;
-    });
-    return {
-      date,
-      wd: weekdayJp(date),
-      md: mdLabel(date),
-      sales: s,
-      orders: o,
-      units: u,
-      cvr: visits > 0 ? (o / visits) * 100 : 0,
-    };
-  });
+  // The company's days for the charts, as the server added them up. A day it
+  // could not add up is left out rather than drawn as 0.
+  const dailyTotals = hasHistory
+    ? (history?.daily || [])
+        .filter((d) => d?.date)
+        .map(day)
+        .filter((d) => d.sales !== null && d.orders !== null && d.units !== null)
+    : [];
   const maxDaily = Math.max(1, ...dailyTotals.map((d) => d.sales));
   const heroChart = spark(
     dailyTotals.map((d) => d.sales),
@@ -394,7 +362,7 @@ export function buildModel(sales, history, logos) {
     .slice()
     .sort((a, b) => (b.sales ?? -1) - (a.sales ?? -1))
     .map((s) => {
-      const h = histByName.get(s.name) || { total: 0, orders: 0, cvr: 0, daily: [] };
+      const h = histByName.get(s.name) || { total: null, orders: null, units: null, cvr: null, daily: [] };
       const share = ratio(s.sales, rtTotal);
       return {
         name: s.name,
@@ -406,7 +374,7 @@ export function buildModel(sales, history, logos) {
         rtBarPct: s.sales === null ? null : (s.sales / rtMax) * 100,
         // this shop's share of the trailing-7d total — the "normal" baseline the
         // bullet compares today's share against (today ≥ baseline = over-indexing).
-        h7Share: grandTotal > 0 ? (h.total / grandTotal) * 100 : 0,
+        h7Share: grandTotal > 0 && h.total !== null ? (h.total / grandTotal) * 100 : 0,
         h7Total: h.total,
         h7Units: h.units,
         h7Orders: h.orders,
@@ -458,7 +426,7 @@ export function buildModel(sales, history, logos) {
     maxDaily,
     heroChart,
     shareScale,
-    hasHistory: Boolean(history && (history.shops || []).length),
+    hasHistory,
   };
 }
 
