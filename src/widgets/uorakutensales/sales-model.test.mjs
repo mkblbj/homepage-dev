@@ -688,52 +688,97 @@ test("buildPeaks never treats a dateless company record as a legendary day", () 
 
 // ---- monthly rollup ----
 
-// Trimmed from the live GET /api/sales/monthly response on 2026-09-04 11:59 JST.
-// The figures are real, so the derived pace below is verifiable against the
-// service: history 9/1-9/3 (2,245,871) + today live (714,904) = 2,960,775.
+// Trimmed from the live GET /api/sales/monthly response on 2026-09-04 11:59 JST,
+// reshaped to the order-API contract of 2026-10-30 (source times, per-shop
+// status / includedInTotals, coverage counts). The figures are real, so the
+// derived pace below is verifiable: 9/1-9/3 (2,245,871) + today (714,904) = 2,960,775.
+const ready = (row) => ({ status: "ready", includedInTotals: true, ...row });
 const monthlyPayload = {
   ok: true,
   partial: false,
-  generatedAtJST: "2026-09-04 11:59 JST",
+  source: "rakuten-order-api",
+  generatedAtJST: "2026-09-04 11:59:02 JST",
   shopCount: 3,
   currentMonth: {
     month: "2026-09",
     status: "live",
+    ok: true,
+    partial: false,
     completedThroughDate: "2026-09-03",
     liveDate: "2026-09-04",
-    updatedAtJST: "2026-09-04 11:55 JST",
+    updatedAtJST: "2026-09-04 11:55:00 JST",
+    sourceUpdatedAtJST: "2026-09-04 11:55:00 JST",
+    shopCount: 3,
+    updatedShopCount: 3,
     totals: { salesYen: 2960775, orderCount: 2439, unitsSold: 2721 },
     shops: [
-      { shopName: "松武", salesYen: 626125, orderCount: 597, unitsSold: 637 },
-      { shopName: "3911", salesYen: 1408644, orderCount: 992, unitsSold: 1173 },
-      { shopName: "kurumu", salesYen: 0, orderCount: 0, unitsSold: 0 },
+      ready({ shopName: "松武", salesYen: 626125, orderCount: 597, unitsSold: 637 }),
+      ready({ shopName: "3911", salesYen: 1408644, orderCount: 992, unitsSold: 1173 }),
+      ready({ shopName: "kurumu", salesYen: 0, orderCount: 0, unitsSold: 0 }),
     ],
   },
   previousMonth: {
     month: "2026-08",
     status: "complete",
+    ok: true,
+    partial: false,
     startDate: "2026-08-01",
     endDate: "2026-08-31",
+    shopCount: 3,
+    updatedShopCount: 3,
     totals: { salesYen: 26128885, orderCount: 24619, unitsSold: 26786 },
     shops: [
-      { shopName: "松武", salesYen: 6805926, orderCount: 5889, unitsSold: 6491 },
-      { shopName: "3911", salesYen: 9548875, orderCount: 10267, unitsSold: 11106 },
-      { shopName: "kurumu", salesYen: 0, orderCount: 0, unitsSold: 0 },
+      ready({ shopName: "松武", salesYen: 6805926, orderCount: 5889, unitsSold: 6491 }),
+      ready({ shopName: "3911", salesYen: 9548875, orderCount: 10267, unitsSold: 11106 }),
+      ready({ shopName: "kurumu", salesYen: 0, orderCount: 0, unitsSold: 0 }),
     ],
   },
 };
 
 // The matching realtime snapshot — today's share of the running month total.
-// Its generatedAtJST is what the rollup republishes as currentMonth.updatedAtJST
-// whenever it folds today in, so the two must agree for the pair to be coherent.
+// Both are built from the same order-API read, so they carry the same
+// sourceUpdatedAtJST; generatedAtJST is each response's own build time and
+// differs by a second or two even when the data is identical.
 const monthlyToday = {
-  generatedAtJST: "2026-09-04 11:55 JST",
+  generatedAtJST: "2026-09-04 11:55:02 JST",
+  sourceUpdatedAtJST: "2026-09-04 11:55:00 JST",
   totals: { salesYen: 714904, orderCount: 161, unitsSold: 286 },
   shops: [
-    { shopName: "松武", salesYen: 52107, orderCount: 40, unitsSold: 48 },
-    { shopName: "3911", salesYen: 605294, orderCount: 68, unitsSold: 181 },
-    { shopName: "kurumu", salesYen: 0, orderCount: 0, unitsSold: 0 },
+    ready({ shopName: "松武", salesYen: 52107, orderCount: 40, unitsSold: 48 }),
+    ready({ shopName: "3911", salesYen: 605294, orderCount: 68, unitsSold: 181 }),
+    ready({ shopName: "kurumu", salesYen: 0, orderCount: 0, unitsSold: 0 }),
   ],
+};
+
+// kurumu has no order-API credentials: it is in every list with null figures
+// and left out of both months' totals, so last month can never be "complete".
+const unconfigured = (shopName) => ({
+  shopName,
+  status: "unconfigured",
+  includedInTotals: false,
+  salesYen: null,
+  orderCount: null,
+  unitsSold: null,
+  lastError: "RMS_API_NOT_CONFIGURED",
+});
+const withoutKurumu = (month, totals, status) => ({
+  ...month,
+  status,
+  partial: true,
+  updatedShopCount: 2,
+  totals,
+  shops: [...month.shops.filter((s) => s.shopName !== "kurumu"), unconfigured("kurumu")],
+});
+const monthlyWithoutKurumu = {
+  ...monthlyPayload,
+  partial: true,
+  // kurumu sold nothing in the base fixture, so the 2-shop totals are unchanged
+  currentMonth: withoutKurumu(monthlyPayload.currentMonth, monthlyPayload.currentMonth.totals, "provisional"),
+  previousMonth: withoutKurumu(monthlyPayload.previousMonth, monthlyPayload.previousMonth.totals, "provisional"),
+};
+const todayWithoutKurumu = {
+  ...monthlyToday,
+  shops: [...monthlyToday.shops.filter((s) => s.shopName !== "kurumu"), unconfigured("kurumu")],
 };
 
 const near = (actual, expected, eps = 0.01) =>
@@ -838,7 +883,8 @@ test("buildMonthly divides the whole total when the rollup carries no live day",
       status: "provisional",
       liveDate: null,
       // no live day → the stamp is the historical snapshot's, not today's
-      updatedAtJST: "2026-09-04 03:10 JST",
+      updatedAtJST: "2026-09-04 03:10:00 JST",
+      sourceUpdatedAtJST: "2026-09-04 03:10:00 JST",
       totals: { salesYen: 2245871, orderCount: 2278, unitsSold: 2435 },
       shops: [
         { shopName: "松武", salesYen: 574018, orderCount: 557, unitsSold: 589 },
@@ -857,8 +903,8 @@ test("buildMonthly divides the whole total when the rollup carries no live day",
 test("buildMonthly withholds the pace when the two snapshots disagree", () => {
   // A realtime payload one refresh newer than the rollup still subtracts to a
   // positive number, so the negative guard never fires — the average would just
-  // be quietly wrong. Only an exact stamp match proves they are the same read.
-  const m = buildMonthly(monthlyPayload, { ...monthlyToday, generatedAtJST: "2026-09-04 12:10 JST" });
+  // be quietly wrong. Only an exact source-time match proves they are the same read.
+  const m = buildMonthly(monthlyPayload, { ...monthlyToday, sourceUpdatedAtJST: "2026-09-04 12:10:00 JST" });
   assert.equal(m.current.hasLiveDay, true);
   for (const dim of MONTH_DIMS) {
     assert.equal(m.metrics[dim].pace, null, `${dim} company pace`);
@@ -873,10 +919,78 @@ test("buildMonthly withholds the pace when the two snapshots disagree", () => {
 test("buildMonthly does not accept two blank stamps as a match", () => {
   const payload = {
     ...monthlyPayload,
-    currentMonth: { ...monthlyPayload.currentMonth, updatedAtJST: null },
+    currentMonth: { ...monthlyPayload.currentMonth, updatedAtJST: null, sourceUpdatedAtJST: null },
   };
-  const m = buildMonthly(payload, { ...monthlyToday, generatedAtJST: null });
+  const m = buildMonthly(payload, { ...monthlyToday, generatedAtJST: null, sourceUpdatedAtJST: null });
   assert.equal(m.metrics.sales.pace, null);
+});
+
+test("buildMonthly pairs the two reads by source time, not by response build time", () => {
+  // the live case of 2026-10-30: same read, build times two seconds apart
+  const m = buildMonthly(monthlyPayload, { ...monthlyToday, generatedAtJST: "2026-09-04 11:55:59 JST" });
+  near(m.metrics.sales.pace, 748623.67);
+  // a build time that happens to equal the rollup's stamp proves nothing on its own
+  const n = buildMonthly(monthlyPayload, {
+    ...monthlyToday,
+    generatedAtJST: "2026-09-04 11:55:00 JST",
+    sourceUpdatedAtJST: "2026-09-04 11:40:00 JST",
+  });
+  assert.equal(n.metrics.sales.pace, null);
+});
+
+test("buildMonthly reports which shops the month's totals cover", () => {
+  assert.deepEqual(buildMonthly(monthlyPayload, monthlyToday).current.coverage, { covered: 3, total: 3 });
+  assert.deepEqual(buildMonthly(monthlyWithoutKurumu, todayWithoutKurumu).current.coverage, { covered: 2, total: 3 });
+});
+
+test("buildMonthly compares with a provisional last month that covers the same shops", () => {
+  // kurumu has no order API in either month: 2/3 shops against the same 2/3
+  const m = buildMonthly(monthlyWithoutKurumu, todayWithoutKurumu);
+  assert.deepEqual(m.previous, { month: "2026-08", status: "provisional", days: 31 });
+  assert.equal(m.metrics.sales.previous, 26128885);
+  near(m.metrics.sales.pace, 748623.67);
+  near(m.metrics.sales.paceDeltaPct, -11.18);
+  near(m.shops.find((s) => s.name === "松武").metrics.sales.paceDeltaPct, -12.85);
+  const kurumu = m.shops.find((s) => s.name === "kurumu");
+  assert.equal(kurumu.metrics.sales.current, null);
+  assert.equal(kurumu.metrics.sales.previous, null);
+});
+
+test("buildMonthly drops the company comparison when the months cover different shops", () => {
+  // this month 2/3 shops, last month all 3: the totals measure different things
+  const payload = { ...monthlyWithoutKurumu, previousMonth: monthlyPayload.previousMonth };
+  const m = buildMonthly(payload, todayWithoutKurumu);
+  assert.equal(m.previous, null);
+  assert.equal(m.metrics.sales.previous, null);
+  assert.equal(m.metrics.sales.paceDeltaPct, null);
+  near(m.metrics.sales.pace, 748623.67); // this month's own pace stands
+  // a shop counted in both months still gets its own comparison
+  near(m.shops.find((s) => s.name === "松武").metrics.sales.paceDeltaPct, -12.85);
+});
+
+test("buildMonthly skips a shop's comparison when either month left it out of the totals", () => {
+  const payload = {
+    ...monthlyPayload,
+    partial: true,
+    currentMonth: {
+      ...monthlyPayload.currentMonth,
+      shops: monthlyPayload.currentMonth.shops.map((s) =>
+        s.shopName === "松武" ? { ...s, status: "stale", includedInTotals: false } : s,
+      ),
+    },
+    previousMonth: {
+      ...monthlyPayload.previousMonth,
+      shops: monthlyPayload.previousMonth.shops.map((s) =>
+        s.shopName === "3911" ? { ...s, status: "stale", includedInTotals: false } : s,
+      ),
+    },
+  };
+  const m = buildMonthly(payload, monthlyToday);
+  const matsutake = m.shops.find((s) => s.name === "松武");
+  assert.equal(matsutake.metrics.sales.current, 626125); // the old figure is still shown
+  assert.equal(matsutake.metrics.sales.previous, null);
+  assert.equal(matsutake.metrics.sales.paceDeltaPct, null);
+  assert.equal(m.shops.find((s) => s.name === "3911").metrics.sales.previous, null);
 });
 
 test("buildMonthly drops the comparison when last month is not complete", () => {

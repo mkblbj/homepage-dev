@@ -25,6 +25,7 @@ function salesOf(shops) {
   const sum = (k) => shops.reduce((acc, s) => acc + s[k], 0);
   return {
     generatedAtJST: STAMP,
+    sourceUpdatedAtJST: STAMP,
     totals: { salesYen: sum("salesYen"), orderCount: sum("orderCount"), unitsSold: sum("unitsSold") },
     shops,
   };
@@ -53,6 +54,7 @@ function monthlyOf(sales, current, previous) {
       completedThroughDate: "2026-10-24",
       liveDate: "2026-10-25",
       updatedAtJST: STAMP,
+      sourceUpdatedAtJST: STAMP,
       totals: { salesYen: current.reduce((a, s) => a + s.salesYen, 0), orderCount: 10, unitsSold: 10 },
       shops: current,
     },
