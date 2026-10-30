@@ -37,6 +37,13 @@ function isZero(values) {
   return !values || (!(values.sales > 0) && !(values.orders > 0));
 }
 
+// The 7-day history still comes from R-Karte, whose yen are after coupons;
+// today and the month come from the order API, before coupons. Counts mean the
+// same on both sides, so only 売上 is never set against the history.
+export function historyComparable(metric) {
+  return metric !== "sales";
+}
+
 function monthOf(shop) {
   if (!shop) return { month: null, monthDelta: null };
   const m = shop.metrics;
@@ -59,7 +66,7 @@ export function buildShopTable({ model, monthly, performance }) {
   const monthOrder = (monthly?.shops || []).map((s) => s.name);
   const rest = (model?.rows || [])
     .filter((r) => !monthByName.has(r.name))
-    .sort((a, b) => b.rtSales - a.rtSales)
+    .sort((a, b) => (b.rtSales ?? -1) - (a.rtSales ?? -1))
     .map((r) => r.name);
 
   const rows = [];
@@ -67,27 +74,31 @@ export function buildShopTable({ model, monthly, performance }) {
   [...monthOrder, ...rest].forEach((name) => {
     const live = todayByName.get(name);
     const visits = visitsByName.get(name);
+    const today = live ? triple(live.rtSales, live.rtUnits, live.rtOrders) : null;
     const row = {
       name,
-      // a shop missing from the live snapshot is unknown today, not a ¥0 day
-      today: live ? triple(live.rtSales, live.rtUnits, live.rtOrders) : null,
+      // a shop missing from the live snapshot, or left out of today's total, is
+      // unknown today, not a ¥0 day
+      today: isKnown(today) ? today : null,
       avg: hasHistory && live ? triple(live.h7Total / nDays, live.h7Units / nDays, live.h7Orders / nDays) : null,
       cvr: hasHistory && live ? live.cvr : null,
       ...monthOf(monthByName.get(name)),
       visits: visits?.visit ?? null,
       visitDelta: medianDelta(visits),
     };
+    // nothing known for today or the month: the shop is on the list but not read
+    row.unknown = !isKnown(row.today) && !isKnown(row.month);
     const week = live ? { sales: live.h7Total, orders: live.h7Orders } : null;
     // "no sales today, this week or this month" is only said with every figure in hand
-    const isIdle =
-      isKnown(row.today) && isKnown(row.month) && isZero(row.today) && isZero(week) && isZero(row.month);
+    const isIdle = isKnown(row.today) && isKnown(row.month) && isZero(row.today) && isZero(week) && isZero(row.month);
     (isIdle ? idle : rows).push(row);
   });
 
   const m = monthly?.metrics;
+  const companyToday = model ? triple(model.rtTotal, model.rtUnits, model.rtOrders) : null;
   const total = {
     name: null,
-    today: triple(model?.rtTotal ?? 0, model?.rtUnits ?? 0, model?.rtOrders ?? 0),
+    today: isKnown(companyToday) ? companyToday : null,
     avg: hasHistory ? triple(model.avg, model.avgUnits, model.avgOrders) : null,
     cvr: hasHistory ? model.grandCvr : null,
     month: m ? triple(m.sales.current, m.units.current, m.orders.current) : null,
@@ -105,7 +116,8 @@ const AVG_KEY = { sales: "avg", units: "avgUnits", orders: "avgOrders" };
 // today against the trailing 7-day daily average — a raw ratio with no
 // time-of-day correction, so the UI never colours it as good or bad
 export function todayVsAverage(model, metric) {
-  const value = model?.[TODAY_KEY[metric]] ?? 0;
+  const value = model?.[TODAY_KEY[metric]] ?? null;
   const avg = model?.hasHistory ? (model[AVG_KEY[metric]] ?? null) : null;
-  return { value, avg, pct: avg > 0 ? (value / avg) * 100 : null };
+  const comparable = value !== null && historyComparable(metric);
+  return { value, avg, pct: comparable && avg > 0 ? (value / avg) * 100 : null };
 }

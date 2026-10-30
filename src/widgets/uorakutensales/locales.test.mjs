@@ -175,7 +175,9 @@ const REQUIRED_KEYS = [
   "todayLabel",
   "todayNoTimeCorrection",
   "vsAvgOf",
-  "last7AndToday",
+  "lastDaysAndToday",
+  "lastDaysAfterCoupon",
+  "salesBasisNote",
   "avgLine",
   "prevPaceDelta",
   "dailyAvgVsPrev",
@@ -210,6 +212,14 @@ const REQUIRED_KEYS = [
   "idleLeftOut",
   "visitsNote",
   "manYen",
+  // what the page cannot vouch for: missing shops, the coupon basis, stopped history
+  "notFetched",
+  "shopsAggregatedPartial",
+  "afterCouponTag",
+  "afterCoupon",
+  "historyStopped",
+  "historyLagging",
+  "visitsStale",
 ];
 
 function loadNamespace(locale) {
