@@ -291,3 +291,91 @@ test("shapeProxyResponse keeps a device evidence row's own page only when it is 
   assert.equal(pageOf("b2"), null);
   assert.equal(pageOf("d4"), null);
 });
+
+test("item boards keep only what the page shows", () => {
+  const item = {
+    rank: 1,
+    itemManagementNumber: "case-1",
+    itemNumber: "101X long item number",
+    itemName: "a very long title the page never shows",
+    imageUrl: "https://img/1.jpg",
+    itemUrl: "https://item/1",
+    salesYen: 1000,
+    unitsSold: 2,
+    orderCount: 1,
+    averageUnitPriceYen: 500,
+    shopCount: 2,
+    shopBreakdown: [
+      { shopName: "3911", salesYen: 600 },
+      { shopName: "0406", salesYen: 400 },
+    ],
+  };
+  const board = { shopCount: 1, overall: { items: [item] }, shops: [{ shopName: "3911", items: [item] }] };
+  const today = shapeProxyResponse("ranking", { sourceDateJST: "2026-10-30", rankings: { sales: board } });
+  const slim = today.rankings.sales.overall.items[0];
+  assert.deepEqual(slim, {
+    rank: 1,
+    itemManagementNumber: "case-1",
+    imageUrl: "https://img/1.jpg",
+    itemUrl: "https://item/1",
+    salesYen: 1000,
+    unitsSold: 2,
+    orderCount: 1,
+    averageUnitPriceYen: 500,
+    shopCount: 2,
+    shopBreakdown: [{ shopName: "3911" }],
+  });
+  assert.equal(today.sourceDateJST, "2026-10-30");
+  assert.deepEqual(today.rankings.sales.shops[0].items[0], slim);
+
+  // without either item number, a short title stays as the handle
+  const bare = { ...item, itemManagementNumber: "", itemNumber: "" };
+  const kept = shapeProxyResponse("ranking", { rankings: { sales: { overall: { items: [bare] }, shops: [] } } });
+  assert.equal(kept.rankings.sales.overall.items[0].itemName, "a very long title the page never shows".slice(0, 40));
+
+  // each month's boards are trimmed the same way
+  const monthly = shapeProxyResponse("rankingMonthly", {
+    currentMonth: { month: "2026-10", rankings: { sales: board } },
+    previousMonth: { month: "2026-09", rankings: { sales: board } },
+  });
+  assert.deepEqual(monthly.previousMonth.rankings.sales.overall.items[0], slim);
+  assert.equal(monthly.currentMonth.month, "2026-10");
+});
+
+test("Amazon item boards drop titles and catalog relationships", () => {
+  const item = {
+    rank: 1,
+    asin: "B0F",
+    sku: "rs-1",
+    itemName: "UOWORLD | a long catalog title",
+    imageUrl: "https://img/a.jpg",
+    itemUrl: "https://amazon/dp/B0F",
+    currency: "JPY",
+    salesAmount: null,
+    unitsSold: 1,
+    orderCount: 1,
+    variations: { color: "黒" },
+    relationships: [{ type: "VARIATION" }],
+  };
+  const today = shapeProxyResponse("amazonRanking", {
+    ok: true,
+    shops: [{ shopName: "uoworld", status: "ready", rankings: { sales: [item], units: [item], orderCount: [item] } }],
+  });
+  assert.deepEqual(today.shops[0].rankings.units[0], {
+    rank: 1,
+    sku: "rs-1",
+    asin: "B0F",
+    imageUrl: "https://img/a.jpg",
+    itemUrl: "https://amazon/dp/B0F",
+    currency: "JPY",
+    salesAmount: null,
+    unitsSold: 1,
+    orderCount: 1,
+  });
+  assert.equal(today.shops[0].status, "ready");
+  const monthly = shapeProxyResponse("amazonRankingMonthly", {
+    currentMonth: { shops: [{ shopName: "uoworld", rankings: { sales: [item] } }] },
+    previousMonth: { shops: [] },
+  });
+  assert.equal(monthly.currentMonth.shops[0].rankings.sales[0].variations, undefined);
+});

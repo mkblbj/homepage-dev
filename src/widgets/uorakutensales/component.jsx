@@ -15,6 +15,9 @@
  *   "amazonSales"   → GET /api/amazon/sales          Amazon today, this month, last month
  *   "amazonHistory" → GET /api/amazon/history/sales  Amazon's last seven finished days
  *   "amazonRanking" → GET /api/amazon/item-rankings  Amazon's item boards, per shop
+ *   "rankingMonthly" / "amazonRankingMonthly" → this and last month's item boards,
+ *                     read only while 今月 or 先月 is picked on the best sellers
+ *   "amazonPeaks"   → GET /api/amazon/history/peaks  each Amazon shop's best day
  *
  * Amazon shops sit beside 楽天's as peers. Counts add up across platforms;
  * yen never do, since each platform measures its amounts its own way.
@@ -30,12 +33,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { buildPerformanceModel, DASH } from "widgets/uoperformance/performance-model.mjs";
 
-import { buildAmazon, buildAmazonBoards } from "./amazon-model.mjs";
+import { amazonTrendRow, buildAmazon, buildAmazonBoards, withAmazonPeaks } from "./amazon-model.mjs";
 import { buildMonthView, buildShopTable, buildTodayView, RANKING_DIM_BY_METRIC } from "./daily-check-model.mjs";
 import {
   historyNotes,
   MetricSwitch,
   MonthCard,
+  PlatformTag,
   ShopTable,
   TodayCard,
   VisitCard,
@@ -319,7 +323,7 @@ function ShopMiniChart({ points, mode, cvr = 0, t, height = 32 }) {
           <span className="block text-[8.5px] font-medium tabular-nums text-slate-400">
             {fmt(t, Math.round(avgOrders))}
             {t(`${NS}.ordersUnit`)}
-            {t(`${NS}.perDay`)} · CVR {cvr.toFixed(2)}%
+            {t(`${NS}.perDay`)} · CVR {cvr === null ? DASH : `${cvr.toFixed(2)}%`}
           </span>
         </div>
       ) : null}
@@ -354,7 +358,8 @@ function ShopMiniChart({ points, mode, cvr = 0, t, height = 32 }) {
 }
 
 // ---- daily area chart with hover (aggregate across shops) ----
-function DailyChart({ model, mode, onModeChange, t }) {
+// `scope` names whose chart it is once the board shows several platforms
+function DailyChart({ model, mode, onModeChange, scope = "", t }) {
   const [hover, setHover] = useState(null);
   const [avgHover, setAvgHover] = useState(false);
   // hover is an index into model.days; a background refresh can shrink model.days
@@ -369,6 +374,7 @@ function DailyChart({ model, mode, onModeChange, t }) {
     <div className="flex min-w-0 flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
         <span className="min-w-0 truncate text-[10.5px] font-bold tracking-wide text-theme-600 dark:text-theme-300">
+          {scope ? `${scope} ` : ""}
           {t(`${NS}.dailyTrend`)}{" "}
           <span className="text-[9px] font-medium text-theme-500 dark:text-theme-400">
             · {t(`${NS}.excludesToday`)}
@@ -684,7 +690,58 @@ const DIM_LABEL = { orderCount: "sortOrders", sales: "sortSales", units: "sortUn
 // The metric comes from the daily check's switch. Six rows until opened; the
 // shop chips only appear once the reader asks for more, and closing the board
 // goes back to every shop.
-function RankingSection({ ranking, dim, cardCls, t }) {
+const RANKING_PERIODS = [
+  ["today", "todayLabel"],
+  ["month", "thisMonth"],
+  ["previous", "lastMonth"],
+];
+
+function PeriodSwitch({ period, onPeriod, t }) {
+  return (
+    <div
+      role="group"
+      className="flex shrink-0 gap-0.5 rounded-lg border border-theme-300/60 bg-theme-100/50 p-0.5 dark:border-theme-600/60 dark:bg-theme-900/30"
+    >
+      {RANKING_PERIODS.map(([key, label]) => (
+        <button
+          key={key}
+          type="button"
+          aria-pressed={period === key}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onPeriod(key);
+          }}
+          className={`rounded-md px-2.5 py-0.5 text-xs font-bold transition-colors ${
+            period === key
+              ? "bg-theme-700 text-white dark:bg-theme-100 dark:text-theme-900"
+              : "text-theme-600 hover:bg-theme-200/60 dark:text-theme-300 dark:hover:bg-theme-700/60"
+          }`}
+        >
+          {t(`${NS}.${label}`)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// `ranking` is null while a month's boards are still being read
+function RankingSection({ ranking, period = "today", onPeriod = () => {}, dim, cardCls, t }) {
+  if (!ranking) {
+    return (
+      <section className={`flex flex-col gap-3 p-5 ${cardCls}`}>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <span className="text-base font-extrabold text-theme-900 dark:text-theme-50">{t(`${NS}.bestSellers`)}</span>
+          <PeriodSwitch period={period} onPeriod={onPeriod} t={t} />
+        </div>
+        <span className="py-4 text-center text-xs text-theme-500 dark:text-theme-400">{t(`${NS}.boardLoading`)}</span>
+      </section>
+    );
+  }
+  return <RankingBoards ranking={ranking} period={period} onPeriod={onPeriod} dim={dim} cardCls={cardCls} t={t} />;
+}
+
+function RankingBoards({ ranking, period, onPeriod, dim, cardCls, t }) {
   const [shop, setShop] = useState("__all__");
   // index into RANKING_STEPS — progressive reveal (6 → 20 → 50 → 100)
   const [step, setStep] = useState(0);
@@ -744,6 +801,7 @@ function RankingSection({ ranking, dim, cardCls, t }) {
     <section className={`flex flex-col gap-3 p-5 ${cardCls}`}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <span className="text-base font-extrabold text-theme-900 dark:text-theme-50">{t(`${NS}.bestSellers`)}</span>
+        <PeriodSwitch period={period} onPeriod={onPeriod} t={t} />
         <span className="text-xs tabular-nums text-theme-600 dark:text-theme-300">
           {ranking.sourceDate} · {meta} · {t(`${NS}.rankedBy`, { metric: t(`${NS}.${DIM_LABEL[activeDim]}`) })}
         </span>
@@ -839,11 +897,12 @@ function peakValueText(dim, value, t) {
 }
 
 // company record + the stacked shop contribution for that single day
-function RecordCard({ dim, record, shopColors, sinceYear, t }) {
+function RecordCard({ dim, record, shopColors, sinceYear, scope = "", t }) {
   const tone = PEAK_TONE[dim] ?? PEAK_TONE.sales;
   return (
     <div className={`flex min-w-0 flex-col gap-1 rounded-xl border p-3 ${tone.card}`}>
       <span className={`text-[9.5px] font-extrabold uppercase tracking-[0.1em] ${tone.label}`}>
+        {scope ? `${scope} ` : ""}
         {t(`${NS}.${PEAK_LABEL_KEY[dim] ?? "recordSales"}`)}
       </span>
       <span className={`text-[22px] font-extrabold leading-none tabular-nums ${tone.value}`}>
@@ -877,7 +936,9 @@ function RecordCard({ dim, record, shopColors, sinceYear, t }) {
   );
 }
 
-function PeaksSection({ peaks, shopColors, cardCls, t }) {
+// `scope` labels the company record cards, which stay 楽天's once Amazon's
+// shops join the shop bests below them
+function PeaksSection({ peaks, scope = "", shopColors, cardCls, t }) {
   const [dim, setDim] = useState(DEFAULT_PEAK_DIM);
   // a dimension can disappear across refreshes → fall back to what is present
   const activeDim = peaks.shopBests[dim] ? dim : peaks.available.find((d) => peaks.shopBests[d]);
@@ -908,7 +969,10 @@ function PeaksSection({ peaks, shopColors, cardCls, t }) {
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
         <span className="text-[12px] font-bold text-theme-700 dark:text-theme-200">{t(`${NS}.allTimeRecords`)}</span>
         <span className="text-[10px] font-semibold tabular-nums text-theme-700 dark:text-theme-200">
+          {scope ? `${scope} ` : ""}
           {t(`${NS}.peaksCoverage`, { year: peaks.coverage.startYear, count: peaks.coverage.shopCount })}
+          {/* Amazon's API only serves the last two years: its bests cover less */}
+          {peaks.amazonSince ? ` · ${t(`${NS}.peaksCoverageAmazon`, { date: peaks.amazonSince })}` : ""}
         </span>
       </div>
 
@@ -924,6 +988,7 @@ function PeaksSection({ peaks, shopColors, cardCls, t }) {
             dim={d}
             record={peaks.records[d]}
             shopColors={shopColors}
+            scope={scope}
             sinceYear={
               d === "units" &&
               peaks.coverage.unitsStartYear &&
@@ -949,7 +1014,7 @@ function PeaksSection({ peaks, shopColors, cardCls, t }) {
             <div className="flex flex-wrap gap-1">
               {bests.map((b) => (
                 <span
-                  key={b.shopName}
+                  key={b.key ?? b.shopName}
                   className="inline-flex min-w-0 items-center gap-1 rounded-full border border-theme-300/70 bg-theme-100/60 px-1.5 py-0.5 text-[10px] tabular-nums dark:border-white/[0.18] dark:bg-white/[0.06]"
                 >
                   <span
@@ -957,6 +1022,7 @@ function PeaksSection({ peaks, shopColors, cardCls, t }) {
                     style={{ backgroundColor: shopColors[b.shopName] ?? FALLBACK_SHOP_COLOR }}
                   />
                   <span className="truncate font-semibold text-theme-800 dark:text-theme-100">{b.shopName}</span>
+                  {b.platform === "amazon" ? <PlatformTag platform="amazon" t={t} /> : null}
                   {b.noRecord ? (
                     <span className="text-[9.5px] font-medium text-theme-500 dark:text-theme-400">
                       {t(`${NS}.noRecord`)}
@@ -1027,11 +1093,14 @@ function ShopTrendCard({ row: r, mode, t }) {
         </span>
       ) : null}
       <div className="relative flex min-w-0 flex-col gap-1.5">
-        <span className="truncate text-[11px] font-semibold text-theme-900 dark:text-theme-50">{r.name}</span>
+        <span className="flex min-w-0 items-center gap-1">
+          <span className="truncate text-[11px] font-semibold text-theme-900 dark:text-theme-50">{r.name}</span>
+          {r.platform === "amazon" ? <PlatformTag platform="amazon" t={t} /> : null}
+        </span>
         <span className="flex items-baseline gap-0.5">
           <span className="text-[9px] font-bold text-theme-600 dark:text-theme-300">¥</span>
           <span className="text-[15px] font-bold leading-none tabular-nums text-theme-900 dark:text-theme-50">
-            {man(r.h7Total)}
+            {r.h7Total === null ? DASH : man(r.h7Total)}
           </span>
           <span className="text-[9px] font-medium text-theme-600 dark:text-theme-300">{t(`${NS}.manUnit`)}</span>
         </span>
@@ -1039,7 +1108,7 @@ function ShopTrendCard({ row: r, mode, t }) {
         <span className="border-t border-theme-300/30 pt-1.5 text-[9px] font-medium tabular-nums text-theme-600 dark:border-white/10 dark:text-theme-300">
           {fmt(t, r.h7Orders)}
           {t(`${NS}.ordersUnit`)} · {fmt(t, r.h7Units)}
-          {t(`${NS}.unitsShort`)} · CVR {r.cvr.toFixed(2)}%
+          {t(`${NS}.unitsShort`)} · CVR {r.cvr === null ? DASH : `${r.cvr.toFixed(2)}%`}
         </span>
       </div>
     </div>
@@ -1114,6 +1183,8 @@ export default function Component({ service }) {
   const [chartMode, setChartMode] = useState("line");
   // the daily check's metric: today, the month, the shop table and the best sellers — 件数 first
   const [metric, setMetric] = useState("orders");
+  // the best sellers' period: today, this month or last month
+  const [rankingPeriod, setRankingPeriod] = useState("today");
   // read after mount so the server render and the first client render agree
   const [analysisOpen, setAnalysisOpen] = useState(true);
   useEffect(() => {
@@ -1126,6 +1197,12 @@ export default function Component({ service }) {
   const { data: history, mutate: mutateHistory } = useWidgetAPI(widget, "history", { refreshInterval });
   const { data: logos } = useWidgetAPI(widget, "logos", { refreshInterval });
   const { data: rankingData, mutate: mutateRanking } = useWidgetAPI(widget, "ranking", { refreshInterval });
+  // the month boards are heavy: they are read only once someone picks 今月 / 先月
+  const monthBoards = rankingPeriod === "today" ? "" : "rankingMonthly";
+  const { data: rankingMonthlyData } = useWidgetAPI(widget, monthBoards, { refreshInterval });
+  const { data: amazonRankingMonthlyData } = useWidgetAPI(widget, monthBoards ? "amazonRankingMonthly" : "", {
+    refreshInterval,
+  });
   const { data: devicesData, mutate: mutateDevices } = useWidgetAPI(widget, "devices", { refreshInterval });
   const { data: monthlyData, mutate: mutateMonthly } = useWidgetAPI(widget, "monthly", { refreshInterval });
   // the device month boards are read in the same round as the monthly sales
@@ -1133,6 +1210,7 @@ export default function Component({ service }) {
     refreshInterval,
   });
   const { data: peaksData } = useWidgetAPI(widget, "peaks", { refreshInterval });
+  const { data: amazonPeaksData } = useWidgetAPI(widget, "amazonPeaks", { refreshInterval });
   // yesterday's visits and the new / repeat mix — a morning snapshot
   const { data: performanceData, mutate: mutatePerformance } = useWidgetAPI(widget, "performance", {
     refreshInterval,
@@ -1169,11 +1247,18 @@ export default function Component({ service }) {
   const freshness = useFreshness(sales?.sourceUpdatedAtJST || sales?.generatedAtJST, refreshInterval);
   const model = useMemo(() => buildModel(sales, history, logos), [sales, history, logos]);
   const amazon = useMemo(() => buildAmazon(amazonSalesData, amazonHistoryData), [amazonSalesData, amazonHistoryData]);
-  const ranking = useMemo(
+  const rankingToday = useMemo(
     () => buildRanking(rankingData, buildAmazonBoards(amazonRankingData)),
     [rankingData, amazonRankingData],
   );
-  const peaks = useMemo(() => buildPeaks(peaksData), [peaksData]);
+  const rankingMonth = useMemo(() => {
+    if (!rankingMonthlyData || rankingMonthlyData.error) return null;
+    const key = rankingPeriod === "previous" ? "previousMonth" : "currentMonth";
+    const amazonMonth = amazonRankingMonthlyData?.error ? null : amazonRankingMonthlyData?.[key];
+    return buildRanking(rankingMonthlyData[key], buildAmazonBoards(amazonMonth));
+  }, [rankingMonthlyData, amazonRankingMonthlyData, rankingPeriod]);
+  const ranking = rankingPeriod === "today" ? rankingToday : rankingMonth;
+  const peaks = useMemo(() => withAmazonPeaks(buildPeaks(peaksData), amazonPeaksData), [peaksData, amazonPeaksData]);
   const devices = useMemo(() => buildDeviceSales(devicesData, devicesMonthlyData), [devicesData, devicesMonthlyData]);
   const market = useMemo(() => buildMarketReference(marketData), [marketData]);
   const evidence = useMemo(
@@ -1352,8 +1437,15 @@ export default function Component({ service }) {
           cardCls={cardCls}
           t={t}
         />
-        {ranking ? (
-          <RankingSection ranking={ranking} dim={RANKING_DIM_BY_METRIC[metric]} cardCls={cardCls} t={t} />
+        {rankingToday ? (
+          <RankingSection
+            ranking={ranking}
+            period={rankingPeriod}
+            onPeriod={setRankingPeriod}
+            dim={RANKING_DIM_BY_METRIC[metric]}
+            cardCls={cardCls}
+            t={t}
+          />
         ) : null}
 
         {/* 2 分析・深掘り — figures that need not be read every day */}
@@ -1394,6 +1486,7 @@ export default function Component({ service }) {
             {devices ? (
               <DeviceSalesSection
                 devices={devices}
+                scope={rakutenScope}
                 market={market}
                 evidence={evidence}
                 onEvidence={setEvidenceModel}
@@ -1408,14 +1501,13 @@ export default function Component({ service }) {
             {model.hasHistory && model.days.length ? (
               <section className={`grid grid-cols-1 gap-x-5 gap-y-4 p-4 @4xl:grid-cols-[300px_1fr] ${cardCls}`}>
                 <div className="min-w-0 @4xl:border-r @4xl:border-theme-300/30 dark:@4xl:border-white/10 @4xl:pr-5">
-                  <DailyChart model={model} mode={chartMode} onModeChange={setChartMode} t={t} />
+                  <DailyChart model={model} mode={chartMode} onModeChange={setChartMode} scope={rakutenScope} t={t} />
                 </div>
                 <div className="flex min-w-0 flex-col gap-2.5">
                   <span className="min-w-0 text-xs font-bold tracking-wide text-theme-600 dark:text-theme-300">
-                    {rakutenScope ? `${rakutenScope} ` : ""}
                     {t(`${NS}.shopTrend`)}{" "}
                     <span className="font-medium text-theme-500 dark:text-theme-400">
-                      · {t(`${NS}.excludesToday`)} · {t(`${NS}.afterCoupon`)}
+                      · {t(`${NS}.excludesToday`)} · {amazon ? t(`${NS}.afterCouponTag`) : t(`${NS}.afterCoupon`)}
                       {idleNames ? ` · ${t(`${NS}.idleLeftOut`, { names: idleNames })}` : ""}
                     </span>
                   </span>
@@ -1430,6 +1522,11 @@ export default function Component({ service }) {
                       .map((r) => (
                         <ShopTrendCard key={r.name} row={r} mode={chartMode} t={t} />
                       ))}
+                    {(amazon?.shops || [])
+                      .filter((s) => activeNames.has(s.name))
+                      .map((s) => (
+                        <ShopTrendCard key={s.key} row={amazonTrendRow(s)} mode={chartMode} t={t} />
+                      ))}
                   </div>
                 </div>
               </section>
@@ -1437,10 +1534,12 @@ export default function Component({ service }) {
 
             {performance ? (
               <div className="grid grid-cols-1 gap-3 @5xl:grid-cols-2">
-                <CustomerMixCard performance={performance} cardCls={cardCls} t={t} />
+                <CustomerMixCard performance={performance} scope={rakutenScope} cardCls={cardCls} t={t} />
                 <ShopVisitsTable
                   performance={performance}
                   names={table.rows.map((r) => r.name)}
+                  platformByName={new Map(table.rows.map((r) => [r.name, r.platform]))}
+                  scope={rakutenScope}
                   shopColors={shopColors}
                   logoByName={logoByName}
                   cardCls={cardCls}
@@ -1449,7 +1548,9 @@ export default function Component({ service }) {
               </div>
             ) : null}
 
-            {peaks ? <PeaksSection peaks={peaks} shopColors={shopColors} cardCls={cardCls} t={t} /> : null}
+            {peaks ? (
+              <PeaksSection peaks={peaks} scope={rakutenScope} shopColors={shopColors} cardCls={cardCls} t={t} />
+            ) : null}
           </>
         ) : null}
       </div>

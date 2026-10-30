@@ -1447,7 +1447,7 @@
         "sevenDayAvgShare": "7 日平均占比",
         "total": "合计",
         "noData": "暂无数据",
-        "bestSellers": "今日热销",
+        "bestSellers": "热销",
         "allShops": "全店",
         "shopsAggregated": "共 {{count}} 家店铺",
         "itemsCount": "{{count}} 个商品",
@@ -1638,7 +1638,9 @@
         "platformSplit": "乐天 {{rakuten}}・Amazon {{amazon}}",
         "platformTotal": "{{platform}} 合计",
         "companyTotal": "全公司合计",
-        "salesNotSummed": "各平台销售额口径不同，不合计"
+        "salesNotSummed": "各平台销售额口径不同，不合计",
+        "boardLoading": "加载中…",
+        "peaksCoverageAmazon": "Amazon 自 {{date}} 起"
     },
     "uoshippingdashboard": {
         "allPlatforms": "全部",

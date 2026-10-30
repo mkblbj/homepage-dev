@@ -227,6 +227,8 @@ const REQUIRED_KEYS = [
   "platformTotal",
   "companyTotal",
   "salesNotSummed",
+  "boardLoading",
+  "peaksCoverageAmazon",
 ];
 
 function loadNamespace(locale) {

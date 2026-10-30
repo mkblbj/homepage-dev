@@ -517,6 +517,15 @@ export function ShopLogo({ name, url, size = 18 }) {
 
 // logo, then the shop's colour as a thin bar, then the name — the colour ties
 // the row to the shop's bars elsewhere on the page
+// names a shop's platform beside it in a list that mixes platforms
+export function PlatformTag({ platform, t }) {
+  return (
+    <span className="shrink-0 rounded border border-amber-500/40 bg-amber-500/10 px-1 py-px text-[10px] font-bold leading-none text-amber-700 dark:text-amber-300">
+      {platformLabel(platform, t)}
+    </span>
+  );
+}
+
 // `platform` is named beside a shop that is not 楽天's, so a peer list reads clearly
 export function ShopName({ name, color, logoUrl, platform = "rakuten", t }) {
   return (
@@ -524,11 +533,7 @@ export function ShopName({ name, color, logoUrl, platform = "rakuten", t }) {
       <ShopLogo name={name} url={logoUrl} />
       <span aria-hidden="true" className="block h-3 w-[3px] shrink-0 rounded-full" style={{ backgroundColor: color }} />
       {name}
-      {platform !== "rakuten" && t ? (
-        <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1 py-px text-[10px] font-bold text-amber-700 dark:text-amber-300">
-          {platformLabel(platform, t)}
-        </span>
-      ) : null}
+      {platform !== "rakuten" && t ? <PlatformTag platform={platform} t={t} /> : null}
     </span>
   );
 }

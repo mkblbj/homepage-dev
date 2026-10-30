@@ -490,6 +490,12 @@ test("buildRanking says how many shops a board actually adds up", () => {
   assert.equal(buildRanking({ rankings: { sales: board() } }).dims.sales.updatedShopCount, null);
 });
 
+test("buildRanking names a month's boards by their month", () => {
+  const board = { shopCount: 1, overall: { items: [{ rank: 1, itemManagementNumber: "a", salesYen: 1 }] }, shops: [] };
+  assert.equal(buildRanking({ month: "2026-10", rankings: { sales: board } }).sourceDate, "2026-10");
+  assert.equal(buildRanking({ sourceDateJST: "2026-10-30", rankings: { sales: board } }).sourceDate, "2026-10-30");
+});
+
 test("buildRanking exposes the three dimensions in UI order", () => {
   const r = buildRanking(rankingPayload);
   assert.equal(r.sourceDate, "2026-07-29");

@@ -28,6 +28,10 @@ const ENDPOINT_PATHS = {
   amazonSales: "/api/amazon/sales",
   amazonHistory: "/api/amazon/history/sales",
   amazonRanking: "/api/amazon/item-rankings",
+  // read only once someone opens 今月 / 先月 on the best sellers
+  rankingMonthly: "/api/item-rankings/monthly",
+  amazonRankingMonthly: "/api/amazon/item-rankings/monthly",
+  amazonPeaks: "/api/amazon/history/peaks",
 };
 
 export function normalizeSalesServiceUrl(baseUrl = DEFAULT_SALES_SERVICE_URL) {
@@ -242,7 +246,112 @@ function slimDeviceEvidence(data) {
 }
 
 // what a successful read of each endpoint hands to the browser
+// ---- item boards ----
+// The boards carry every item's full title, shop breakdown and (for Amazon)
+// catalog relationships; the page shows a handle, a thumbnail, a link and three
+// figures. 楽天's month boards weigh about 3.7 MB as served and a tenth of that
+// once trimmed.
+
+function pick(source, fields) {
+  return Object.fromEntries(fields.filter((key) => key in source).map((key) => [key, source[key]]));
+}
+
+const RAKUTEN_ITEM_FIELDS = [
+  "rank",
+  "itemManagementNumber",
+  "itemNumber",
+  "imageUrl",
+  "itemUrl",
+  "salesYen",
+  "unitsSold",
+  "orderCount",
+  "averageUnitPriceYen",
+  "shopCount",
+];
+
+function slimRakutenItem(item) {
+  if (!item || typeof item !== "object") return item;
+  const slim = pick(item, RAKUTEN_ITEM_FIELDS);
+  // the item number is only the handle when the management number is missing
+  if (slim.itemManagementNumber) delete slim.itemNumber;
+  // the title is only a fallback handle when both item numbers are missing
+  if (!item.itemManagementNumber && !item.itemNumber && item.itemName) {
+    slim.itemName = String(item.itemName).slice(0, 40);
+  }
+  // the page names only the first shop an item sold in
+  const first = item.shopBreakdown?.[0]?.shopName;
+  if (first) slim.shopBreakdown = [{ shopName: first }];
+  return slim;
+}
+
+const slimItems = (items, slimItem) => (Array.isArray(items) ? items.map(slimItem) : items);
+
+function slimRakutenBoards(rankings) {
+  if (!rankings || typeof rankings !== "object") return rankings;
+  return Object.fromEntries(
+    Object.entries(rankings).map(([dim, block]) => {
+      if (!block || typeof block !== "object") return [dim, block];
+      const overall = Array.isArray(block.overall)
+        ? slimItems(block.overall, slimRakutenItem)
+        : block.overall && { ...block.overall, items: slimItems(block.overall.items, slimRakutenItem) };
+      const shops = (block.shops || []).map((s) => ({ ...s, items: slimItems(s.items, slimRakutenItem) }));
+      return [dim, { ...block, overall, shops }];
+    }),
+  );
+}
+
+const AMAZON_ITEM_FIELDS = [
+  "rank",
+  "sku",
+  "asin",
+  "imageUrl",
+  "itemUrl",
+  "currency",
+  "salesAmount",
+  "unitsSold",
+  "orderCount",
+];
+
+function slimAmazonItem(item) {
+  if (!item || typeof item !== "object") return item;
+  const slim = pick(item, AMAZON_ITEM_FIELDS);
+  if (!item.sku && !item.asin && item.itemName) slim.itemName = String(item.itemName).slice(0, 40);
+  return slim;
+}
+
+function slimAmazonShops(container) {
+  if (!container || typeof container !== "object" || !Array.isArray(container.shops)) return container;
+  return {
+    ...container,
+    shops: container.shops.map((s) => ({
+      ...s,
+      rankings: s.rankings
+        ? Object.fromEntries(Object.entries(s.rankings).map(([dim, items]) => [dim, slimItems(items, slimAmazonItem)]))
+        : s.rankings,
+    })),
+  };
+}
+
+// today's boards hold `rankings` at the top; the month boards hold one per month
+export function slimItemBoards(endpoint, data) {
+  if (!data || typeof data !== "object") return data;
+  const months = (slim) => ({
+    ...data,
+    currentMonth: slim(data.currentMonth),
+    previousMonth: slim(data.previousMonth),
+  });
+  const rakuten = (c) => (c && typeof c === "object" ? { ...c, rankings: slimRakutenBoards(c.rankings) } : c);
+  if (endpoint === "ranking") return rakuten(data);
+  if (endpoint === "rankingMonthly") return months(rakuten);
+  if (endpoint === "amazonRanking") return slimAmazonShops(data);
+  if (endpoint === "amazonRankingMonthly") return months(slimAmazonShops);
+  return data;
+}
+
+const ITEM_BOARD_ENDPOINTS = new Set(["ranking", "rankingMonthly", "amazonRanking", "amazonRankingMonthly"]);
+
 export function shapeProxyResponse(endpoint, data, params = {}) {
+  if (ITEM_BOARD_ENDPOINTS.has(endpoint)) return slimItemBoards(endpoint, data);
   if (endpoint === "market") return slimMarketReference(data);
   if (endpoint === "marketEvidence") return pickModelEvidence(data, params.model);
   if (endpoint === "devicesEvidence") return slimDeviceEvidence(data);

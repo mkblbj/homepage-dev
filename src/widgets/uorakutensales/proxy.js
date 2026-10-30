@@ -28,6 +28,9 @@ const EXPECTED_METHOD_BY_ENDPOINT = {
   amazonSales: "GET",
   amazonHistory: "GET",
   amazonRanking: "GET",
+  rankingMonthly: "GET",
+  amazonRankingMonthly: "GET",
+  amazonPeaks: "GET",
 };
 
 function parseResponseData(data) {

@@ -244,7 +244,8 @@ export function buildRanking(ranking, amazonBoards = null) {
   if (!available.length) return null;
 
   return {
-    sourceDate: normalizeText(ranking?.sourceDateJST),
+    // today's boards name their day, a month's boards their month
+    sourceDate: normalizeText(ranking?.sourceDateJST || ranking?.month),
     generatedAt: normalizeText(ranking?.generatedAtJST),
     partial: Boolean(ranking?.partial),
     dims,

@@ -1434,7 +1434,7 @@
         "sevenDayAvgShare": "7日平均シェア",
         "total": "合計",
         "noData": "データがありません",
-        "bestSellers": "本日 売れ筋",
+        "bestSellers": "売れ筋",
         "allShops": "全店",
         "shopsAggregated": "全{{count}}店舗集計",
         "itemsCount": "{{count}}商品",
@@ -1625,7 +1625,9 @@
         "platformSplit": "楽天{{rakuten}}・Amazon{{amazon}}",
         "platformTotal": "{{platform}} 計",
         "companyTotal": "全社 計",
-        "salesNotSummed": "売上はモールごとに集計基準が違うため、合算しません"
+        "salesNotSummed": "売上はモールごとに集計基準が違うため、合算しません",
+        "boardLoading": "読み込み中…",
+        "peaksCoverageAmazon": "Amazon は {{date}} から"
     },
     "uoshippingdashboard": {
         "allPlatforms": "全部",
