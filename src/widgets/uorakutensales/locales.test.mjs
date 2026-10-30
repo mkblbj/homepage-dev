@@ -220,6 +220,13 @@ const REQUIRED_KEYS = [
   "historyStopped",
   "historyLagging",
   "visitsStale",
+  // Amazon beside 楽天
+  "platformRakuten",
+  "platformAmazon",
+  "platformSplit",
+  "platformTotal",
+  "companyTotal",
+  "salesNotSummed",
 ];
 
 function loadNamespace(locale) {

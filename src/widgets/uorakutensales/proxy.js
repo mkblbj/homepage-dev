@@ -25,6 +25,9 @@ const EXPECTED_METHOD_BY_ENDPOINT = {
   marketEvidence: "GET",
   devicesEvidence: "GET",
   performance: "GET",
+  amazonSales: "GET",
+  amazonHistory: "GET",
+  amazonRanking: "GET",
 };
 
 function parseResponseData(data) {

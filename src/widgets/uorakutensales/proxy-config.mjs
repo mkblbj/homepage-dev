@@ -24,6 +24,10 @@ const ENDPOINT_PATHS = {
   devicesEvidence: "/api/device-sales/evidence",
   // yesterday's visits and the new / repeat mix (the 経営表現 snapshot)
   performance: "/api/performance",
+  // Amazon's shops: today / this month / last month, the last 7 days, today's item boards
+  amazonSales: "/api/amazon/sales",
+  amazonHistory: "/api/amazon/history/sales",
+  amazonRanking: "/api/amazon/item-rankings",
 };
 
 export function normalizeSalesServiceUrl(baseUrl = DEFAULT_SALES_SERVICE_URL) {

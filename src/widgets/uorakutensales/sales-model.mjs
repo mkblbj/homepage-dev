@@ -41,14 +41,14 @@ function toNumber(value) {
 
 // A figure the API may leave out: null when absent, never 0 — "not read" and
 // "read, nothing sold" are different answers.
-function numberOrNull(value) {
+export function numberOrNull(value) {
   if (value === null || value === undefined || value === "") return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
 }
 
 // a / b, unknown when either side is, 0 when there is nothing to divide by
-function ratio(a, b) {
+export function ratio(a, b) {
   if (a === null || b === null) return null;
   return b > 0 ? a / b : 0;
 }
@@ -229,13 +229,15 @@ function normalizeRankingDim(block) {
 // Build the item-ranking view model from GET /api/item-rankings.
 // The payload carries three independently ranked dimensions (sales / units /
 // orderCount); each is normalized separately so the UI can switch between them.
-export function buildRanking(ranking) {
+// `amazonBoards` (amazon-model's buildAmazonBoards) adds each Amazon shop's
+// board beside 楽天's shop boards; the company board stays 楽天's alone.
+export function buildRanking(ranking, amazonBoards = null) {
   if (!ranking) return null;
 
   const dims = {};
   RANKING_DIMS.forEach((dim) => {
     const built = normalizeRankingDim(ranking?.rankings?.[dim]);
-    if (built) dims[dim] = built;
+    if (built) dims[dim] = amazonBoards?.[dim] ? { ...built, shops: [...built.shops, ...amazonBoards[dim]] } : built;
   });
 
   const available = RANKING_DIMS.filter((d) => dims[d]);
@@ -248,6 +250,7 @@ export function buildRanking(ranking) {
     dims,
     // dimensions actually present, in UI order — the toggle renders from this
     available,
+    hasAmazon: Boolean(amazonBoards),
   };
 }
 
@@ -591,7 +594,7 @@ export const MONTH_DIMS = PEAK_DIMS;
 
 // "2026-09" → 30. Day 0 of the next month is the last day of this one; computed
 // in UTC so it never shifts with the runtime's timezone.
-function daysInMonth(monthStr) {
+export function daysInMonth(monthStr) {
   const [y, m] = String(monthStr || "")
     .split("-")
     .map(Number);
@@ -602,7 +605,7 @@ function daysInMonth(monthStr) {
 // Day number of `dateStr`, but only when it genuinely falls inside `monthStr`.
 // On the 1st, completedThroughDate still points at last month's final day —
 // reading "31" straight out of it would claim 31 finished days of the new month.
-function dayWithinMonth(dateStr, monthStr) {
+export function dayWithinMonth(dateStr, monthStr) {
   const date = normalizeText(dateStr);
   const month = normalizeText(monthStr);
   if (!date || !month || !date.startsWith(`${month}-`)) return 0;
@@ -636,7 +639,7 @@ function paceOf(monthTotal, todayValue, completedDays) {
   return completed < 0 ? null : completed / completedDays;
 }
 
-function monthMetrics(current, previous, today, completedDays, prevDays) {
+export function monthMetrics(current, previous, today, completedDays, prevDays) {
   const out = {};
   MONTH_DIMS.forEach((dim) => {
     const value = current[dim];

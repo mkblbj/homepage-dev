@@ -12,6 +12,12 @@
  *   "devicesMonthly" → GET /api/device-sales/monthly  this month + last month device boards
  *   "peaks"   → GET /api/history/peaks  all-time record boards
  *   "logos"   → GET /api/shops/logos    shop logo urls
+ *   "amazonSales"   → GET /api/amazon/sales          Amazon today, this month, last month
+ *   "amazonHistory" → GET /api/amazon/history/sales  Amazon's last seven finished days
+ *   "amazonRanking" → GET /api/amazon/item-rankings  Amazon's item boards, per shop
+ *
+ * Amazon shops sit beside 楽天's as peers. Counts add up across platforms;
+ * yen never do, since each platform measures its amounts its own way.
  *
  * Realtime has NO conversionRate → per-row CVR comes from the 7-day history.
  * Freshness pill (LIVE / 遅延 / 停止) is derived from sales.sourceUpdatedAtJST (the
@@ -22,9 +28,10 @@ import Container from "components/services/widget/container";
 import { useTranslation } from "next-i18next/pages";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { buildPerformanceModel } from "widgets/uoperformance/performance-model.mjs";
+import { buildPerformanceModel, DASH } from "widgets/uoperformance/performance-model.mjs";
 
-import { buildShopTable, RANKING_DIM_BY_METRIC } from "./daily-check-model.mjs";
+import { buildAmazon, buildAmazonBoards } from "./amazon-model.mjs";
+import { buildMonthView, buildShopTable, buildTodayView, RANKING_DIM_BY_METRIC } from "./daily-check-model.mjs";
 import {
   historyNotes,
   MetricSwitch,
@@ -617,21 +624,27 @@ function ItemLink({ item, className, children }) {
   );
 }
 
+// an Amazon item on a pending order can carry units before its amount: that
+// amount reads as a dash, never ¥0
+function yenText(value, t) {
+  return value === null || value === undefined ? DASH : `¥${fmt(t, value)}`;
+}
+
 // the metric the board is ranked by leads; the other two trail as context
 function primaryMetric(item, dim, t) {
   if (dim === "units") return `${fmt(t, item.unitsSold)}${t(`${NS}.unitsShort`)}`;
   if (dim === "orderCount") return `${fmt(t, item.orderCount)}${t(`${NS}.ordersUnit`)}`;
-  return `¥${fmt(t, item.salesYen)}`;
+  return yenText(item.salesYen, t);
 }
 
 function secondaryMetrics(item, dim, t) {
-  const sales = `¥${fmt(t, item.salesYen)}`;
+  const sales = yenText(item.salesYen, t);
   const units = `${fmt(t, item.unitsSold)}${t(`${NS}.unitsShort`)}`;
   const orders = `${fmt(t, item.orderCount)}${t(`${NS}.ordersUnit`)}`;
-  const price = `@¥${fmt(t, item.avgPrice)}`;
-  if (dim === "units") return [sales, orders, price];
-  if (dim === "orderCount") return [sales, units, price];
-  return [units, orders, price];
+  const price = item.avgPrice === null || item.avgPrice === undefined ? null : `@¥${fmt(t, item.avgPrice)}`;
+  const parts =
+    dim === "units" ? [sales, orders, price] : dim === "orderCount" ? [sales, units, price] : [units, orders, price];
+  return parts.filter(Boolean);
 }
 
 // compact row — two columns of these on a wide container; the top three keep a
@@ -681,7 +694,10 @@ function RankingSection({ ranking, dim, cardCls, t }) {
   const board = ranking.dims[activeDim];
 
   const open = step > 0;
-  const active = open && shop !== "__all__" ? board.shops.find((s) => s.shopName === shop) : null;
+  // Amazon boards carry a platform-qualified key, so a shop name shared across
+  // platforms never picks the wrong board
+  const keyOf = (s) => s.key ?? s.shopName;
+  const active = open && shop !== "__all__" ? board.shops.find((s) => keyOf(s) === shop) : null;
   // a shop chip can outlive its data across refreshes → fall back to the overall board
   const selectedShop = active ? shop : "__all__";
   const isAll = selectedShop === "__all__";
@@ -697,7 +713,9 @@ function RankingSection({ ranking, dim, cardCls, t }) {
     covered !== null && covered < board.shopCount
       ? t(`${NS}.shopsAggregatedPartial`, { covered, total: board.shopCount })
       : t(`${NS}.shopsAggregated`, { count: board.shopCount });
-  const meta = isAll ? aggregated : t(`${NS}.itemsCount`, { count: active?.itemCount ?? 0 });
+  // with Amazon's shop boards on offer, the company board says it is 楽天's
+  const rakutenPrefix = ranking.hasAmazon ? `${t(`${NS}.platformRakuten`)} · ` : "";
+  const meta = isAll ? `${rakutenPrefix}${aggregated}` : t(`${NS}.itemsCount`, { count: active?.itemCount ?? 0 });
 
   const chip = (key, label) => (
     <button
@@ -736,8 +754,10 @@ function RankingSection({ ranking, dim, cardCls, t }) {
         ) : null}
         {open ? (
           <div className="ml-auto flex flex-wrap gap-1.5">
-            {chip("__all__", t(`${NS}.allShops`))}
-            {board.shops.map((s) => chip(s.shopName, s.shopName))}
+            {chip("__all__", `${rakutenPrefix ? `${t(`${NS}.platformRakuten`)} ` : ""}${t(`${NS}.allShops`)}`)}
+            {board.shops.map((s) =>
+              chip(keyOf(s), s.platform === "amazon" ? `${s.shopName}（${t(`${NS}.platformAmazon`)}）` : s.shopName),
+            )}
           </div>
         ) : null}
       </div>
@@ -1117,6 +1137,17 @@ export default function Component({ service }) {
   const { data: performanceData, mutate: mutatePerformance } = useWidgetAPI(widget, "performance", {
     refreshInterval,
   });
+  // Amazon's shops, read on the same interval; an older server answers 404,
+  // which simply leaves the board 楽天-only
+  const { data: amazonSalesData, mutate: mutateAmazonSales } = useWidgetAPI(widget, "amazonSales", {
+    refreshInterval,
+  });
+  const { data: amazonHistoryData, mutate: mutateAmazonHistory } = useWidgetAPI(widget, "amazonHistory", {
+    refreshInterval,
+  });
+  const { data: amazonRankingData, mutate: mutateAmazonRanking } = useWidgetAPI(widget, "amazonRanking", {
+    refreshInterval,
+  });
   // the market reference changes once a day: never read it more than hourly
   const { data: marketData, mutate: mutateMarket } = useWidgetAPI(widget, "market", {
     refreshInterval: Math.max(refreshInterval, MARKET_REFRESH_INTERVAL),
@@ -1137,7 +1168,11 @@ export default function Component({ service }) {
 
   const freshness = useFreshness(sales?.sourceUpdatedAtJST || sales?.generatedAtJST, refreshInterval);
   const model = useMemo(() => buildModel(sales, history, logos), [sales, history, logos]);
-  const ranking = useMemo(() => buildRanking(rankingData), [rankingData]);
+  const amazon = useMemo(() => buildAmazon(amazonSalesData, amazonHistoryData), [amazonSalesData, amazonHistoryData]);
+  const ranking = useMemo(
+    () => buildRanking(rankingData, buildAmazonBoards(amazonRankingData)),
+    [rankingData, amazonRankingData],
+  );
   const peaks = useMemo(() => buildPeaks(peaksData), [peaksData]);
   const devices = useMemo(() => buildDeviceSales(devicesData, devicesMonthlyData), [devicesData, devicesMonthlyData]);
   const market = useMemo(() => buildMarketReference(marketData), [marketData]);
@@ -1158,9 +1193,11 @@ export default function Component({ service }) {
     [performanceData, logos],
   );
   const table = useMemo(
-    () => (model ? buildShopTable({ model, monthly, performance }) : null),
-    [model, monthly, performance],
+    () => (model ? buildShopTable({ model, monthly, performance, amazon }) : null),
+    [model, monthly, performance, amazon],
   );
+  const todayView = useMemo(() => (model ? buildTodayView(model, amazon) : null), [model, amazon]);
+  const monthView = useMemo(() => buildMonthView(monthly, amazon), [monthly, amazon]);
   // shop logos sit beside the names in both shop tables
   const logoByName = useMemo(
     () => new Map((logos?.shops || []).map((shop) => [shop.shopName, shop.logoUrl || null])),
@@ -1174,8 +1211,9 @@ export default function Component({ service }) {
         ...(model?.rows || []).map((r) => r.name),
         ...(monthly?.shopNames || []),
         ...(peaks?.shopNames || []),
+        ...(amazon?.shops || []).map((s) => s.name),
       ]),
-    [model, monthly, peaks],
+    [model, monthly, peaks, amazon],
   );
 
   const handleRefresh = useCallback(
@@ -1190,6 +1228,9 @@ export default function Component({ service }) {
       mutateDevicesMonthly();
       mutateMarket();
       mutatePerformance();
+      mutateAmazonSales();
+      mutateAmazonHistory();
+      mutateAmazonRanking();
     },
     [
       mutateSales,
@@ -1200,6 +1241,9 @@ export default function Component({ service }) {
       mutateDevicesMonthly,
       mutateMarket,
       mutatePerformance,
+      mutateAmazonSales,
+      mutateAmazonHistory,
+      mutateAmazonRanking,
     ],
   );
 
@@ -1215,9 +1259,13 @@ export default function Component({ service }) {
   const cardCls = "rounded-2xl border border-theme-300/40 bg-theme-200/30 dark:border-theme-600/40 dark:bg-white/10";
   const activeNames = new Set(table.rows.map((r) => r.name));
   const idleNames = table.idle.map((r) => r.name).join("・");
-  const hasSide = Boolean(monthly) || (performance && performance.visit !== null);
+  const hasSide = Boolean(monthView) || (performance && performance.visit !== null);
   // a shop on the list whose today and month are both unknown is not counted as 稼働
   const activeCount = table.rows.filter((r) => !r.unknown).length;
+  const amazonCount = amazon?.shops.length ?? 0;
+  const missing = [...model.missing, ...(amazon?.company.missing ?? [])];
+  // with Amazon beside it, 楽天-only figures say whose they are
+  const rakutenScope = amazon ? t(`${NS}.platformRakuten`) : "";
   const notes = historyNotes(model.week, t);
   const periods = {
     colToday: model.time ? t(`${NS}.asOf`, { time: model.time }) : "",
@@ -1247,11 +1295,14 @@ export default function Component({ service }) {
         <div className="flex flex-wrap items-center justify-between gap-2 px-0.5">
           <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
             <span className="text-xs font-semibold text-theme-600 dark:text-theme-300">
-              {t(`${NS}.subtitle`, { count: model.rows.length })} · {t(`${NS}.activeShops`, { count: activeCount })}
-              {model.missing.length ? (
+              {t(`${NS}.subtitle`, { count: model.rows.length + amazonCount })}
+              {amazon
+                ? `（${t(`${NS}.platformSplit`, { rakuten: model.rows.length, amazon: amazonCount })}）`
+                : ""} · {t(`${NS}.activeShops`, { count: activeCount })}
+              {missing.length ? (
                 <span className="text-amber-700 dark:text-amber-300">
                   {" "}
-                  · {t(`${NS}.notFetched`, { names: model.missing.join("・") })}
+                  · {t(`${NS}.notFetched`, { names: missing.join("・") })}
                 </span>
               ) : null}
             </span>
@@ -1283,11 +1334,11 @@ export default function Component({ service }) {
           <MetricSwitch metric={metric} onChange={setMetric} t={t} />
         </ModuleHeader>
         <div className={`grid grid-cols-1 gap-3 ${hasSide ? "@5xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]" : ""}`}>
-          <TodayCard model={model} metric={metric} shopColors={shopColors} cardCls={cardCls} t={t} />
+          <TodayCard view={todayView} metric={metric} shopColors={shopColors} cardCls={cardCls} t={t} />
           {hasSide ? (
             <div className="flex min-w-0 flex-col gap-3">
-              <MonthCard monthly={monthly} metric={metric} cardCls={cardCls} t={t} />
-              <VisitCard performance={performance} cardCls={cardCls} t={t} />
+              <MonthCard monthly={monthView} metric={metric} cardCls={cardCls} t={t} />
+              <VisitCard performance={performance} scope={rakutenScope} cardCls={cardCls} t={t} />
             </div>
           ) : null}
         </div>
@@ -1361,6 +1412,7 @@ export default function Component({ service }) {
                 </div>
                 <div className="flex min-w-0 flex-col gap-2.5">
                   <span className="min-w-0 text-xs font-bold tracking-wide text-theme-600 dark:text-theme-300">
+                    {rakutenScope ? `${rakutenScope} ` : ""}
                     {t(`${NS}.shopTrend`)}{" "}
                     <span className="font-medium text-theme-500 dark:text-theme-400">
                       · {t(`${NS}.excludesToday`)} · {t(`${NS}.afterCoupon`)}
