@@ -3,8 +3,11 @@ import test from "node:test";
 
 import { buildPerformanceModel } from "../uoperformance/performance-model.mjs";
 
+import { buildAmazon } from "./amazon-model.mjs";
 import {
+  buildMonthView,
   buildShopTable,
+  buildTodayView,
   deltaTone,
   historyComparable,
   RANKING_DIM_BY_METRIC,
@@ -279,7 +282,7 @@ test("deltaTone colours only past twenty percent", () => {
 
 test("todayVsAverage compares today's counts with the 7-day daily average", () => {
   const { model } = fixture();
-  assert.deepEqual(todayVsAverage(model, "orders"), { value: 6, avg: 2, pct: 300 });
+  assert.deepEqual(todayVsAverage(buildTodayView(model), "orders"), { value: 6, avg: 2, pct: 300 });
 });
 
 test("todayVsAverage never sets today's yen against the after-coupon history", () => {
@@ -288,7 +291,7 @@ test("todayVsAverage never sets today's yen against the after-coupon history", (
   assert.equal(historyComparable("orders"), true);
   assert.equal(historyComparable("units"), true);
   // the average is still there to draw; only the ratio is withheld
-  assert.deepEqual(todayVsAverage(model, "sales"), { value: 60, avg: 200, pct: null });
+  assert.deepEqual(todayVsAverage(buildTodayView(model), "sales"), { value: 60, avg: 200, pct: null });
 });
 
 test("a shop left out of today's total reads unknown today, never zero", () => {
@@ -308,14 +311,161 @@ test("the total row is unknown when the server has no readable shop today", () =
   const sales = { ok: false, totals: null, generatedAtJST: STAMP, shops: [] };
   const t = buildShopTable({ ...f, model: buildModel(sales, null) });
   assert.equal(t.total.today, null);
-  assert.deepEqual(todayVsAverage(buildModel(sales, null), "orders"), { value: null, avg: null, pct: null });
+  assert.deepEqual(todayVsAverage(buildTodayView(buildModel(sales, null)), "orders"), {
+    value: null,
+    avg: null,
+    pct: null,
+  });
 });
 
 test("todayVsAverage has no ratio without history", () => {
   const { model } = fixture();
-  assert.deepEqual(todayVsAverage({ ...model, hasHistory: false }, "sales"), { value: 60, avg: null, pct: null });
+  assert.deepEqual(todayVsAverage(buildTodayView({ ...model, hasHistory: false }), "sales"), {
+    value: 60,
+    avg: null,
+    pct: null,
+  });
 });
 
 test("each module metric maps onto the ranking board it sorts by", () => {
   assert.deepEqual(RANKING_DIM_BY_METRIC, { sales: "sales", units: "units", orders: "orderCount" });
+});
+
+// one Amazon shop beside the 楽天 fixture: same JST day, same month
+function amazonOf({ todayTotals = { salesAmount: 700, unitsSold: 3, orderCount: 2 } } = {}) {
+  const row = (extra) => ({
+    shopName: "uoworld",
+    accountId: "acc",
+    marketplaceId: "JP",
+    currency: "JPY",
+    timezone: "Asia/Tokyo",
+    enabled: true,
+    status: "ready",
+    includedInTotals: true,
+    sourceUpdatedAt: "2026-10-25T01:20:00.000Z",
+    ...extra,
+  });
+  const period = (r) => ({
+    ok: true,
+    enabledShopCount: 1,
+    updatedShopCount: 1,
+    totalsByCurrency: { JPY: r.totals },
+    shops: [r],
+  });
+  const sales = {
+    today: period(row({ date: "2026-10-25", totals: todayTotals })),
+    month: period(row({ month: "2026-10", totals: { salesAmount: 1800, unitsSold: 30, orderCount: 20 } })),
+    previousMonth: period(row({ month: "2026-09", totals: { salesAmount: 1500, unitsSold: 30, orderCount: 30 } })),
+  };
+  const history = {
+    window: { completeDays: 7 },
+    shops: [
+      row({
+        totals: { salesAmount: 700, unitsSold: 7, orderCount: 7 },
+        daily: DATES.map((date) => ({ date, totals: { salesAmount: 100, unitsSold: 1, orderCount: 1 } })),
+      }),
+    ],
+  };
+  return buildAmazon(sales, history);
+}
+
+test("Amazon shops take their place among 楽天's by this month's sales", () => {
+  const f = fixture();
+  const t = buildShopTable({ ...f, amazon: amazonOf() });
+  // A ¥2,410 · uoworld ¥1,800 · B ¥1,250 this month
+  assert.deepEqual(
+    t.rows.map((r) => r.name),
+    ["A", "uoworld", "B"],
+  );
+  const az = t.rows[1];
+  assert.equal(az.platform, "amazon");
+  assert.equal(az.key, "amazon:acc:JP");
+  assert.deepEqual(az.today, { sales: 700, units: 3, orders: 2 });
+  assert.deepEqual(az.avg, { sales: 100, units: 1, orders: 1 });
+  // Amazon reports no visits, so there is no CVR or visit figure to show
+  assert.equal(az.cvr, null);
+  assert.equal(az.visits, null);
+  assert.equal(t.rows[0].platform, "rakuten");
+});
+
+test("the footer has a line per platform and a company line that adds only counts", () => {
+  const f = fixture();
+  const t = buildShopTable({ ...f, amazon: amazonOf() });
+  assert.deepEqual(
+    t.totals.map((r) => r.key),
+    ["total:rakuten", "total:amazon", "total:company"],
+  );
+  const [rakuten, amazon, company] = t.totals;
+  assert.deepEqual(rakuten.today, { sales: 60, units: 6, orders: 6 });
+  assert.deepEqual(amazon.today, { sales: 700, units: 3, orders: 2 });
+  // the company's yen stay empty: the platforms measure them differently
+  assert.deepEqual(company.today, { sales: null, units: 9, orders: 8 });
+  assert.equal(company.month.sales, null);
+  assert.equal(company.month.orders, 10 + 20);
+  // visits are 楽天's alone
+  assert.equal(rakuten.visits, 300);
+  assert.equal(company.visits, null);
+  assert.equal(t.total, company);
+});
+
+test("without Amazon the table keeps its single 楽天 total", () => {
+  const t = buildShopTable(fixture());
+  assert.equal(t.totals.length, 1);
+  assert.equal(t.total, t.totals[0]);
+});
+
+test("the today view adds counts across platforms and keeps each platform's yen apart", () => {
+  const { model } = fixture();
+  const view = buildTodayView(model, amazonOf());
+  assert.equal(view.multi, true);
+  assert.deepEqual(view.values, { sales: null, units: 9, orders: 8 });
+  assert.deepEqual(
+    view.platforms.map((p) => [p.platform, p.values.sales]),
+    [
+      ["rakuten", 60],
+      ["amazon", 700],
+    ],
+  );
+  assert.deepEqual(view.coverage, { covered: 4, total: 4 });
+  // the week: 楽天's 2 orders a day plus Amazon's 1, matched by date
+  assert.equal(view.days.length, 7);
+  assert.equal(view.days[0].orders, 3);
+  assert.equal(view.days[0].sales, null);
+  // 売上 bars stay 楽天's
+  assert.equal(view.salesDays, model.days);
+  const orders = todayVsAverage(view, "orders");
+  assert.equal(orders.value, 8);
+  assert.equal(orders.avg, 3);
+  assert.deepEqual(todayVsAverage(view, "sales"), { value: null, avg: null, pct: null });
+});
+
+test("the today view still counts 楽天 when Amazon could not be read today", () => {
+  const { model } = fixture();
+  const stale = amazonOf({ todayTotals: null });
+  const view = buildTodayView(model, stale);
+  assert.deepEqual(view.values, { sales: null, units: 6, orders: 6 });
+});
+
+test("the month view adds counts and lists each platform's yen", () => {
+  const { monthly } = fixture();
+  const view = buildMonthView(monthly, amazonOf());
+  assert.equal(view.multi, true);
+  assert.equal(view.metrics.sales, null);
+  assert.equal(view.metrics.orders.current, 30);
+  assert.deepEqual(
+    view.platforms.map((p) => [p.platform, p.metrics.sales.current]),
+    [
+      ["rakuten", 3660],
+      ["amazon", 1800],
+    ],
+  );
+  // and without Amazon it is the 楽天 month as it was
+  const alone = buildMonthView(monthly, null);
+  assert.equal(alone.multi, false);
+  assert.equal(alone.metrics, monthly.metrics);
+});
+
+test("Amazon's week stands against today even for 売上: both come from its Sales API", () => {
+  assert.equal(historyComparable("sales", "amazon"), true);
+  assert.equal(historyComparable("sales", "rakuten"), false);
 });

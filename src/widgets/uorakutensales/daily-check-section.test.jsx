@@ -3,6 +3,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { buildTodayView } from "./daily-check-model.mjs";
 import {
   barLabel,
   historyNotes,
@@ -217,13 +218,13 @@ describe("widgets/uorakutensales/daily-check-section", () => {
       null,
     );
     const tc = (key, opts) => (key === `${NS}.shopCoverage` ? `${opts.covered}/${opts.total}店舗` : t(key, opts));
-    render(<TodayCard model={model} metric="orders" shopColors={{}} t={tc} />);
+    render(<TodayCard view={buildTodayView(model)} metric="orders" shopColors={{}} t={tc} />);
 
     expect(screen.getByText(/1\/2店舗/)).toBeInTheDocument();
   });
 
   it("the today card does not set today's yen against the after-coupon week", () => {
-    render(<TodayCard model={weekModel()} metric="sales" shopColors={{}} t={t} />);
+    render(<TodayCard view={buildTodayView(weekModel())} metric="sales" shopColors={{}} t={t} />);
 
     expect(screen.queryByText(`${NS}.todayNoTimeCorrection`)).not.toBeInTheDocument();
     expect(screen.getByText(`${NS}.salesBasisNote`)).toBeInTheDocument();
@@ -233,7 +234,7 @@ describe("widgets/uorakutensales/daily-check-section", () => {
   });
 
   it("the today card still compares counts with the week", () => {
-    render(<TodayCard model={weekModel()} metric="orders" shopColors={{}} t={t} />);
+    render(<TodayCard view={buildTodayView(weekModel())} metric="orders" shopColors={{}} t={t} />);
 
     expect(screen.getByText(`${NS}.todayNoTimeCorrection`)).toBeInTheDocument();
     expect(screen.getByText(`${NS}.lastDaysAndToday`)).toBeInTheDocument();
@@ -287,12 +288,117 @@ describe("widgets/uorakutensales/daily-check-section", () => {
     expect(screen.getByText(new RegExp(`${NS}.confirmed`))).toBeInTheDocument();
   });
 
+  // platform labels and footer names, as the locale renders them
+  const tl = (key, opts) =>
+    ({
+      [`${NS}.platformRakuten`]: "楽天",
+      [`${NS}.platformAmazon`]: "Amazon",
+      [`${NS}.platformTotal`]: `${opts?.platform} 計`,
+      [`${NS}.companyTotal`]: "全社 計",
+    })[key] ?? t(key, opts);
+
+  const amazonShop = shopRow("uoworld", { key: "amazon:acc:JP", platform: "amazon", cvr: null, visits: null });
+  const multiTable = {
+    rows: [shopRow("A", { platform: "rakuten" }), amazonShop],
+    idle: [],
+    totals: [
+      { ...shopRow(null), key: "total:rakuten", platform: "rakuten", today: { sales: 4800, units: 56, orders: 48 } },
+      { ...shopRow(null), key: "total:amazon", platform: "amazon", visits: null },
+      { ...shopRow(null), key: "total:company", platform: null, today: { sales: null, units: 70, orders: 60 } },
+    ],
+  };
+  multiTable.total = multiTable.totals[2];
+
+  it("the shop table names Amazon shops and closes with a line per platform and the company", () => {
+    render(<ShopTable table={multiTable} metric="orders" shopColors={{}} t={tl} />);
+
+    expect(within(screen.getByRole("row", { name: /^uoworld/ })).getByText("Amazon")).toBeInTheDocument();
+    expect(within(screen.getByRole("row", { name: /^A(?!mazon)/ })).queryByText("Amazon")).not.toBeInTheDocument();
+    expect(screen.getByRole("row", { name: /^楽天 計/ })).toBeInTheDocument();
+    expect(screen.getByRole("row", { name: /^Amazon 計/ })).toBeInTheDocument();
+    // a count's share is of the company: 12 of 60
+    const company = screen.getByRole("row", { name: /^全社 計/ });
+    expect(within(company).getByText("100.0%")).toBeInTheDocument();
+    expect(within(screen.getByRole("row", { name: /^uoworld/ })).getByText("20.0%")).toBeInTheDocument();
+  });
+
+  it("in 売上 each shop's share is of its own platform, and the company has no yen", () => {
+    render(<ShopTable table={multiTable} metric="sales" shopColors={{}} t={tl} />);
+
+    // 楽天 A: ¥1,200 of 楽天's ¥4,800; uoworld: ¥1,200 of Amazon's ¥1,200
+    expect(within(screen.getByRole("row", { name: /^A(?!mazon)/ })).getByText("25.0%")).toBeInTheDocument();
+    expect(within(screen.getByRole("row", { name: /^uoworld/ })).getByText("100.0%")).toBeInTheDocument();
+    // the company's share cell (after 今日) is a dash
+    const company = screen.getByRole("row", { name: /^全社 計/ });
+    expect(within(company).getAllByRole("cell")[1]).toHaveTextContent(/^—$/);
+  });
+
+  it("an Amazon shop's 売上 still stands against its own week; 楽天's does not", () => {
+    render(<ShopTable table={multiTable} metric="sales" shopColors={{}} t={tl} />);
+
+    // ¥1,200 today against ¥3,000 a day
+    expect(within(screen.getByRole("row", { name: /^uoworld/ })).getByText("40%")).toBeInTheDocument();
+    expect(within(screen.getByRole("row", { name: /^A(?!mazon)/ })).queryByText("40%")).not.toBeInTheDocument();
+  });
+
+  const multiView = {
+    multi: true,
+    platforms: [
+      { platform: "rakuten", values: { sales: 324785, units: 276, orders: 261 }, aov: 1244, time: "13:40" },
+      { platform: "amazon", values: { sales: 7897, units: 9, orders: 6 }, aov: 1316, time: "13:55" },
+    ],
+    values: { sales: null, units: 285, orders: 267 },
+    avg: null,
+    days: [],
+    salesDays: [],
+    coverage: { covered: 9, total: 10 },
+    time: "13:40",
+    mix: [],
+  };
+
+  it("the today card adds counts across platforms into one figure", () => {
+    render(<TodayCard view={multiView} metric="orders" shopColors={{}} t={tl} />);
+
+    expect(screen.getByText(`267${NS}.ordersUnit`)).toBeInTheDocument();
+    // each platform keeps a line with its own yen
+    expect(screen.getByText("楽天")).toBeInTheDocument();
+    expect(screen.getByText(/¥7897/)).toBeInTheDocument();
+    expect(screen.queryByText(`${NS}.salesNotSummed`)).not.toBeInTheDocument();
+  });
+
+  it("the today card shows each platform's 売上 instead of one total", () => {
+    render(<TodayCard view={multiView} metric="sales" shopColors={{}} t={tl} />);
+
+    expect(screen.getByText("¥324785")).toBeInTheDocument();
+    expect(screen.getByText("¥7897")).toBeInTheDocument();
+    expect(screen.getByText(`${NS}.salesNotSummed`)).toBeInTheDocument();
+  });
+
+  it("the month card lists each platform's 売上 when the company has none", () => {
+    const metric = { current: 900, previous: 1000, pace: 30, prevPace: 32, paceDeltaPct: -6, vsPrevPct: 90 };
+    const monthly = {
+      multi: true,
+      current: { month: "2026-10", completedDays: 29, hasLiveDay: true, progressPct: 93, coverage: null },
+      metrics: { sales: null, units: metric, orders: metric },
+      platforms: [
+        { platform: "rakuten", metrics: { sales: { ...metric, current: 26333000 } } },
+        { platform: "amazon", metrics: { sales: { ...metric, current: 472523, paceDeltaPct: 12 } } },
+      ],
+    };
+    render(<MonthCard monthly={monthly} metric="sales" t={tl} />);
+
+    expect(screen.getByText("楽天")).toBeInTheDocument();
+    expect(screen.getByText("Amazon")).toBeInTheDocument();
+    expect(screen.getByText("+12.0%")).toBeInTheDocument();
+    expect(screen.getByText(`${NS}.salesNotSummed`)).toBeInTheDocument();
+  });
+
   it("the today card shows no 7-day ratio without history", () => {
     const model = buildModel(
       { generatedAtJST: "2026-10-25 10:20 JST", totals: { salesYen: 500, orderCount: 5, unitsSold: 5 }, shops: [] },
       null,
     );
-    render(<TodayCard model={model} metric="sales" shopColors={{}} t={t} />);
+    render(<TodayCard view={buildTodayView(model)} metric="sales" shopColors={{}} t={t} />);
 
     expect(screen.getByText("¥500")).toBeInTheDocument();
     expect(screen.queryByText(`${NS}.todayNoTimeCorrection`)).not.toBeInTheDocument();

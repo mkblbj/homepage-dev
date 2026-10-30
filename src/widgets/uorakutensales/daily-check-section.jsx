@@ -2,7 +2,7 @@
 // month and the latest visits sit on top, then one table with every shop on
 // one line. One metric switch drives all of it; a figure that is unknown reads
 // as a dash, never as zero.
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { DASH, mdLabel, weekdayJp } from "widgets/uoperformance/performance-model.mjs";
 
 import { deltaTone, historyComparable, METRICS, todayVsAverage } from "./daily-check-model.mjs";
@@ -11,8 +11,7 @@ import { FALLBACK_SHOP_COLOR, man } from "./sales-model.mjs";
 const NS = "uorakutensales";
 const METRIC_LABEL = { sales: "sortSales", units: "sortUnits", orders: "sortOrders" };
 const UNIT_KEY = { units: "unitsShort", orders: "ordersUnit" };
-const TODAY_KEY = { sales: "rtTotal", units: "rtUnits", orders: "rtOrders" };
-const ROW_TODAY_KEY = { sales: "rtSales", units: "rtUnits", orders: "rtOrders" };
+const PLATFORM_KEY = { rakuten: "platformRakuten", amazon: "platformAmazon" };
 
 const TONE_CLASS = {
   down: "font-bold text-rose-600 dark:text-rose-300",
@@ -95,11 +94,11 @@ export function MetricSwitch({ metric, onChange, t }) {
 }
 
 // the two metrics the switch is not showing, plus 客単価 / 点数 where they belong
-function todaySubLine(model, metric, t) {
-  const parts = METRICS.filter((m) => m !== metric).map((m) => valueText(m, model[TODAY_KEY[m]], t));
-  if (metric !== "units") parts.push(`${t(`${NS}.aov`)} ${model.aov === null ? DASH : `¥${fmt(t, model.aov)}`}`);
+function todaySubLine(view, metric, t) {
+  const parts = METRICS.filter((m) => m !== metric).map((m) => valueText(m, view.values[m], t));
+  if (metric !== "units") parts.push(`${t(`${NS}.aov`)} ${view.aov === null ? DASH : `¥${fmt(t, view.aov)}`}`);
   if (metric !== "orders") {
-    const perOrder = model.rtUnitsPerOrder;
+    const perOrder = view.unitsPerOrder;
     parts.push(`${t(`${NS}.unitsPerOrder`)} ${perOrder === null ? DASH : `×${perOrder.toFixed(2)}`}`);
   }
   return parts.join(" · ");
@@ -113,9 +112,9 @@ export function barLabel(metric, value, t) {
 
 // The days every shop has, then today. Today's bar only stands beside them when
 // both sides count the same way: 売上 history is after coupons, today before.
-function WeekBars({ model, metric, value, avg, t }) {
+function WeekBars({ days, metric, value, avg, t }) {
   const withToday = historyComparable(metric) && value !== null;
-  const series = model.days.map((d) => ({ key: d.date, md: d.md, wd: d.wd, v: d[metric] || 0 }));
+  const series = days.map((d) => ({ key: d.date, md: d.md, wd: d.wd, v: d[metric] || 0 }));
   const peak = Math.max(1, withToday ? value : 0, ...series.map((d) => d.v));
   const px = (v) => `${Math.max(3, Math.round((v / peak) * CHART_HEIGHT))}px`;
   const count = series.length;
@@ -166,39 +165,86 @@ function WeekBars({ model, metric, value, avg, t }) {
   );
 }
 
-export function TodayCard({ model, metric, shopColors, cardCls = "", t }) {
-  const { value, avg, pct } = todayVsAverage(model, metric);
-  const mix = model.rows.filter((r) => r[ROW_TODAY_KEY[metric]] > 0);
+function platformLabel(platform, t) {
+  return t(`${NS}.${PLATFORM_KEY[platform]}`);
+}
+
+// one line per platform, the picked metric first: its own counts and yen, read
+// at its own time
+function PlatformLines({ platforms, metric, t }) {
+  const order = [metric, ...METRICS.filter((m) => m !== metric)];
+  return (
+    <div className="grid grid-cols-[auto_1fr] items-baseline gap-x-3 gap-y-1 text-sm tabular-nums">
+      {platforms.map((p) => (
+        <Fragment key={p.platform}>
+          <span className="font-bold text-theme-800 dark:text-theme-100">{platformLabel(p.platform, t)}</span>
+          <span className="text-theme-700 dark:text-theme-200">
+            {order.map((m) => valueText(m, p.values[m], t)).join(" · ")}
+            {p.aov !== null ? ` · ${t(`${NS}.aov`)} ¥${fmt(t, p.aov)}` : ""}
+            {p.time ? <span className={`ml-2 text-xs ${MUTED}`}>{t(`${NS}.asOf`, { time: p.time })}</span> : null}
+          </span>
+        </Fragment>
+      ))}
+    </div>
+  );
+}
+
+// `view` is buildTodayView's: one platform, or 楽天 and Amazon side by side
+export function TodayCard({ view, metric, shopColors, cardCls = "", t }) {
+  const { value, avg, pct } = todayVsAverage(view, metric);
+  // 売上 across platforms is never one figure: each platform keeps its own
+  const split = view.multi && metric === "sales";
+  const mix = split ? [] : view.mix.filter((r) => r.values[metric] > 0);
   // today's total adds up fewer shops than the list holds — e.g. one without the order API
-  const coverage = model.coverage && model.coverage.covered < model.coverage.total ? model.coverage : null;
+  const coverage = view.coverage && view.coverage.covered < view.coverage.total ? view.coverage : null;
+  const days = metric === "sales" ? view.salesDays : view.days;
   return (
     <section className={`flex min-w-0 flex-wrap justify-between gap-6 p-5 ${cardCls}`}>
       <div className="flex min-w-[260px] flex-1 flex-col gap-3">
         <span className="flex items-baseline gap-2">
           <span className="text-sm font-bold text-theme-800 dark:text-theme-100">{t(`${NS}.todayLabel`)}</span>
-          {model.time || coverage ? (
+          {view.time || coverage ? (
             <span className={`text-xs ${MUTED}`}>
-              {model.time ? t(`${NS}.asOf`, { time: model.time }) : ""}
-              {model.time && coverage ? " · " : ""}
+              {view.time ? t(`${NS}.asOf`, { time: view.time }) : ""}
+              {view.time && coverage ? " · " : ""}
               {coverage ? t(`${NS}.shopCoverage`, coverage) : ""}
             </span>
           ) : null}
         </span>
-        <span className={`text-[52px] font-extrabold leading-none tracking-tight tabular-nums ${ACCENT_TEXT}`}>
-          {valueText(metric, value, t)}
-        </span>
-        <span className="text-sm tabular-nums text-theme-700 dark:text-theme-200">
-          {todaySubLine(model, metric, t)}
-        </span>
-        {value > 0 ? (
+        {split ? (
+          <span className="flex flex-col gap-1.5">
+            {view.platforms.map((p) => (
+              <span key={p.platform} className="flex items-baseline gap-3">
+                <span className="w-16 shrink-0 text-sm font-bold text-theme-800 dark:text-theme-100">
+                  {platformLabel(p.platform, t)}
+                </span>
+                <span className={`text-[36px] font-extrabold leading-none tracking-tight tabular-nums ${ACCENT_TEXT}`}>
+                  {valueText("sales", p.values.sales, t)}
+                </span>
+              </span>
+            ))}
+          </span>
+        ) : (
+          <span className={`text-[52px] font-extrabold leading-none tracking-tight tabular-nums ${ACCENT_TEXT}`}>
+            {valueText(metric, value, t)}
+          </span>
+        )}
+        {view.multi ? (
+          <PlatformLines platforms={view.platforms} metric={metric} t={t} />
+        ) : (
+          <span className="text-sm tabular-nums text-theme-700 dark:text-theme-200">
+            {todaySubLine(view, metric, t)}
+          </span>
+        )}
+        {value > 0 && mix.length ? (
           <span className="flex h-2 overflow-hidden rounded-full bg-theme-400/40 dark:bg-white/10">
             {mix.map((r) => (
               <span
-                key={r.name}
+                key={r.key}
                 className="block h-full"
                 title={r.name}
                 style={{
-                  width: `${(r[ROW_TODAY_KEY[metric]] / value) * 100}%`,
+                  width: `${(r.values[metric] / value) * 100}%`,
                   backgroundColor: shopColors[r.name] ?? FALLBACK_SHOP_COLOR,
                 }}
               />
@@ -224,19 +270,22 @@ export function TodayCard({ model, metric, shopColors, cardCls = "", t }) {
             <span className={`text-xs ${MUTED}`}>{t(`${NS}.todayNoTimeCorrection`)}</span>
           </div>
         ) : null}
-        {model.hasHistory && !historyComparable(metric) ? (
-          <span className={`mt-1 text-xs ${MUTED}`}>{t(`${NS}.salesBasisNote`)}</span>
+        {split ? <span className={`mt-1 text-xs ${MUTED}`}>{t(`${NS}.salesNotSummed`)}</span> : null}
+        {days.length && !historyComparable(metric) ? (
+          <span className={`text-xs ${MUTED}`}>{t(`${NS}.salesBasisNote`)}</span>
         ) : null}
       </div>
-      {model.hasHistory && model.days.length ? (
+      {days.length ? (
         <div className="min-w-[280px] flex-1 @5xl:max-w-[400px]">
-          <WeekBars model={model} metric={metric} value={value} avg={avg} t={t} />
+          <WeekBars days={days} metric={metric} value={value} avg={avg} t={t} />
         </div>
       ) : null}
     </section>
   );
 }
 
+// `monthly` is buildMonthView's. Across platforms the 売上 metric is null: each
+// platform's yen get a line of their own instead of one company figure.
 export function MonthCard({ monthly, metric, cardCls = "", t }) {
   if (!monthly) return null;
   const m = monthly.metrics[metric];
@@ -256,36 +305,72 @@ export function MonthCard({ monthly, metric, cardCls = "", t }) {
             {coverage ? ` · ${t(`${NS}.shopCoverage`, coverage)}` : ""}
           </span>
         </span>
-        <span className={`text-xs ${MUTED}`}>
-          {t(`${NS}.prevPaceDelta`)} <Delta value={m.paceDeltaPct} className="ml-1 text-base font-extrabold" />
-        </span>
+        {m ? (
+          <span className={`text-xs ${MUTED}`}>
+            {t(`${NS}.prevPaceDelta`)} <Delta value={m.paceDeltaPct} className="ml-1 text-base font-extrabold" />
+          </span>
+        ) : null}
       </span>
-      <span className="text-[32px] font-extrabold leading-tight tabular-nums text-theme-900 dark:text-theme-50">
-        {shortText(metric, m.current, t)}
-      </span>
-      <span className="text-sm tabular-nums text-theme-700 dark:text-theme-200">
-        {t(`${NS}.dailyAvgVsPrev`, { pace: shortText(metric, m.pace, t), prev: shortText(metric, m.prevPace, t) })}
-      </span>
-      {m.vsPrevPct !== null ? (
+      {m ? (
         <>
-          <span className="relative mt-1 block h-2 rounded-full bg-theme-400/40 dark:bg-white/10">
-            <span
-              className="absolute inset-y-0 left-0 rounded-full bg-amber-500 dark:bg-[#E8B26A]"
-              style={{ width: `${Math.min(100, m.vsPrevPct)}%` }}
-            />
-            <span
-              className="absolute -top-1 h-4 w-0.5 rounded-full bg-theme-800 dark:bg-white"
-              style={{ left: `calc(${Math.min(100, cur.progressPct)}% - 1px)` }}
-            />
+          <span className="text-[32px] font-extrabold leading-tight tabular-nums text-theme-900 dark:text-theme-50">
+            {shortText(metric, m.current, t)}
           </span>
-          <span className={`flex flex-wrap justify-between gap-x-3 text-xs tabular-nums ${MUTED}`}>
-            <span>
-              {t(`${NS}.reachOfPrev`, { prev: shortText(metric, m.previous, t), pct: m.vsPrevPct.toFixed(1) })}
-            </span>
-            <span>{t(`${NS}.monthElapsed`, { pct: Math.round(cur.progressPct) })}</span>
+          <span className="text-sm tabular-nums text-theme-700 dark:text-theme-200">
+            {t(`${NS}.dailyAvgVsPrev`, { pace: shortText(metric, m.pace, t), prev: shortText(metric, m.prevPace, t) })}
           </span>
+          {m.vsPrevPct !== null ? (
+            <>
+              <span className="relative mt-1 block h-2 rounded-full bg-theme-400/40 dark:bg-white/10">
+                <span
+                  className="absolute inset-y-0 left-0 rounded-full bg-amber-500 dark:bg-[#E8B26A]"
+                  style={{ width: `${Math.min(100, m.vsPrevPct)}%` }}
+                />
+                <span
+                  className="absolute -top-1 h-4 w-0.5 rounded-full bg-theme-800 dark:bg-white"
+                  style={{ left: `calc(${Math.min(100, cur.progressPct)}% - 1px)` }}
+                />
+              </span>
+              <span className={`flex flex-wrap justify-between gap-x-3 text-xs tabular-nums ${MUTED}`}>
+                <span>
+                  {t(`${NS}.reachOfPrev`, { prev: shortText(metric, m.previous, t), pct: m.vsPrevPct.toFixed(1) })}
+                </span>
+                <span>{t(`${NS}.monthElapsed`, { pct: Math.round(cur.progressPct) })}</span>
+              </span>
+            </>
+          ) : null}
         </>
-      ) : null}
+      ) : (
+        <>
+          {monthly.platforms.map(({ platform, metrics }) => {
+            const pm = metrics[metric];
+            return (
+              <span key={platform} className="flex flex-col gap-0.5">
+                <span className="flex flex-wrap items-baseline justify-between gap-x-3">
+                  <span className="flex items-baseline gap-3">
+                    <span className="w-16 shrink-0 text-sm font-bold text-theme-800 dark:text-theme-100">
+                      {platformLabel(platform, t)}
+                    </span>
+                    <span className="text-[26px] font-extrabold leading-tight tabular-nums text-theme-900 dark:text-theme-50">
+                      {shortText(metric, pm.current, t)}
+                    </span>
+                  </span>
+                  <span className={`text-xs ${MUTED}`}>
+                    {t(`${NS}.prevPaceDelta`)} <Delta value={pm.paceDeltaPct} className="ml-1 text-sm font-extrabold" />
+                  </span>
+                </span>
+                <span className="pl-[76px] text-xs tabular-nums text-theme-700 dark:text-theme-200">
+                  {t(`${NS}.dailyAvgVsPrev`, {
+                    pace: shortText(metric, pm.pace, t),
+                    prev: shortText(metric, pm.prevPace, t),
+                  })}
+                </span>
+              </span>
+            );
+          })}
+          <span className={`text-xs ${MUTED}`}>{t(`${NS}.salesNotSummed`)}</span>
+        </>
+      )}
     </section>
   );
 }
@@ -312,7 +397,8 @@ export function visitsStale(performance) {
   return performance?.sources?.traffic?.stale === true;
 }
 
-export function VisitCard({ performance, cardCls = "", t }) {
+// `scope` names the platform the visits belong to once the board shows several
+export function VisitCard({ performance, scope = "", cardCls = "", t }) {
   if (!performance || performance.visit === null) return null;
   // fewer than 3 same-weekday samples means there is no median to compare with
   const delta = performance.sampleCount >= 3 ? performance.delta : null;
@@ -321,6 +407,7 @@ export function VisitCard({ performance, cardCls = "", t }) {
     <section className={`flex min-w-0 flex-col gap-2 p-5 ${cardCls}`}>
       <span className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <span className="text-sm font-bold text-theme-800 dark:text-theme-100">
+          {scope ? `${scope} ` : ""}
           {t(`${NS}.visitsTitle`)}{" "}
           <span className={`text-xs font-medium ${MUTED}`}>
             {visitDayLabel(performance.dataDateJST)} ·{" "}
@@ -430,12 +517,18 @@ export function ShopLogo({ name, url, size = 18 }) {
 
 // logo, then the shop's colour as a thin bar, then the name — the colour ties
 // the row to the shop's bars elsewhere on the page
-export function ShopName({ name, color, logoUrl }) {
+// `platform` is named beside a shop that is not 楽天's, so a peer list reads clearly
+export function ShopName({ name, color, logoUrl, platform = "rakuten", t }) {
   return (
     <span className="flex items-center gap-2 font-bold text-theme-900 dark:text-theme-50">
       <ShopLogo name={name} url={logoUrl} />
       <span aria-hidden="true" className="block h-3 w-[3px] shrink-0 rounded-full" style={{ backgroundColor: color }} />
       {name}
+      {platform !== "rakuten" && t ? (
+        <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1 py-px text-[10px] font-bold text-amber-700 dark:text-amber-300">
+          {platformLabel(platform, t)}
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -449,7 +542,8 @@ function TodayCell({ row, metric, maxToday, color, t }) {
       </td>
     );
   }
-  const others = METRICS.filter((m) => m !== metric)
+  // the company line has no yen of its own: leave the slot out, not a dash
+  const others = METRICS.filter((m) => m !== metric && row.today[m] !== null && row.today[m] !== undefined)
     .map((m) => valueText(m, row.today[m], t))
     .join(" · ");
   return (
@@ -481,7 +575,9 @@ function TodayCell({ row, metric, maxToday, color, t }) {
 
 function AvgRatioCell({ row, metric }) {
   const avg = row.avg?.[metric];
-  const pct = historyComparable(metric) && avg > 0 && row.today ? (row.today[metric] / avg) * 100 : null;
+  const value = row.today?.[metric];
+  const comparable = historyComparable(metric, row.platform ?? "rakuten");
+  const pct = comparable && avg > 0 && value !== null && value !== undefined ? (value / avg) * 100 : null;
   return (
     <td {...colProps(3)} className={`${colProps(3).className} px-2 py-2.5`}>
       {pct === null ? (
@@ -510,8 +606,12 @@ function Cell({ i, className = "", children }) {
   );
 }
 
-function ShopRow({ row, metric, total, maxToday, color, logoUrl, t, isTotal = false }) {
-  const share = total > 0 && row.today ? `${((row.today[metric] / total) * 100).toFixed(1)}%` : DASH;
+// `shareBase` is what the row's share is of; `label` names a footer row
+function ShopRow({ row, metric, shareBase, maxToday, color, logoUrl, t, label = null }) {
+  const isTotal = label !== null;
+  const value = row.today?.[metric];
+  const share =
+    shareBase > 0 && value !== null && value !== undefined ? `${((value / shareBase) * 100).toFixed(1)}%` : DASH;
   return (
     <tr
       className={
@@ -522,9 +622,9 @@ function ShopRow({ row, metric, total, maxToday, color, logoUrl, t, isTotal = fa
     >
       <th scope="row" className="px-2 py-2.5 text-left text-sm">
         {isTotal ? (
-          <span className="font-bold text-theme-900 dark:text-theme-50">{t(`${NS}.total`)}</span>
+          <span className="font-bold text-theme-900 dark:text-theme-50">{label}</span>
         ) : (
-          <ShopName name={row.name} color={color} logoUrl={logoUrl} />
+          <ShopName name={row.name} color={color} logoUrl={logoUrl} platform={row.platform} t={t} />
         )}
       </th>
       <TodayCell row={row} metric={metric} maxToday={maxToday} color={isTotal ? null : color} t={t} />
@@ -558,7 +658,7 @@ function IdleRow({ row, color, logoUrl, t }) {
   return (
     <tr className="border-b border-theme-300/30 text-theme-500 dark:border-white/[0.07] dark:text-theme-400">
       <th scope="row" className="px-2 py-2 text-left text-sm">
-        <ShopName name={row.name} color={color} logoUrl={logoUrl} />
+        <ShopName name={row.name} color={color} logoUrl={logoUrl} platform={row.platform} t={t} />
       </th>
       <td colSpan={7} {...colProps(1)} className={`${colProps(1).className} px-2 py-2 text-xs`}>
         {t(`${NS}.idleNote`)}
@@ -586,7 +686,19 @@ export function ShopTable({
   const [showIdle, setShowIdle] = useState(false);
   const colorOf = (name) => shopColors[name] ?? FALLBACK_SHOP_COLOR;
   const maxToday = Math.max(1, ...table.rows.map((r) => r.today?.[metric] ?? 0));
-  const total = table.total.today?.[metric] ?? null;
+  // one footer row per platform, then the company's once there are several
+  const totals = table.totals ?? [table.total];
+  const multi = totals.length > 1;
+  const companyToday = table.total.today?.[metric] ?? null;
+  // a share of the company for counts; 売上 only shares within its own platform
+  const shareBaseOf = (platform) =>
+    multi && metric === "sales" ? (totals.find((r) => r.platform === platform)?.today?.sales ?? null) : companyToday;
+  const footerLabel = (row) => {
+    if (!multi) return t(`${NS}.total`);
+    return row.platform
+      ? t(`${NS}.platformTotal`, { platform: platformLabel(row.platform, t) })
+      : t(`${NS}.companyTotal`);
+  };
   const unit = unitOf(metric, t);
   // the 7-day yen are R-Karte's, after coupons: the header says so on a line of its own
   const weekAvgLabel = historyComparable(metric) ? (
@@ -672,10 +784,10 @@ export function ShopTable({
           <tbody>
             {table.rows.map((row) => (
               <ShopRow
-                key={row.name}
+                key={row.key ?? row.name}
                 row={row}
                 metric={metric}
-                total={total}
+                shareBase={shareBaseOf(row.platform)}
                 maxToday={maxToday}
                 color={colorOf(row.name)}
                 logoUrl={logoByName.get(row.name)}
@@ -685,7 +797,7 @@ export function ShopTable({
             {showIdle
               ? table.idle.map((row) => (
                   <IdleRow
-                    key={row.name}
+                    key={row.key ?? row.name}
                     row={row}
                     color={colorOf(row.name)}
                     logoUrl={logoByName.get(row.name)}
@@ -695,7 +807,17 @@ export function ShopTable({
               : null}
           </tbody>
           <tfoot>
-            <ShopRow row={table.total} metric={metric} total={total} maxToday={maxToday} t={t} isTotal />
+            {totals.map((row) => (
+              <ShopRow
+                key={row.key ?? "total"}
+                row={row}
+                metric={metric}
+                shareBase={row.platform ? shareBaseOf(row.platform) : companyToday}
+                maxToday={maxToday}
+                t={t}
+                label={footerLabel(row)}
+              />
+            ))}
           </tfoot>
         </table>
       </div>

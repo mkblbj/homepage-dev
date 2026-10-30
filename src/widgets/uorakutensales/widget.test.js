@@ -18,6 +18,9 @@ const READ_ONLY = [
   "marketEvidence",
   "devicesEvidence",
   "performance",
+  "amazonSales",
+  "amazonHistory",
+  "amazonRanking",
 ];
 
 describe("uorakutensales widget config", () => {
