@@ -155,6 +155,20 @@ describe("widgets/uorakutensales/daily-check-section", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it("the month card names the shop coverage only when shops are missing", () => {
+    const metric = { current: 900, previous: 1000, pace: 30, prevPace: 32, paceDeltaPct: -6, vsPrevPct: 90 };
+    const monthly = (coverage) => ({
+      current: { month: "2026-10", completedDays: 29, hasLiveDay: true, progressPct: 93, coverage },
+      metrics: { sales: metric, units: metric, orders: metric },
+    });
+    const tc = (key, opts) => (key === `${NS}.shopCoverage` ? `${opts.covered}/${opts.total}店舗` : t(key, opts));
+    const { rerender } = render(<MonthCard monthly={monthly({ covered: 8, total: 9 })} metric="orders" t={tc} />);
+    expect(screen.getByText(/· 8\/9店舗/)).toBeInTheDocument();
+
+    rerender(<MonthCard monthly={monthly({ covered: 9, total: 9 })} metric="orders" t={tc} />);
+    expect(screen.queryByText(/店舗/)).not.toBeInTheDocument();
+  });
+
   it("the visit card says nothing without the performance snapshot", () => {
     const { container } = render(<VisitCard performance={null} t={t} />);
     expect(container).toBeEmptyDOMElement();

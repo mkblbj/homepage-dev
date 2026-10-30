@@ -218,6 +218,9 @@ export function MonthCard({ monthly, metric, cardCls = "", t }) {
   const m = monthly.metrics[metric];
   const cur = monthly.current;
   const done = t(`${NS}.monthCompleted`, { count: cur.completedDays });
+  // the month (and last month, which is only compared over the same shops)
+  // adds up fewer shops than the list holds — e.g. one without the order API
+  const coverage = cur.coverage && cur.coverage.covered < cur.coverage.total ? cur.coverage : null;
   return (
     <section className={`flex min-w-0 flex-col gap-2 p-5 ${cardCls}`}>
       <span className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
@@ -226,6 +229,7 @@ export function MonthCard({ monthly, metric, cardCls = "", t }) {
           <span className={`text-xs font-medium ${MUTED}`}>
             {cur.month} · {done}
             {cur.hasLiveDay ? `＋${t(`${NS}.todayLabel`)}` : ""}
+            {coverage ? ` · ${t(`${NS}.shopCoverage`, coverage)}` : ""}
           </span>
         </span>
         <span className={`text-xs ${MUTED}`}>

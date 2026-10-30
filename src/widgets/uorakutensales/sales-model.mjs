@@ -555,6 +555,26 @@ function monthMetrics(current, previous, today, completedDays, prevDays) {
   return out;
 }
 
+// A shop row the server left out of a month's totals (unconfigured, not read
+// yet, or stale) still shows its figures, but is never compared with anything.
+const countedInTotals = (row) => row?.includedInTotals !== false;
+
+// A shop count the API may omit: null when absent rather than 0.
+function shopCountOf(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(value);
+  return Number.isInteger(n) && n >= 0 ? n : null;
+}
+
+// The names a month's totals actually add up, sorted so two months compare.
+function countedShopNames(month) {
+  return (month?.shops || [])
+    .filter(countedInTotals)
+    .map((s) => normalizeText(s.shopName))
+    .sort()
+    .join("\n");
+}
+
 // Build the "this month vs last month" view model. Everything here is actual —
 // no month-end projection — because 楽天's campaign days make the intra-month
 // rhythm far too uneven for a linear extrapolation to be honest.
@@ -568,35 +588,44 @@ export function buildMonthly(monthly, sales) {
   const days = daysInMonth(month);
   const completedDays = dayWithinMonth(cur.completedThroughDate, month);
 
+  // Since the order-API switch a month is "provisional" whenever any shop is
+  // missing from it — kurumu has no API access, so last month is never
+  // "complete". Its totals are still a fair baseline as long as they add up
+  // the same shops as this month's; when the two sets differ, the company
+  // figures measure different things and are not compared.
   const prev = monthly.previousMonth;
-  // a partial month is never dressed up as a baseline
-  const prevTotals = prev?.status === "complete" ? metricsOf(prev.totals) : null;
-  const prevDays = prevTotals ? daysInMonth(prev.month) : 0;
+  const prevReadable = prev && prev.ok !== false && ["complete", "provisional"].includes(prev.status);
+  const sameShops = prevReadable && countedShopNames(prev) === countedShopNames(cur);
+  const prevTotals = sameShops ? metricsOf(prev.totals) : null;
+  const prevDays = prevReadable ? daysInMonth(prev.month) : 0;
 
   // today's live figures, and only when the API says today really is part of
   // this month's running total — otherwise there is nothing to strip out
   const hasLiveDay = dayWithinMonth(cur.liveDate, month) > 0;
-  // Folding a live day in makes the rollup stamp that day's own source, so
-  // currentMonth.updatedAtJST IS the realtime snapshot's generatedAtJST. An
-  // exact match is therefore proof that both payloads saw the same snapshot.
-  // Any other value means the two boards polled a refresh apart: the totals
-  // would disagree by a whole tick without the difference ever going negative,
-  // so subtracting one from the other would bias the average and say nothing.
-  const liveStamp = normalizeText(cur.updatedAtJST);
-  const sameSnapshot = hasLiveDay && liveStamp !== "" && liveStamp === normalizeText(sales?.generatedAtJST);
+  // The rollup and the realtime snapshot are built from the same order-API
+  // read, so an exact sourceUpdatedAtJST match proves both saw the same data.
+  // generatedAtJST is each response's own build time and differs by seconds
+  // even then. Any other source time means the two polled a refresh apart:
+  // the totals would disagree by a whole tick without the difference ever
+  // going negative, so subtracting one from the other would bias the average.
+  const liveStamp = normalizeText(cur.sourceUpdatedAtJST);
+  const sameSnapshot = hasLiveDay && liveStamp !== "" && liveStamp === normalizeText(sales?.sourceUpdatedAtJST);
   const today = sameSnapshot ? metricsOf(sales?.totals) : null;
   // a live day we cannot measure leaves the finished-day span unknowable: report
   // no pace rather than one inflated by spreading a partial day over whole ones
   const paceDays = hasLiveDay && !today ? 0 : completedDays;
   const todayByShop = new Map(sameSnapshot ? (sales?.shops || []).map((s) => [s.shopName, metricsOf(s)]) : []);
 
-  const prevByShop = new Map(prevTotals ? (prev.shops || []).map((s) => [s.shopName, metricsOf(s)]) : []);
+  const prevByShop = new Map(
+    prevReadable ? (prev.shops || []).filter(countedInTotals).map((s) => [s.shopName, metricsOf(s)]) : [],
+  );
 
-  const shops = (cur.shops || [])
+  const shopRows = cur.shops || [];
+  const shops = shopRows
     .map((s) => {
       const metrics = monthMetrics(
         metricsOf(s),
-        prevByShop.get(s.shopName) || null,
+        countedInTotals(s) ? prevByShop.get(s.shopName) || null : null,
         todayByShop.get(s.shopName) || null,
         paceDays,
         prevDays,
@@ -629,6 +658,11 @@ export function buildMonthly(monthly, sales) {
       // Today is excluded here too, so the marker and the pace measure the same span.
       progressPct: days > 0 ? (completedDays / days) * 100 : 0,
       hasLiveDay,
+      // how many shops the totals add up, against all shops on the list
+      coverage: {
+        covered: shopCountOf(cur.updatedShopCount) ?? shopRows.filter(countedInTotals).length,
+        total: shopCountOf(cur.shopCount) ?? shopRows.length,
+      },
     },
     previous: prevTotals
       ? { month: normalizeText(prev.month), status: normalizeText(prev.status), days: prevDays }
