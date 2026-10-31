@@ -1638,9 +1638,9 @@
         "lastDays": "近{{count}}日",
         "platformAupay": "au PAY",
         "platformCount": "{{platform}} {{count}}",
-        "weekExcludes": "7日均值比较不含 {{names}}（无历史数据）",
-        "prevExcludes": "上月比不含 {{names}}（无上月数据）",
-        "companyExcludes": "全公司合计的 7日均值比、上月比不含 {{names}}（无历史和上月数据）",
+        "weekExcludes": "过去 7 日柱状图、7 日均值及其比率不含 {{names}}（无历史数据）",
+        "prevExcludes": "上月数字和上月比不含 {{names}}（无上月数据）",
+        "companyExcludes": "全公司合计的今日、本月含所有店铺；7 日均值及其比率、上月比不含 {{names}}（无历史和上月数据）",
         "noWeekLeftOut": "{{names}} 无历史数据，已省略"
     },
     "uoshippingdashboard": {
