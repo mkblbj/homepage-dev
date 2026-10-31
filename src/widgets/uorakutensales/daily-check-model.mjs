@@ -75,27 +75,31 @@ function monthOf(shop) {
 
 const sumAll = (values) => (values.every(known) ? values.reduce((a, b) => a + b, 0) : null);
 
-// One company month metric (counts only). The month adds up every platform, but
-// a comparison needs the same shops on both sides, so last month, the paces and
-// the delta add up only `comparable`: the platforms that serve a last month.
-// Each side's pace already leaves its own today out, so the paces add up.
+// One company month metric (counts only). This month's total and daily pace add up
+// every platform. Last month and the comparisons add up only `comparable`, the
+// platforms that serve a last month, so both sides cover the same shops. Each
+// side's pace already leaves its own today out, so the paces add up; a platform
+// whose today could not be read just adds no pace of its own.
 function combineMonth(parts, comparable) {
   if (parts.some((part) => !part)) return null;
   const pick = (list, key) => sumAll(list.map((part) => part[key]));
   const current = pick(parts, "current");
   const comparableCurrent = pick(comparable, "current");
   const previous = pick(comparable, "previous");
-  const pace = pick(comparable, "pace");
+  const comparablePace = pick(comparable, "pace");
   const prevPace = pick(comparable, "prevPace");
-  const canCompare = pace !== null && prevPace > 0;
+  const canCompare = comparablePace !== null && prevPace > 0;
+  const extraPace = parts
+    .filter((part) => !comparable.includes(part))
+    .reduce((total, part) => total + (part.pace ?? 0), 0);
   return {
     current,
     previous,
     vsPrevPct: previous > 0 && comparableCurrent !== null ? (comparableCurrent / previous) * 100 : null,
-    pace,
+    pace: comparablePace === null ? null : comparablePace + extraPace,
     prevPace,
-    paceDeltaPct: canCompare ? (pace / prevPace - 1) * 100 : null,
-    ahead: canCompare ? pace >= prevPace : null,
+    paceDeltaPct: canCompare ? (comparablePace / prevPace - 1) * 100 : null,
+    ahead: canCompare ? comparablePace >= prevPace : null,
   };
 }
 

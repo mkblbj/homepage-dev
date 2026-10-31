@@ -591,6 +591,9 @@ test("the month view lists au PAY's yen and leaves it out of the comparison", ()
   assert.equal(view.metrics.orders.previous, without.metrics.orders.previous);
   assert.equal(view.metrics.orders.paceDeltaPct, without.metrics.orders.paceDeltaPct);
   assert.equal(view.metrics.orders.vsPrevPct, without.metrics.orders.vsPrevPct);
+  // this month's daily pace is every shop's: au PAY's (40 − 4) orders over 24 days
+  assert.equal(view.metrics.orders.pace, without.metrics.orders.pace + 36 / 24);
+  assert.equal(view.metrics.orders.prevPace, without.metrics.orders.prevPace);
   assert.deepEqual(view.prevExcludes, ["aupay"]);
   assert.deepEqual(
     view.platforms.map((p) => [p.platform, p.metrics.sales.current]),

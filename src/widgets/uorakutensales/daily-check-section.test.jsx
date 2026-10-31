@@ -459,10 +459,14 @@ describe("widgets/uorakutensales/daily-check-section", () => {
       weekValues: { sales: null, units: 285, orders: 150 },
       avg: { sales: null, units: 300, orders: 300 },
       weekExcludes: ["aupay"],
+      days: [{ date: "2026-10-30", md: "10/30", wd: "金", orders: 100 }],
     };
     render(<TodayCard view={view} metric="orders" shopColors={{}} t={tn} />);
 
     expect(screen.getByText(`300${NS}.ordersUnit`)).toBeInTheDocument();
+    // today's bar is every shop, like the big figure; only the ratio stays like for like
+    expect(screen.getByText("300")).toBeInTheDocument();
+    expect(screen.queryByText("150")).not.toBeInTheDocument();
     expect(screen.getByText("50%")).toBeInTheDocument();
     expect(screen.getByText("week excludes au PAY")).toBeInTheDocument();
   });

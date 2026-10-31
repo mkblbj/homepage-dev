@@ -1625,9 +1625,9 @@
         "lastDays": "Last {{count}} days",
         "platformAupay": "au PAY",
         "platformCount": "{{platform}} {{count}}",
-        "weekExcludes": "{{names}} left out of the 7-day comparison (no history)",
-        "prevExcludes": "{{names}} left out of the comparison with last month (no data)",
-        "companyExcludes": "Company total: {{names}} left out of the 7-day and last-month comparisons (no data)",
+        "weekExcludes": "{{names}} is missing from the past 7 days, their average and this ratio (no history)",
+        "prevExcludes": "{{names}} is missing from last month's figures and the comparison (no data)",
+        "companyExcludes": "Company total: today and this month cover every shop; {{names}} is missing from the 7-day average, its ratio and the last-month comparison (no data)",
         "noWeekLeftOut": "{{names}} left out: no history"
     },
     "uoshippingdashboard": {

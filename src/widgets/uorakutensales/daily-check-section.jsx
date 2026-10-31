@@ -211,9 +211,8 @@ export function TodayCard({ view, metric, shopColors, cardCls = "", t }) {
   // today's total adds up fewer shops than the list holds — e.g. one without the order API
   const coverage = view.coverage && view.coverage.covered < view.coverage.total ? view.coverage : null;
   const days = metric === "sales" ? view.salesDays : view.days;
-  // a platform with no week counts in the big figure but not against the week
+  // today is every shop; a platform with no week is only missing from the past
   const excluded = !split && pct !== null ? platformNames(view.weekExcludes, t) : "";
-  const weekValue = view.weekValues ? (view.weekValues[metric] ?? null) : value;
   return (
     <section className={`flex min-w-0 flex-wrap justify-between gap-6 p-5 ${cardCls}`}>
       <div className="flex min-w-[260px] flex-1 flex-col gap-3">
@@ -294,7 +293,7 @@ export function TodayCard({ view, metric, shopColors, cardCls = "", t }) {
       {days.length ? (
         <div className="min-w-[280px] flex-1 @5xl:max-w-[400px]">
           {/* 売上 across platforms: the bars are 楽天's yen alone */}
-          <WeekBars days={days} metric={metric} value={weekValue} avg={avg} platform={split ? "rakuten" : null} t={t} />
+          <WeekBars days={days} metric={metric} value={value} avg={avg} platform={split ? "rakuten" : null} t={t} />
         </div>
       ) : null}
     </section>
