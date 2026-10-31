@@ -22,7 +22,7 @@ const performance = buildPerformanceModel({
 
 describe("widgets/uorakutensales/insight-section", () => {
   it("a shop the snapshot misses still gets its row, read as dashes", () => {
-    render(<ShopVisitsTable performance={performance} names={["A", "B"]} shopColors={{}} t={t} />);
+    render(<ShopVisitsTable performance={performance} shops={[{ name: "A" }, { name: "B" }]} shopColors={{}} t={t} />);
 
     const row = screen.getByRole("row", { name: /^B/ });
     expect(within(row).getAllByText("—")).toHaveLength(5);
@@ -37,8 +37,7 @@ describe("widgets/uorakutensales/insight-section", () => {
     render(
       <ShopVisitsTable
         performance={performance}
-        names={["A", "uoworld"]}
-        platformByName={new Map([["uoworld", "amazon"]])}
+        shops={[{ name: "A" }, { key: "amazon:acc:JP", name: "uoworld", platform: "amazon" }]}
         scope="楽天"
         shopColors={{}}
         t={tl}
@@ -51,11 +50,34 @@ describe("widgets/uorakutensales/insight-section", () => {
     expect(screen.getByRole("row", { name: /^楽天 計/ })).toBeInTheDocument();
   });
 
+  it("an au PAY shop named like a 楽天 shop keeps its own dashes and takes no logo", () => {
+    const tl = (key, opts) => ({ "uorakutensales.platformAupay": "au PAY" })[key] ?? t(key, opts);
+    const { container } = render(
+      <ShopVisitsTable
+        performance={performance}
+        shops={[
+          { key: "rakuten:A", name: "A", platform: "rakuten" },
+          { key: "aupay:1", name: "A", platform: "aupay" },
+        ]}
+        logoByName={new Map([["A", "https://example.test/a.png"]])}
+        shopColors={{}}
+        t={tl}
+      />,
+    );
+
+    const rows = screen.getAllByRole("row", { name: /^A/ });
+    expect(rows).toHaveLength(2);
+    expect(within(rows[0]).getByText("200")).toBeInTheDocument();
+    expect(within(rows[1]).getAllByText("—")).toHaveLength(5);
+    // the logo is the 楽天 shop's alone
+    expect(container.querySelectorAll('img[src="https://example.test/a.png"]')).toHaveLength(1);
+  });
+
   it("each shop's logo sits beside its name", () => {
     const { container } = render(
       <ShopVisitsTable
         performance={performance}
-        names={["A"]}
+        shops={[{ name: "A" }]}
         shopColors={{}}
         logoByName={new Map([["A", "https://example.test/a.png"]])}
         t={t}

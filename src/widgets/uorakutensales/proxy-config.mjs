@@ -32,6 +32,8 @@ const ENDPOINT_PATHS = {
   rankingMonthly: "/api/item-rankings/monthly",
   amazonRankingMonthly: "/api/amazon/item-rankings/monthly",
   amazonPeaks: "/api/amazon/history/peaks",
+  // au PAY's shops: today and this month are all it serves
+  aupaySales: "/api/aupay/sales",
 };
 
 export function normalizeSalesServiceUrl(baseUrl = DEFAULT_SALES_SERVICE_URL) {

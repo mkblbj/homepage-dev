@@ -1630,13 +1630,18 @@
         "visitsStale": "已停止更新",
         "platformRakuten": "乐天",
         "platformAmazon": "Amazon",
-        "platformSplit": "乐天 {{rakuten}}・Amazon {{amazon}}",
         "platformTotal": "{{platform}} 合计",
         "companyTotal": "全公司合计",
         "salesNotSummed": "各平台销售额口径不同，不合计",
         "boardLoading": "加载中…",
         "peaksCoverageAmazon": "Amazon 自 {{date}} 起",
-        "lastDays": "近{{count}}日"
+        "lastDays": "近{{count}}日",
+        "platformAupay": "au PAY",
+        "platformCount": "{{platform}} {{count}}",
+        "weekExcludes": "7日均值比较不含 {{names}}（无历史数据）",
+        "prevExcludes": "上月比不含 {{names}}（无上月数据）",
+        "companyExcludes": "全公司合计的 7日均值比、上月比不含 {{names}}（无历史和上月数据）",
+        "noWeekLeftOut": "{{names}} 无历史数据，已省略"
     },
     "uoshippingdashboard": {
         "allPlatforms": "全部",

@@ -1,14 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import {
-  amazonKey,
-  amazonTrendRow,
-  buildAmazon,
-  buildAmazonBoards,
-  jstStamp,
-  withAmazonPeaks,
-} from "./amazon-model.mjs";
+import { amazonKey, buildAmazon, buildAmazonBoards, jstStamp, trendRowOf, withAmazonPeaks } from "./amazon-model.mjs";
 
 const SOURCE = "2026-10-30T04:55:45.603Z"; // 13:55:45 JST
 
@@ -188,7 +181,7 @@ test("buildAmazonBoards gives each shop a board per dimension in the 楽天 item
 });
 
 test("an Amazon shop's 7-day card has its week and no CVR", () => {
-  const row = amazonTrendRow(buildAmazon(salesOf(), history).shops[0]);
+  const row = trendRowOf(buildAmazon(salesOf(), history).shops[0]);
   assert.equal(row.platform, "amazon");
   assert.equal(row.h7Total, 70000);
   assert.equal(row.h7Orders, 63);

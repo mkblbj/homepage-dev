@@ -358,6 +358,61 @@ describe("widgets/uorakutensales/daily-check-section", () => {
     expect(within(screen.getByRole("row", { name: /^A(?!mazon)/ })).getByText("40%")).toBeInTheDocument();
   });
 
+  it("a shop on another platform takes no 楽天 logo, even under the same name", () => {
+    const table3 = {
+      rows: [
+        shopRow("3911", { key: "rakuten:3911", platform: "rakuten" }),
+        shopRow("3911", { key: "aupay:1", platform: "aupay", cvr: null, visits: null }),
+      ],
+      idle: [],
+      total: shopRow(null),
+    };
+    const { container } = render(
+      <ShopTable
+        table={table3}
+        metric="orders"
+        shopColors={{}}
+        logoByName={new Map([["3911", "https://example.test/3911.png"]])}
+        t={tl}
+      />,
+    );
+
+    expect(container.querySelectorAll('img[src="https://example.test/3911.png"]')).toHaveLength(1);
+  });
+
+  it("the shop table says which platform the company's comparisons leave out", () => {
+    const tn = (key, opts) =>
+      key === `${NS}.companyExcludes`
+        ? `excludes ${opts.names}`
+        : key === `${NS}.platformAupay`
+          ? "au PAY"
+          : tl(key, opts);
+    render(<ShopTable table={{ ...multiTable, compareExcludes: ["aupay"] }} metric="orders" shopColors={{}} t={tn} />);
+
+    expect(screen.getByText("excludes au PAY")).toBeInTheDocument();
+  });
+
+  it("the company's 7-day ratio sets only the platforms with a week against it", () => {
+    const company = {
+      ...shopRow(null),
+      key: "total:company",
+      platform: null,
+      today: { sales: null, units: 70, orders: 50 },
+      weekToday: { sales: null, units: 60, orders: 25 },
+      avg: { sales: null, units: 30, orders: 25 },
+    };
+    render(
+      <ShopTable
+        table={{ rows: [], idle: [], total: company, totals: [company] }}
+        metric="orders"
+        shopColors={{}}
+        t={t}
+      />,
+    );
+
+    expect(screen.getByText("100%")).toBeInTheDocument();
+  });
+
   const multiView = {
     multi: true,
     platforms: [
@@ -389,6 +444,27 @@ describe("widgets/uorakutensales/daily-check-section", () => {
     expect(screen.getByText("¥324785")).toBeInTheDocument();
     expect(screen.getByText("¥7897")).toBeInTheDocument();
     expect(screen.getByText(`${NS}.salesNotSummed`)).toBeInTheDocument();
+  });
+
+  it("the today card says which platform stays out of the week", () => {
+    const tn = (key, opts) =>
+      key === `${NS}.weekExcludes`
+        ? `week excludes ${opts.names}`
+        : key === `${NS}.platformAupay`
+          ? "au PAY"
+          : tl(key, opts);
+    const view = {
+      ...multiView,
+      values: { sales: null, units: 285, orders: 300 },
+      weekValues: { sales: null, units: 285, orders: 150 },
+      avg: { sales: null, units: 300, orders: 300 },
+      weekExcludes: ["aupay"],
+    };
+    render(<TodayCard view={view} metric="orders" shopColors={{}} t={tn} />);
+
+    expect(screen.getByText(`300${NS}.ordersUnit`)).toBeInTheDocument();
+    expect(screen.getByText("50%")).toBeInTheDocument();
+    expect(screen.getByText("week excludes au PAY")).toBeInTheDocument();
   });
 
   it("the month card lists each platform's 売上 when the company has none", () => {

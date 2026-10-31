@@ -12,7 +12,7 @@ import { FALLBACK_SHOP_COLOR, man } from "./sales-model.mjs";
 const NS = "uorakutensales";
 const METRIC_LABEL = { sales: "sortSales", units: "sortUnits", orders: "sortOrders" };
 const UNIT_KEY = { units: "unitsShort", orders: "ordersUnit" };
-const PLATFORM_KEY = { rakuten: "platformRakuten", amazon: "platformAmazon" };
+const PLATFORM_KEY = { rakuten: "platformRakuten", amazon: "platformAmazon", aupay: "platformAupay" };
 
 const TONE_CLASS = {
   down: "font-bold text-rose-600 dark:text-rose-300",
@@ -171,8 +171,13 @@ function WeekBars({ days, metric, value, avg, platform = null, t }) {
   );
 }
 
-function platformLabel(platform, t) {
+export function platformLabel(platform, t) {
   return t(`${NS}.${PLATFORM_KEY[platform]}`);
+}
+
+// platforms named in a sentence, e.g. those a comparison leaves out
+function platformNames(platforms, t) {
+  return (platforms || []).map((platform) => platformLabel(platform, t)).join("・");
 }
 
 // one line per platform, the picked metric first: its own counts and yen, read
@@ -197,7 +202,7 @@ function PlatformLines({ platforms, metric, t }) {
   );
 }
 
-// `view` is buildTodayView's: one platform, or 楽天 and Amazon side by side
+// `view` is buildTodayView's: one platform, or several side by side
 export function TodayCard({ view, metric, shopColors, cardCls = "", t }) {
   const { value, avg, pct } = todayVsAverage(view, metric);
   // 売上 across platforms is never one figure: each platform keeps its own
@@ -206,6 +211,9 @@ export function TodayCard({ view, metric, shopColors, cardCls = "", t }) {
   // today's total adds up fewer shops than the list holds — e.g. one without the order API
   const coverage = view.coverage && view.coverage.covered < view.coverage.total ? view.coverage : null;
   const days = metric === "sales" ? view.salesDays : view.days;
+  // a platform with no week counts in the big figure but not against the week
+  const excluded = !split && pct !== null ? platformNames(view.weekExcludes, t) : "";
+  const weekValue = view.weekValues ? (view.weekValues[metric] ?? null) : value;
   return (
     <section className={`flex min-w-0 flex-wrap justify-between gap-6 p-5 ${cardCls}`}>
       <div className="flex min-w-[260px] flex-1 flex-col gap-3">
@@ -276,6 +284,9 @@ export function TodayCard({ view, metric, shopColors, cardCls = "", t }) {
               />
             </span>
             <span className={`text-xs ${MUTED}`}>{t(`${NS}.todayNoTimeCorrection`)}</span>
+            {excluded ? (
+              <span className={`text-xs ${MUTED}`}>{t(`${NS}.weekExcludes`, { names: excluded })}</span>
+            ) : null}
           </div>
         ) : null}
         {split ? <span className={`mt-1 text-xs ${MUTED}`}>{t(`${NS}.salesNotSummed`)}</span> : null}
@@ -283,7 +294,7 @@ export function TodayCard({ view, metric, shopColors, cardCls = "", t }) {
       {days.length ? (
         <div className="min-w-[280px] flex-1 @5xl:max-w-[400px]">
           {/* 売上 across platforms: the bars are 楽天's yen alone */}
-          <WeekBars days={days} metric={metric} value={value} avg={avg} platform={split ? "rakuten" : null} t={t} />
+          <WeekBars days={days} metric={metric} value={weekValue} avg={avg} platform={split ? "rakuten" : null} t={t} />
         </div>
       ) : null}
     </section>
@@ -300,6 +311,7 @@ export function MonthCard({ monthly, metric, cardCls = "", t }) {
   // the month (and last month, which is only compared over the same shops)
   // adds up fewer shops than the list holds — e.g. one without the order API
   const coverage = cur.coverage && cur.coverage.covered < cur.coverage.total ? cur.coverage : null;
+  const excluded = platformNames(monthly.prevExcludes, t);
   return (
     <section className={`flex min-w-0 flex-col gap-2 p-5 ${cardCls}`}>
       <span className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
@@ -345,6 +357,7 @@ export function MonthCard({ monthly, metric, cardCls = "", t }) {
               </span>
             </>
           ) : null}
+          {excluded ? <span className={`text-xs ${MUTED}`}>{t(`${NS}.prevExcludes`, { names: excluded })}</span> : null}
         </>
       ) : (
         <>
@@ -572,7 +585,8 @@ function TodayCell({ row, metric, maxToday, color, t }) {
 
 function AvgRatioCell({ row, metric }) {
   const avg = row.avg?.[metric];
-  const value = row.today?.[metric];
+  // the company's line sets only the platforms with a week against its average
+  const value = (row.weekToday ?? row.today)?.[metric];
   const pct = avg > 0 && value !== null && value !== undefined ? (value / avg) * 100 : null;
   return (
     <td {...colProps(3)} className={`${colProps(3).className} px-2 py-2.5`}>
@@ -681,6 +695,9 @@ export function ShopTable({
 }) {
   const [showIdle, setShowIdle] = useState(false);
   const colorOf = (name) => shopColors[name] ?? FALLBACK_SHOP_COLOR;
+  // logos are 楽天's: a shop of the same name elsewhere (3911 on au PAY) is another shop
+  const logoOf = (row) => (!row.platform || row.platform === "rakuten" ? logoByName.get(row.name) : undefined);
+  const excluded = platformNames(table.compareExcludes, t);
   const maxToday = Math.max(1, ...table.rows.map((r) => r.today?.[metric] ?? 0));
   // one footer row per platform, then the company's once there are several
   const totals = table.totals ?? [table.total];
@@ -783,19 +800,13 @@ export function ShopTable({
                 shareBase={shareBaseOf(row.platform)}
                 maxToday={maxToday}
                 color={colorOf(row.name)}
-                logoUrl={logoByName.get(row.name)}
+                logoUrl={logoOf(row)}
                 t={t}
               />
             ))}
             {showIdle
               ? table.idle.map((row) => (
-                  <IdleRow
-                    key={row.key ?? row.name}
-                    row={row}
-                    color={colorOf(row.name)}
-                    logoUrl={logoByName.get(row.name)}
-                    t={t}
-                  />
+                  <IdleRow key={row.key ?? row.name} row={row} color={colorOf(row.name)} logoUrl={logoOf(row)} t={t} />
                 ))
               : null}
           </tbody>
@@ -814,6 +825,7 @@ export function ShopTable({
           </tfoot>
         </table>
       </div>
+      {excluded ? <span className={`text-xs ${MUTED}`}>{t(`${NS}.companyExcludes`, { names: excluded })}</span> : null}
       {table.idle.length ? (
         <button
           type="button"

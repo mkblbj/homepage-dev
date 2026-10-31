@@ -93,28 +93,34 @@ export function CustomerMixCard({ performance, scope = "", cardCls = "", t }) {
   );
 }
 
-// `names` are the shop table's active rows, so both tables list shops in the same order
 // a shop the snapshot does not cover keeps its line, read as dashes
 function unknownShop(name) {
   return { name, visit: null, uu: null, expected: null, delta: null, sampleCount: 0, newSalesShare: null };
 }
 
-// `platformByName` marks the shops of other platforms, which have no visits to
-// show; `scope` names whose visits the total is once the board shows several
+// `shops` are the shop table's rows, so both tables list shops in the same order.
+// Visits and logos are 楽天's: a shop of another platform reads as dashes even
+// when it shares a 楽天 shop's name (3911 on au PAY). `scope` names whose visits
+// the total is once the board shows several platforms.
 export function ShopVisitsTable({
   performance,
-  names,
+  shops,
   shopColors,
   logoByName = new Map(),
-  platformByName = new Map(),
   scope = "",
   cardCls = "",
   t,
 }) {
   if (!performance) return null;
   const byName = new Map(performance.shops.map((s) => [s.name, s]));
-  const rows = names.map((name) => byName.get(name) ?? unknownShop(name));
-  const omitted = performance.shops.filter((s) => !names.includes(s.name)).map((s) => s.name);
+  const isRakuten = (shop) => !shop.platform || shop.platform === "rakuten";
+  const rows = shops.map((shop) => ({
+    ...(isRakuten(shop) ? (byName.get(shop.name) ?? unknownShop(shop.name)) : unknownShop(shop.name)),
+    key: shop.key ?? shop.name,
+    platform: shop.platform ?? "rakuten",
+  }));
+  const listed = new Set(shops.filter(isRakuten).map((shop) => shop.name));
+  const omitted = performance.shops.filter((s) => !listed.has(s.name)).map((s) => s.name);
   const companyDelta = performance.sampleCount >= 3 ? performance.delta : null;
   const cell = "px-2 py-2 text-right text-sm tabular-nums";
   const headBase = "px-2 py-2 text-xs font-semibold text-theme-600 dark:text-theme-300";
@@ -158,13 +164,13 @@ export function ShopVisitsTable({
           </thead>
           <tbody>
             {rows.map((s) => (
-              <tr key={s.name} className="border-b border-theme-300/30 dark:border-white/[0.07]">
+              <tr key={s.key} className="border-b border-theme-300/30 dark:border-white/[0.07]">
                 <th scope="row" className="px-2 py-2 text-left text-sm">
                   <ShopName
                     name={s.name}
                     color={shopColors[s.name] ?? FALLBACK_SHOP_COLOR}
-                    logoUrl={logoByName.get(s.name)}
-                    platform={platformByName.get(s.name) ?? "rakuten"}
+                    logoUrl={s.platform === "rakuten" ? logoByName.get(s.name) : undefined}
+                    platform={s.platform}
                     t={t}
                   />
                 </th>

@@ -18,8 +18,9 @@
  *   "rankingMonthly" / "amazonRankingMonthly" → this and last month's item boards,
  *                     read only while 今月 or 先月 is picked on the best sellers
  *   "amazonPeaks"   → GET /api/amazon/history/peaks  each Amazon shop's best day
+ *   "aupaySales"    → GET /api/aupay/sales           au PAY today and this month
  *
- * Amazon shops sit beside 楽天's as peers. Counts add up across platforms;
+ * Amazon's and au PAY's shops sit beside 楽天's as peers. Counts add up across platforms;
  * yen never do, since each platform measures its amounts its own way.
  *
  * No endpoint carries a conversion rate any more: the order API has no visitors,
@@ -34,12 +35,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { buildPerformanceModel, DASH } from "widgets/uoperformance/performance-model.mjs";
 
-import { amazonTrendRow, buildAmazon, buildAmazonBoards, withAmazonPeaks } from "./amazon-model.mjs";
+import { buildAmazon, buildAmazonBoards, trendRowOf, withAmazonPeaks } from "./amazon-model.mjs";
+import { buildAupay, withUnrecordedShops } from "./aupay-model.mjs";
 import { buildMonthView, buildShopTable, buildTodayView, RANKING_DIM_BY_METRIC } from "./daily-check-model.mjs";
 import {
   historyNotes,
   MetricSwitch,
   MonthCard,
+  platformLabel,
   ShopTable,
   TodayCard,
   VisitCard,
@@ -792,7 +795,7 @@ function RankingBoards({ ranking, period, onPeriod, dim, cardCls, t }) {
       <span className="inline-flex items-center gap-1">
         <PlatformMark platform={platform} size={12} />
         {label}
-        <PlatformSuffix label={t(`${NS}.${platform === "amazon" ? "platformAmazon" : "platformRakuten"}`)} />
+        <PlatformSuffix label={platformLabel(platform, t)} />
       </span>
     ) : (
       label
@@ -965,8 +968,8 @@ function PeaksSection({ peaks, scope = "", shopColors, cardCls, t }) {
   // a dimension can disappear across refreshes → fall back to what is present
   const activeDim = peaks.shopBests[dim] ? dim : peaks.available.find((d) => peaks.shopBests[d]);
   const bests = activeDim ? peaks.shopBests[activeDim] : [];
-  // with Amazon's bests among them, each shop shows its platform's mark
-  const mixed = bests.some((b) => b.platform === "amazon");
+  // with other platforms' shops among them, each shop shows its platform's mark
+  const mixed = bests.some((b) => b.platform && b.platform !== "rakuten");
   const hasRecordDay = bests.some((b) => b.onRecordDay);
 
   const dimChip = (key) => (
@@ -1047,12 +1050,10 @@ function PeaksSection({ peaks, scope = "", shopColors, cardCls, t }) {
                     style={{ backgroundColor: shopColors[b.shopName] ?? FALLBACK_SHOP_COLOR }}
                   />
                   <span className="truncate font-semibold text-theme-800 dark:text-theme-100">{b.shopName}</span>
-                  {mixed ? (
-                    <PlatformSuffix
-                      label={t(`${NS}.${b.platform === "amazon" ? "platformAmazon" : "platformRakuten"}`)}
-                    />
-                  ) : null}
-                  {b.noRecord ? (
+                  {mixed ? <PlatformSuffix label={platformLabel(b.platform ?? "rakuten", t)} /> : null}
+                  {b.value === null ? (
+                    <span className="text-[9.5px] font-medium text-theme-500 dark:text-theme-400">{DASH}</span>
+                  ) : b.noRecord ? (
                     <span className="text-[9.5px] font-medium text-theme-500 dark:text-theme-400">
                       {t(`${NS}.noRecord`)}
                     </span>
@@ -1125,9 +1126,7 @@ function ShopTrendCard({ row: r, mode, t }) {
         <span className="flex min-w-0 items-center gap-1">
           {r.platform ? <PlatformMark platform={r.platform} size={12} /> : null}
           <span className="truncate text-[11px] font-semibold text-theme-900 dark:text-theme-50">{r.name}</span>
-          {r.platform ? (
-            <PlatformSuffix label={t(`${NS}.${r.platform === "amazon" ? "platformAmazon" : "platformRakuten"}`)} />
-          ) : null}
+          {r.platform ? <PlatformSuffix label={platformLabel(r.platform, t)} /> : null}
         </span>
         <span className="flex items-baseline gap-0.5">
           <span className="text-[9px] font-bold text-theme-600 dark:text-theme-300">¥</span>
@@ -1258,6 +1257,7 @@ export default function Component({ service }) {
   const { data: amazonRankingData, mutate: mutateAmazonRanking } = useWidgetAPI(widget, "amazonRanking", {
     refreshInterval,
   });
+  const { data: aupaySalesData, mutate: mutateAupaySales } = useWidgetAPI(widget, "aupaySales", { refreshInterval });
   // the market reference changes once a day: never read it more than hourly
   const { data: marketData, mutate: mutateMarket } = useWidgetAPI(widget, "market", {
     refreshInterval: Math.max(refreshInterval, MARKET_REFRESH_INTERVAL),
@@ -1279,6 +1279,9 @@ export default function Component({ service }) {
   const freshness = useFreshness(sales?.sourceUpdatedAtJST || sales?.generatedAtJST, refreshInterval);
   const model = useMemo(() => buildModel(sales, history, logos), [sales, history, logos]);
   const amazon = useMemo(() => buildAmazon(amazonSalesData, amazonHistoryData), [amazonSalesData, amazonHistoryData]);
+  const aupay = useMemo(() => buildAupay(aupaySalesData), [aupaySalesData]);
+  // the platforms beside 楽天 that answered, in the order the board names them
+  const others = useMemo(() => [amazon, aupay].filter(Boolean), [amazon, aupay]);
   const rankingToday = useMemo(
     () => buildRanking(rankingData, buildAmazonBoards(amazonRankingData)),
     [rankingData, amazonRankingData],
@@ -1290,7 +1293,10 @@ export default function Component({ service }) {
     return buildRanking(rankingMonthlyData[key], buildAmazonBoards(amazonMonth));
   }, [rankingMonthlyData, amazonRankingMonthlyData, rankingPeriod]);
   const ranking = rankingPeriod === "today" ? rankingToday : rankingMonth;
-  const peaks = useMemo(() => withAmazonPeaks(buildPeaks(peaksData), amazonPeaksData), [peaksData, amazonPeaksData]);
+  const peaks = useMemo(
+    () => withUnrecordedShops(withAmazonPeaks(buildPeaks(peaksData), amazonPeaksData), aupay?.shops),
+    [peaksData, amazonPeaksData, aupay],
+  );
   const devices = useMemo(() => buildDeviceSales(devicesData, devicesMonthlyData), [devicesData, devicesMonthlyData]);
   const market = useMemo(() => buildMarketReference(marketData), [marketData]);
   const evidence = useMemo(
@@ -1310,11 +1316,11 @@ export default function Component({ service }) {
     [performanceData, logos],
   );
   const table = useMemo(
-    () => (model ? buildShopTable({ model, monthly, performance, amazon }) : null),
-    [model, monthly, performance, amazon],
+    () => (model ? buildShopTable({ model, monthly, performance, others }) : null),
+    [model, monthly, performance, others],
   );
-  const todayView = useMemo(() => (model ? buildTodayView(model, amazon) : null), [model, amazon]);
-  const monthView = useMemo(() => buildMonthView(monthly, amazon), [monthly, amazon]);
+  const todayView = useMemo(() => (model ? buildTodayView(model, others) : null), [model, others]);
+  const monthView = useMemo(() => buildMonthView(monthly, others), [monthly, others]);
   // shop logos sit beside the names in both shop tables
   const logoByName = useMemo(
     () => new Map((logos?.shops || []).map((shop) => [shop.shopName, shop.logoUrl || null])),
@@ -1328,9 +1334,9 @@ export default function Component({ service }) {
         ...(model?.rows || []).map((r) => r.name),
         ...(monthly?.shopNames || []),
         ...(peaks?.shopNames || []),
-        ...(amazon?.shops || []).map((s) => s.name),
+        ...others.flatMap((other) => other.shops.map((s) => s.name)),
       ]),
-    [model, monthly, peaks, amazon],
+    [model, monthly, peaks, others],
   );
 
   const handleRefresh = useCallback(
@@ -1348,6 +1354,7 @@ export default function Component({ service }) {
       mutateAmazonSales();
       mutateAmazonHistory();
       mutateAmazonRanking();
+      mutateAupaySales();
     },
     [
       mutateSales,
@@ -1361,6 +1368,7 @@ export default function Component({ service }) {
       mutateAmazonSales,
       mutateAmazonHistory,
       mutateAmazonRanking,
+      mutateAupaySales,
     ],
   );
 
@@ -1374,15 +1382,30 @@ export default function Component({ service }) {
   }
 
   const cardCls = "rounded-2xl border border-theme-300/40 bg-theme-200/30 dark:border-theme-600/40 dark:bg-white/10";
-  const activeNames = new Set(table.rows.map((r) => r.name));
+  // by key: a name can stand for two shops (3911 is on 楽天 and au PAY)
+  const activeKeys = new Set(table.rows.map((r) => r.key));
   const idleNames = table.idle.map((r) => r.name).join("・");
   const hasSide = Boolean(monthView) || (performance && performance.visit !== null);
   // a shop on the list whose today and month are both unknown is not counted as 稼働
   const activeCount = table.rows.filter((r) => !r.unknown).length;
-  const amazonCount = amazon?.shops.length ?? 0;
-  const missing = [...model.missing, ...(amazon?.company.missing ?? [])];
-  // with Amazon beside it, 楽天-only figures say whose they are
-  const rakutenScope = amazon ? t(`${NS}.platformRakuten`) : "";
+  const shopCount = others.reduce((count, other) => count + other.shops.length, model.rows.length);
+  const platformCounts = others.length
+    ? [["rakuten", model.rows.length], ...others.map((other) => [other.platform, other.shops.length])]
+        .map(([platform, count]) => t(`${NS}.platformCount`, { platform: platformLabel(platform, t), count }))
+        .join("・")
+    : "";
+  // a shop elsewhere says which platform it is on: the same name can be on 楽天 too
+  const missing = [
+    ...model.missing,
+    ...others.flatMap((other) => other.company.missing.map((name) => `${name}（${platformLabel(other.platform, t)}）`)),
+  ];
+  // a platform that serves no week has no card on the 7-day trend
+  const noWeek = others
+    .filter((other) => !other.provides.week)
+    .map((other) => platformLabel(other.platform, t))
+    .join("・");
+  // with other platforms beside it, 楽天-only figures say whose they are
+  const rakutenScope = others.length ? t(`${NS}.platformRakuten`) : "";
   const notes = historyNotes(model.week, t);
   const periods = {
     colToday: model.time ? t(`${NS}.asOf`, { time: model.time }) : "",
@@ -1412,10 +1435,8 @@ export default function Component({ service }) {
         <div className="flex flex-wrap items-center justify-between gap-2 px-0.5">
           <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
             <span className="text-xs font-semibold text-theme-600 dark:text-theme-300">
-              {t(`${NS}.subtitle`, { count: model.rows.length + amazonCount })}
-              {amazon
-                ? `（${t(`${NS}.platformSplit`, { rakuten: model.rows.length, amazon: amazonCount })}）`
-                : ""} · {t(`${NS}.activeShops`, { count: activeCount })}
+              {t(`${NS}.subtitle`, { count: shopCount })}
+              {platformCounts ? `（${platformCounts}）` : ""} · {t(`${NS}.activeShops`, { count: activeCount })}
               {missing.length ? (
                 <span className="text-amber-700 dark:text-amber-300">
                   {" "}
@@ -1541,6 +1562,7 @@ export default function Component({ service }) {
                     <span className="font-medium text-theme-500 dark:text-theme-400">
                       · {t(`${NS}.excludesToday`)}
                       {idleNames ? ` · ${t(`${NS}.idleLeftOut`, { names: idleNames })}` : ""}
+                      {noWeek ? ` · ${t(`${NS}.noWeekLeftOut`, { names: noWeek })}` : ""}
                     </span>
                   </span>
                   {notes.map((note) => (
@@ -1551,19 +1573,20 @@ export default function Component({ service }) {
                   <div className="grid grid-cols-[repeat(auto-fit,minmax(104px,1fr))] gap-2.5">
                     {/* a shop whose week the server could not count has no trend to draw */}
                     {model.rows
-                      .filter((r) => activeNames.has(r.name) && r.h7Total !== null)
+                      .filter((r) => activeKeys.has(`rakuten:${r.name}`) && r.h7Total !== null)
                       .map((r) => (
                         <ShopTrendCard
                           key={r.name}
-                          row={amazon ? { ...r, platform: "rakuten" } : r}
+                          row={others.length ? { ...r, platform: "rakuten" } : r}
                           mode={chartMode}
                           t={t}
                         />
                       ))}
-                    {(amazon?.shops || [])
-                      .filter((s) => activeNames.has(s.name))
+                    {others
+                      .flatMap((other) => other.shops)
+                      .filter((s) => activeKeys.has(s.key) && s.week)
                       .map((s) => (
-                        <ShopTrendCard key={s.key} row={amazonTrendRow(s)} mode={chartMode} t={t} />
+                        <ShopTrendCard key={s.key} row={trendRowOf(s)} mode={chartMode} t={t} />
                       ))}
                   </div>
                 </div>
@@ -1575,8 +1598,7 @@ export default function Component({ service }) {
                 <CustomerMixCard performance={performance} scope={rakutenScope} cardCls={cardCls} t={t} />
                 <ShopVisitsTable
                   performance={performance}
-                  names={table.rows.map((r) => r.name)}
-                  platformByName={new Map(table.rows.map((r) => [r.name, r.platform]))}
+                  shops={table.rows}
                   scope={rakutenScope}
                   shopColors={shopColors}
                   logoByName={logoByName}
