@@ -59,14 +59,14 @@ export function jstStamp(iso) {
 }
 
 // the newest of several ISO times, or "" when none parses
-function latest(isos) {
+export function latest(isos) {
   const times = isos.map((iso) => Date.parse(String(iso || ""))).filter((ms) => !Number.isNaN(ms));
   return times.length ? new Date(Math.max(...times)).toISOString() : "";
 }
 
 // A shop's figures for one period, only while the server counts them: a stale
 // shop keeps its last values, but like 楽天's they are not today's.
-function periodOf(row) {
+export function periodOf(row) {
   return row && row.includedInTotals === true ? metricsOf(row.totals, row.currency) : null;
 }
 
@@ -76,13 +76,13 @@ export function amazonKey(row) {
   return `amazon:${row?.accountId ?? ""}:${row?.marketplaceId ?? ""}`;
 }
 
-function rowsByKey(period) {
-  return new Map((period?.shops || []).filter((row) => row.enabled !== false).map((row) => [amazonKey(row), row]));
+export function rowsByKey(period, keyOf = amazonKey) {
+  return new Map((period?.shops || []).filter((row) => row.enabled !== false).map((row) => [keyOf(row), row]));
 }
 
 // Finished days of the month, so the pace leaves today's half-run day out; 0
 // when today is unknown, which reports no pace rather than an inflated one.
-function finishedDays(todayDate, month, today) {
+export function finishedDays(todayDate, month, today) {
   if (!today) return 0;
   return Math.max(0, dayWithinMonth(todayDate, month) - 1);
 }
@@ -100,12 +100,12 @@ function addTriples(list) {
   );
 }
 
-function companyTotals(period) {
+export function companyTotals(period) {
   if (!period || period.ok === false) return null;
   return metricsOf(period.totalsByCurrency?.JPY, "JPY");
 }
 
-function coverageOf(period) {
+export function coverageOf(period) {
   const covered = numberOrNull(period?.updatedShopCount);
   const total = numberOrNull(period?.enabledShopCount);
   return covered === null || total === null ? null : { covered, total };
@@ -193,6 +193,9 @@ export function buildAmazon(sales, history) {
   }));
 
   return {
+    platform: "amazon",
+    // Amazon serves a week and a last month, so it joins the company's comparisons
+    provides: { week: true, previous: true },
     shops,
     company: {
       today: todayTotals,
@@ -219,11 +222,11 @@ export function buildAmazon(sales, history) {
 
 // A shop's card for the analysis section's 7-day trend, in the shape the 楽天
 // cards use. Amazon reports no visits, so the CVR is unknown, never 0%.
-export function amazonTrendRow(shop) {
+export function trendRowOf(shop) {
   return {
     key: shop.key,
     name: shop.name,
-    platform: "amazon",
+    platform: shop.platform,
     h7Total: shop.week?.sales ?? null,
     h7Orders: shop.week?.orders ?? null,
     h7Units: shop.week?.units ?? null,

@@ -1,11 +1,13 @@
-// View model for the sales tab's daily check: one row per shop — 楽天 and
-// Amazon side by side — with today, the last 7 days, this month and
-// yesterday's visits. Unknown stays null all the way to the screen — a missing
-// board is never drawn as zero.
+// View model for the sales tab's daily check: one row per shop — 楽天, Amazon and
+// au PAY side by side — with today, the last 7 days, this month and yesterday's
+// visits. Unknown stays null all the way to the screen — a missing board is
+// never drawn as zero.
 //
 // Order and unit counts add up across platforms; yen never do. Each platform
-// counts its amounts its own way (楽天's order API before coupons, Amazon's
-// Sales API), so 売上 stays per platform and the company row leaves it empty.
+// counts its amounts its own way, so 売上 stays per platform and the company row
+// leaves it empty. Comparisons need the same shops on both sides: a platform
+// without a week or a last month (au PAY) counts in the company's figures but
+// stays out of its 7-day and last-month comparisons.
 
 export const METRICS = Object.freeze(["sales", "units", "orders"]);
 
@@ -71,35 +73,54 @@ function monthOf(shop) {
   return { month: triple(m.sales.current, m.units.current, m.orders.current), monthDelta: deltasOf(m) };
 }
 
-// One company month metric from two platforms' (counts only): each side's
-// pace already leaves its own today out, so the paces add up.
-function combineMonth(a, b) {
-  if (!a || !b) return null;
-  const sum = (x, y) => (known(x) && known(y) ? x + y : null);
-  const current = sum(a.current, b.current);
-  const previous = sum(a.previous, b.previous);
-  const pace = sum(a.pace, b.pace);
-  const prevPace = sum(a.prevPace, b.prevPace);
-  const comparable = pace !== null && prevPace > 0;
+const sumAll = (values) => (values.every(known) ? values.reduce((a, b) => a + b, 0) : null);
+
+// One company month metric (counts only). The month adds up every platform, but
+// a comparison needs the same shops on both sides, so last month, the paces and
+// the delta add up only `comparable`: the platforms that serve a last month.
+// Each side's pace already leaves its own today out, so the paces add up.
+function combineMonth(parts, comparable) {
+  if (parts.some((part) => !part)) return null;
+  const pick = (list, key) => sumAll(list.map((part) => part[key]));
+  const current = pick(parts, "current");
+  const comparableCurrent = pick(comparable, "current");
+  const previous = pick(comparable, "previous");
+  const pace = pick(comparable, "pace");
+  const prevPace = pick(comparable, "prevPace");
+  const canCompare = pace !== null && prevPace > 0;
   return {
     current,
     previous,
-    vsPrevPct: previous > 0 && current !== null ? (current / previous) * 100 : null,
+    vsPrevPct: previous > 0 && comparableCurrent !== null ? (comparableCurrent / previous) * 100 : null,
     pace,
     prevPace,
-    paceDeltaPct: comparable ? (pace / prevPace - 1) * 100 : null,
-    ahead: comparable ? pace >= prevPace : null,
+    paceDeltaPct: canCompare ? (pace / prevPace - 1) * 100 : null,
+    ahead: canCompare ? pace >= prevPace : null,
   };
 }
 
-function amazonRow(shop) {
+// The company's unit and order metrics: 楽天 plus each platform with a month to add.
+function companyMonth(rakutenMetrics, others) {
+  const present = others.filter((o) => o.company.metrics);
+  const comparable = present.filter((o) => o.provides.previous);
+  const dim = (key) =>
+    rakutenMetrics
+      ? combineMonth(
+          [rakutenMetrics[key], ...present.map((o) => o.company.metrics[key])],
+          [rakutenMetrics[key], ...comparable.map((o) => o.company.metrics[key])],
+        )
+      : null;
+  return { units: dim("units"), orders: dim("orders"), present };
+}
+
+function otherShopRow(shop) {
   const row = {
     key: shop.key,
     name: shop.name,
-    platform: "amazon",
+    platform: shop.platform,
     today: isKnown(shop.today) ? shop.today : null,
     avg: shop.avg,
-    // Amazon reports no visits, so no CVR either
+    // no other platform reports visits, so no CVR either
     cvr: null,
     month: shop.month,
     monthDelta: deltasOf(shop.metrics),
@@ -112,10 +133,11 @@ function amazonRow(shop) {
 
 // Rows in a fixed order for the whole month — this month's sales, largest
 // first — so a shop keeps its line while today's figures move. Shops the month
-// board does not know yet follow. Amazon shops take their place among 楽天's by
-// the same measure. The footer carries one total per platform and, with more
-// than one platform, the company's.
-export function buildShopTable({ model, monthly, performance, amazon = null }) {
+// board does not know yet follow. Other platforms' shops take their place among
+// 楽天's by the same measure. The footer carries one total per platform and, with
+// more than one platform, the company's. `others` are the other platforms' view
+// models (amazon-model, aupay-model).
+export function buildShopTable({ model, monthly, performance, others = [] }) {
   const hasHistory = Boolean(model?.hasHistory);
   const nDays = model?.nDays || 7;
   const todayByName = new Map((model?.rows || []).map((r) => [r.name, r]));
@@ -154,7 +176,9 @@ export function buildShopTable({ model, monthly, performance, amazon = null }) {
     row.unknown = !isKnown(row.today) && !isKnown(row.month);
     all.push({ row, week: live ? { sales: live.h7Total, orders: live.h7Orders } : null });
   });
-  (amazon?.shops || []).forEach((shop) => all.push({ row: amazonRow(shop), week: shop.week }));
+  others.forEach((other) => {
+    other.shops.forEach((shop) => all.push({ row: otherShopRow(shop), week: shop.week }));
+  });
   // stable: 楽天's month order is kept, and shops without a month stay last
   all.sort((a, b) => (b.row.month?.sales ?? -1) - (a.row.month?.sales ?? -1));
 
@@ -180,30 +204,37 @@ export function buildShopTable({ model, monthly, performance, amazon = null }) {
     visits: performance?.visit ?? null,
     visitDelta: medianDelta(performance),
   };
-  const a = amazon?.company;
-  if (!a) return { rows, idle, total: rakuten, totals: [rakuten] };
+  if (!others.length) return { rows, idle, total: rakuten, totals: [rakuten] };
 
-  const amazonTotal = {
-    key: "total:amazon",
-    name: null,
-    platform: "amazon",
-    today: isKnown(a.today) ? a.today : null,
-    avg: a.avg,
-    cvr: null,
-    month: a.month,
-    monthDelta: deltasOf(a.metrics),
-    visits: null,
-    visitDelta: null,
-  };
-  const units = combineMonth(m?.units, a.metrics?.units);
-  const orders = combineMonth(m?.orders, a.metrics?.orders);
+  const otherTotals = others.map((other) => {
+    const a = other.company;
+    return {
+      key: `total:${other.platform}`,
+      name: null,
+      platform: other.platform,
+      today: isKnown(a.today) ? a.today : null,
+      avg: a.avg,
+      cvr: null,
+      month: a.month,
+      monthDelta: deltasOf(a.metrics),
+      visits: null,
+      visitDelta: null,
+    };
+  });
+  const { units, orders } = companyMonth(m, others);
+  const withWeek = otherTotals.filter((_, i) => others[i].provides.week);
   const company = {
     key: "total:company",
     name: null,
     platform: null,
-    today: addCounts([rakuten.today, amazonTotal.today]),
-    // a week average only when every platform counted today has one
-    avg: rakuten.avg && (amazonTotal.avg || !amazonTotal.today) ? addCounts([rakuten.avg, amazonTotal.avg]) : null,
+    today: addCounts([rakuten.today, ...otherTotals.map((o) => o.today)]),
+    // Today's figure against the week: only the platforms that serve a week, on
+    // both sides, and only when each of those counted today has one.
+    weekToday: addCounts([rakuten.today, ...withWeek.map((o) => o.today)]),
+    avg:
+      rakuten.avg && withWeek.every((o) => o.avg || !o.today)
+        ? addCounts([rakuten.avg, ...withWeek.map((o) => o.avg)])
+        : null,
     cvr: null,
     month: units && orders ? triple(null, units.current, orders.current) : null,
     monthDelta: units && orders ? triple(null, units.paceDeltaPct, orders.paceDeltaPct) : null,
@@ -211,12 +242,19 @@ export function buildShopTable({ model, monthly, performance, amazon = null }) {
     visits: null,
     visitDelta: null,
   };
-  return { rows, idle, total: company, totals: [rakuten, amazonTotal, company] };
+  return {
+    rows,
+    idle,
+    total: company,
+    totals: [rakuten, ...otherTotals, company],
+    // the platforms the company's 7-day and last-month comparisons leave out
+    compareExcludes: others.filter((o) => !o.provides.week || !o.provides.previous).map((o) => o.platform),
+  };
 }
 
-// Today across platforms, for the today card. With Amazon present the company
-// figures are counts only; each platform keeps its own line with its yen.
-export function buildTodayView(model, amazon = null) {
+// Today across platforms, for the today card. With other platforms present the
+// company figures are counts only; each platform keeps its own line with its yen.
+export function buildTodayView(model, others = []) {
   const rakuten = {
     platform: "rakuten",
     values: triple(model.rtTotal, model.rtUnits, model.rtOrders),
@@ -229,8 +267,7 @@ export function buildTodayView(model, amazon = null) {
     name: r.name,
     values: triple(r.rtSales, r.rtUnits, r.rtOrders),
   }));
-  const a = amazon?.company;
-  if (!a) {
+  if (!others.length) {
     return {
       multi: false,
       platforms: [rakuten],
@@ -246,68 +283,83 @@ export function buildTodayView(model, amazon = null) {
     };
   }
 
-  const amazonToday = a.today ?? triple(null, null, null);
-  const byDate = new Map(a.daily.map((d) => [d.date, d]));
-  // the days both histories hold; without Amazon's week only 楽天's days are
-  // honest, and only while Amazon adds nothing to today either
-  let days = [];
-  if (a.daily.length) {
-    days = model.days
-      .filter((d) => byDate.has(d.date))
-      .map((d) => {
-        const other = byDate.get(d.date);
-        return { ...d, sales: null, units: d.units + (other.units ?? 0), orders: d.orders + (other.orders ?? 0) };
-      });
-  } else if (!a.today) {
-    days = model.days;
-  }
+  const rakutenValues = model.rtTotal === null ? null : rakuten.values;
+  const withWeek = others.filter((o) => o.provides.week);
+  // the days every history holds; a platform counted today without its week
+  // leaves no honest bars, while one with nothing today adds nothing to them
+  const histories = withWeek.filter((o) => o.company.daily.length);
+  const missingWeek = withWeek.some((o) => !o.company.daily.length && o.company.today);
+  const days = missingWeek
+    ? []
+    : model.days
+        .map((d) => {
+          const matches = histories.map((o) => o.company.daily.find((day) => day.date === d.date));
+          if (matches.some((day) => !day)) return null;
+          if (!histories.length) return d;
+          const add = (key) => matches.reduce((total, day) => total + (day[key] ?? 0), d[key]);
+          return { ...d, sales: null, units: add("units"), orders: add("orders") };
+        })
+        .filter(Boolean);
   return {
     multi: true,
     platforms: [
       rakuten,
-      {
-        platform: "amazon",
-        values: amazonToday,
-        aov:
-          known(amazonToday.sales) && amazonToday.orders > 0
-            ? Math.round(amazonToday.sales / amazonToday.orders)
-            : null,
-        time: a.updatedAt ? a.updatedAt.slice(11, 16) : "",
-      },
+      ...others.map((o) => {
+        const values = o.company.today ?? triple(null, null, null);
+        return {
+          platform: o.platform,
+          values,
+          aov: known(values.sales) && values.orders > 0 ? Math.round(values.sales / values.orders) : null,
+          time: o.company.updatedAt ? o.company.updatedAt.slice(11, 16) : "",
+        };
+      }),
     ],
-    values: addCounts([model.rtTotal === null ? null : rakuten.values, a.today]) ?? triple(null, null, null),
-    avg: rakutenAvg && (a.avg || !a.today) ? addCounts([rakutenAvg, a.avg]) : null,
+    values: addCounts([rakutenValues, ...others.map((o) => o.company.today)]) ?? triple(null, null, null),
+    // what stands against the week: only the platforms that serve one, on both sides
+    weekValues: addCounts([rakutenValues, ...withWeek.map((o) => o.company.today)]),
+    avg:
+      rakutenAvg && withWeek.every((o) => o.company.avg || !o.company.today)
+        ? addCounts([rakutenAvg, ...withWeek.map((o) => o.company.avg)])
+        : null,
+    weekExcludes: others.filter((o) => !o.provides.week).map((o) => o.platform),
     days,
     // 売上 bars stay 楽天's: no other platform's yen are added to them
     salesDays: model.days,
-    coverage: addCoverage(model.coverage, a.coverage.today),
+    coverage: others.reduce((coverage, o) => addCoverage(coverage, o.company.coverage.today), model.coverage),
     time: model.time,
     mix: [
       ...mix,
-      ...amazon.shops.map((s) => ({ key: s.key, name: s.name, values: s.today ?? triple(null, null, null) })),
+      ...others.flatMap((o) =>
+        o.shops.map((s) => ({ key: s.key, name: s.name, values: s.today ?? triple(null, null, null) })),
+      ),
     ],
   };
 }
 
 // The month across platforms, for the month card: company counts, and each
 // platform's own figures for the yen.
-export function buildMonthView(monthly, amazon = null) {
+export function buildMonthView(monthly, others = []) {
   if (!monthly) return null;
-  const a = amazon?.company;
-  if (!a?.metrics) return { ...monthly, multi: false, platforms: [{ platform: "rakuten", metrics: monthly.metrics }] };
+  const { units, orders, present } = companyMonth(monthly.metrics, others);
+  if (!present.length)
+    return { ...monthly, multi: false, platforms: [{ platform: "rakuten", metrics: monthly.metrics }] };
   return {
     ...monthly,
     multi: true,
-    current: { ...monthly.current, coverage: addCoverage(monthly.current.coverage, a.coverage.month) },
-    metrics: {
-      sales: null,
-      units: combineMonth(monthly.metrics.units, a.metrics.units),
-      orders: combineMonth(monthly.metrics.orders, a.metrics.orders),
+    current: {
+      ...monthly.current,
+      coverage: present.reduce(
+        (coverage, o) => addCoverage(coverage, o.company.coverage.month),
+        monthly.current.coverage,
+      ),
     },
+    metrics: { sales: null, units, orders },
     platforms: [
       { platform: "rakuten", metrics: monthly.metrics },
-      { platform: "amazon", metrics: a.metrics },
+      ...present.map((o) => ({ platform: o.platform, metrics: o.company.metrics })),
     ],
+    // the platforms with no last month, left out of the comparison
+    prevExcludes: present.filter((o) => !o.provides.previous).map((o) => o.platform),
   };
 }
 
@@ -316,5 +368,6 @@ export function buildMonthView(monthly, amazon = null) {
 export function todayVsAverage(view, metric) {
   const value = view?.values?.[metric] ?? null;
   const avg = view?.avg?.[metric] ?? null;
-  return { value, avg, pct: value !== null && avg > 0 ? (value / avg) * 100 : null };
+  const compared = view?.weekValues ? (view.weekValues[metric] ?? null) : value;
+  return { value, avg, pct: compared !== null && avg > 0 ? (compared / avg) * 100 : null };
 }

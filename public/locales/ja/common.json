@@ -1617,13 +1617,18 @@
         "visitsStale": "更新停止中",
         "platformRakuten": "楽天",
         "platformAmazon": "Amazon",
-        "platformSplit": "楽天{{rakuten}}・Amazon{{amazon}}",
         "platformTotal": "{{platform}} 計",
         "companyTotal": "全社 計",
         "salesNotSummed": "売上はモールごとに集計基準が違うため、合算しません",
         "boardLoading": "読み込み中…",
         "peaksCoverageAmazon": "Amazon は {{date}} から",
-        "lastDays": "直近{{count}}日"
+        "lastDays": "直近{{count}}日",
+        "platformAupay": "au PAY",
+        "platformCount": "{{platform}}{{count}}",
+        "weekExcludes": "7日平均との比較に {{names}} は含みません（履歴なし）",
+        "prevExcludes": "先月比に {{names}} は含みません（先月データなし）",
+        "companyExcludes": "全社 計の 7日平均比・先月比に {{names}} は含みません（履歴・先月データなし）",
+        "noWeekLeftOut": "{{names}} は履歴がないため省略"
     },
     "uoshippingdashboard": {
         "allPlatforms": "全部",

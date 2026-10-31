@@ -219,7 +219,12 @@ const REQUIRED_KEYS = [
   // Amazon beside 楽天
   "platformRakuten",
   "platformAmazon",
-  "platformSplit",
+  "platformAupay",
+  "platformCount",
+  "weekExcludes",
+  "prevExcludes",
+  "companyExcludes",
+  "noWeekLeftOut",
   "platformTotal",
   "companyTotal",
   "salesNotSummed",

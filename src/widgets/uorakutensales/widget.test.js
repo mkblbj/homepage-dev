@@ -24,6 +24,7 @@ const READ_ONLY = [
   "rankingMonthly",
   "amazonRankingMonthly",
   "amazonPeaks",
+  "aupaySales",
 ];
 
 describe("uorakutensales widget config", () => {

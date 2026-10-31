@@ -4,6 +4,7 @@ import test from "node:test";
 import { buildPerformanceModel } from "../uoperformance/performance-model.mjs";
 
 import { buildAmazon } from "./amazon-model.mjs";
+import { buildAupay } from "./aupay-model.mjs";
 import {
   buildMonthView,
   buildShopTable,
@@ -376,7 +377,7 @@ function amazonOf({ todayTotals = { salesAmount: 700, unitsSold: 3, orderCount: 
 
 test("Amazon shops take their place among 楽天's by this month's sales", () => {
   const f = fixture();
-  const t = buildShopTable({ ...f, amazon: amazonOf() });
+  const t = buildShopTable({ ...f, others: [amazonOf()] });
   // A ¥2,410 · uoworld ¥1,800 · B ¥1,250 this month
   assert.deepEqual(
     t.rows.map((r) => r.name),
@@ -395,7 +396,7 @@ test("Amazon shops take their place among 楽天's by this month's sales", () =>
 
 test("the footer has a line per platform and a company line that adds only counts", () => {
   const f = fixture();
-  const t = buildShopTable({ ...f, amazon: amazonOf() });
+  const t = buildShopTable({ ...f, others: [amazonOf()] });
   assert.deepEqual(
     t.totals.map((r) => r.key),
     ["total:rakuten", "total:amazon", "total:company"],
@@ -421,7 +422,7 @@ test("without Amazon the table keeps its single 楽天 total", () => {
 
 test("the today view adds counts across platforms and keeps each platform's yen apart", () => {
   const { model } = fixture();
-  const view = buildTodayView(model, amazonOf());
+  const view = buildTodayView(model, [amazonOf()]);
   assert.equal(view.multi, true);
   assert.deepEqual(view.values, { sales: null, units: 9, orders: 8 });
   assert.deepEqual(
@@ -447,13 +448,13 @@ test("the today view adds counts across platforms and keeps each platform's yen 
 test("the today view still counts 楽天 when Amazon could not be read today", () => {
   const { model } = fixture();
   const stale = amazonOf({ todayTotals: null });
-  const view = buildTodayView(model, stale);
+  const view = buildTodayView(model, [stale]);
   assert.deepEqual(view.values, { sales: null, units: 6, orders: 6 });
 });
 
 test("the month view adds counts and lists each platform's yen", () => {
   const { monthly } = fixture();
-  const view = buildMonthView(monthly, amazonOf());
+  const view = buildMonthView(monthly, [amazonOf()]);
   assert.equal(view.multi, true);
   assert.equal(view.metrics.sales, null);
   assert.equal(view.metrics.orders.current, 30);
@@ -465,7 +466,140 @@ test("the month view adds counts and lists each platform's yen", () => {
     ],
   );
   // and without Amazon it is the 楽天 month as it was
-  const alone = buildMonthView(monthly, null);
+  const alone = buildMonthView(monthly);
   assert.equal(alone.multi, false);
   assert.equal(alone.metrics, monthly.metrics);
+});
+
+// two au PAY shops beside the 楽天 fixture; one shares 楽天 shop A's name
+function aupayOf() {
+  const row = (configId, shopName, extra) => ({
+    configId,
+    shopName,
+    currency: "JPY",
+    timezone: "Asia/Tokyo",
+    enabled: true,
+    status: "ready",
+    includedInTotals: true,
+    sourceUpdatedAt: "2026-10-25T01:15:00.000Z",
+    ...extra,
+  });
+  const period = (rows) => ({
+    ok: true,
+    enabledShopCount: rows.length,
+    updatedShopCount: rows.length,
+    totalsByCurrency: {
+      JPY: {
+        salesAmount: rows.reduce((a, r) => a + r.totals.salesAmount, 0),
+        unitsSold: rows.reduce((a, r) => a + r.totals.unitsSold, 0),
+        orderCount: rows.reduce((a, r) => a + r.totals.orderCount, 0),
+      },
+    },
+    shops: rows,
+  });
+  const totals = (salesAmount, unitsSold, orderCount) => ({ salesAmount, unitsSold, orderCount });
+  return buildAupay({
+    today: period([
+      row("1", "A", { date: "2026-10-25", totals: totals(300, 2, 1) }),
+      row("2", "幸田良品", { date: "2026-10-25", totals: totals(400, 3, 3) }),
+    ]),
+    month: period([
+      row("1", "A", { month: "2026-10", totals: totals(1300, 20, 13) }),
+      row("2", "幸田良品", { month: "2026-10", totals: totals(1600, 30, 27) }),
+    ]),
+  });
+}
+
+test("an au PAY shop named like a 楽天 shop keeps its own row and its own figures", () => {
+  const t = buildShopTable({ ...fixture(), others: [amazonOf(), aupayOf()] });
+  const named = t.rows.filter((r) => r.name === "A");
+  assert.deepEqual(
+    named.map((r) => [r.key, r.platform, r.today.sales]),
+    [
+      ["rakuten:A", "rakuten", 10],
+      ["aupay:1", "aupay", 300],
+    ],
+  );
+  const au = named[1];
+  // au PAY serves neither a week, a last month nor visits: unknown, never zero
+  assert.equal(au.avg, null);
+  assert.equal(au.cvr, null);
+  assert.equal(au.visits, null);
+  assert.equal(au.monthDelta.orders, null);
+  assert.equal(au.month.orders, 13);
+});
+
+test("the footer closes with a line per platform and the company adds all their counts", () => {
+  const t = buildShopTable({ ...fixture(), others: [amazonOf(), aupayOf()] });
+  assert.deepEqual(
+    t.totals.map((r) => r.key),
+    ["total:rakuten", "total:amazon", "total:aupay", "total:company"],
+  );
+  // 楽天 6 + Amazon 2 + au PAY 4 orders today; no yen across platforms
+  assert.deepEqual(t.total.today, { sales: null, units: 14, orders: 12 });
+  assert.equal(t.total.month.orders, 10 + 20 + 40);
+  assert.equal(t.total.month.sales, null);
+  assert.deepEqual(t.compareExcludes, ["aupay"]);
+});
+
+test("the company's comparisons leave out a platform with no week or last month", () => {
+  const f = fixture();
+  const withAupay = buildShopTable({ ...f, others: [amazonOf(), aupayOf()] }).total;
+  const without = buildShopTable({ ...f, others: [amazonOf()] }).total;
+  // the same shops on both sides, so au PAY moves neither comparison
+  assert.deepEqual(withAupay.avg, without.avg);
+  assert.deepEqual(withAupay.weekToday, without.today);
+  assert.equal(withAupay.monthDelta.orders, without.monthDelta.orders);
+});
+
+test("the today view counts au PAY but sets only the platforms with a week against it", () => {
+  const { model } = fixture();
+  const view = buildTodayView(model, [amazonOf(), aupayOf()]);
+  assert.deepEqual(
+    view.platforms.map((p) => [p.platform, p.values.sales]),
+    [
+      ["rakuten", 60],
+      ["amazon", 700],
+      ["aupay", 700],
+    ],
+  );
+  assert.deepEqual(view.values, { sales: null, units: 14, orders: 12 });
+  assert.deepEqual(view.coverage, { covered: 6, total: 6 });
+  assert.deepEqual(view.weekExcludes, ["aupay"]);
+  // 楽天 6 + Amazon 2 against 楽天 2 + Amazon 1 a day; au PAY's 4 stay out
+  const orders = todayVsAverage(view, "orders");
+  assert.equal(orders.value, 12);
+  assert.equal(orders.avg, 3);
+  assert.equal(orders.pct, (8 / 3) * 100);
+  // au PAY has no history, so the bars are still the two platforms' week
+  assert.equal(view.days.length, 7);
+  assert.equal(view.days[0].orders, 3);
+});
+
+test("with au PAY alone beside 楽天 the week is 楽天's", () => {
+  const { model } = fixture();
+  const view = buildTodayView(model, [aupayOf()]);
+  assert.equal(view.days[0].orders, model.days[0].orders);
+  assert.equal(todayVsAverage(view, "orders").pct, (6 / 2) * 100);
+});
+
+test("the month view lists au PAY's yen and leaves it out of the comparison", () => {
+  const { monthly } = fixture();
+  const view = buildMonthView(monthly, [amazonOf(), aupayOf()]);
+  const without = buildMonthView(monthly, [amazonOf()]);
+  assert.equal(view.metrics.orders.current, 70);
+  assert.equal(view.metrics.orders.previous, without.metrics.orders.previous);
+  assert.equal(view.metrics.orders.paceDeltaPct, without.metrics.orders.paceDeltaPct);
+  assert.equal(view.metrics.orders.vsPrevPct, without.metrics.orders.vsPrevPct);
+  assert.deepEqual(view.prevExcludes, ["aupay"]);
+  assert.deepEqual(
+    view.platforms.map((p) => [p.platform, p.metrics.sales.current]),
+    [
+      ["rakuten", 3660],
+      ["amazon", 1800],
+      ["aupay", 2900],
+    ],
+  );
+  assert.equal(view.platforms[2].metrics.sales.paceDeltaPct, null);
+  assert.deepEqual(view.current.coverage.total, without.current.coverage.total + 2);
 });
