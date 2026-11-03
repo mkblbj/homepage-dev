@@ -76,6 +76,7 @@ test("each shop carries today and the month, keyed by its config id", () => {
 });
 
 test("what au PAY does not serve stays unknown, never zero", () => {
+  // an older server, from before last month was added
   const a = buildAupay(salesOf());
   assert.deepEqual(a.provides, { week: false, previous: false });
   const [s] = a.shops;
@@ -143,4 +144,38 @@ test("au PAY's shops take a place on the shop bests as an unknown, after the res
   assert.equal(merged.shopBests.orders[1].noRecord, false);
   assert.equal(withUnrecordedShops(peaks, null), peaks);
   assert.equal(withUnrecordedShops(null, shops), null);
+});
+
+// /api/aupay/sales since 2026-11-03: last month beside today and this month
+function withPreviousMonth(previousMonth) {
+  return { ...salesOf(), previousMonth };
+}
+const october = period(
+  [
+    shop({ month: "2026-09", totals: totals(80883, 78, 75) }),
+    shop({ configId: "cfg-2", shopName: "幸田良品", month: "2026-09", totals: totals(61960, 108, 99) }),
+  ],
+  totals(142843, 186, 174),
+);
+
+test("last month joins each shop and the company, and the pace compares with it", () => {
+  const a = buildAupay(withPreviousMonth(october));
+  assert.deepEqual(a.provides, { week: false, previous: true });
+  const [s] = a.shops;
+  assert.deepEqual(s.previous, { sales: 80883, units: 78, orders: 75 });
+  // September has 30 days: 75 orders → 2.5 a day, against this month's 73 over 30
+  assert.equal(s.metrics.orders.prevPace, 75 / 30);
+  assert.equal(s.metrics.orders.paceDeltaPct, (73 / 30 / (75 / 30) - 1) * 100);
+  assert.deepEqual(a.company.previous, { sales: 142843, units: 186, orders: 174 });
+  assert.equal(a.company.metrics.orders.previous, 174);
+  assert.equal(a.company.metrics.orders.prevPace, 174 / 30);
+});
+
+test("a last month the server could not read stays unknown, never zero", () => {
+  const notReady = shop({ month: "2026-09", status: "not_ready", includedInTotals: false, totals: null });
+  const a = buildAupay(withPreviousMonth(period([notReady], null)));
+  assert.equal(a.provides.previous, true);
+  assert.equal(a.company.previous, null);
+  assert.equal(a.shops[0].previous, null);
+  assert.equal(a.company.metrics.orders.paceDeltaPct, null);
 });

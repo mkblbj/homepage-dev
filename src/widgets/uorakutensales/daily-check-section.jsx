@@ -756,7 +756,8 @@ export function ShopTable({
   const colorOf = (name) => shopColors[name] ?? FALLBACK_SHOP_COLOR;
   // logos are 楽天's: a shop of the same name elsewhere (3911 on au PAY) is another shop
   const logoOf = (row) => (!row.platform || row.platform === "rakuten" ? logoByName.get(row.name) : undefined);
-  const excluded = platformNames(table.compareExcludes, t);
+  const weekExcluded = platformNames(table.weekExcludes, t);
+  const prevExcluded = platformNames(table.prevExcludes, t);
   const maxToday = Math.max(1, ...table.rows.map((r) => r.today?.[metric] ?? 0));
   // one footer row per platform, then the company's once there are several
   const totals = table.totals ?? [table.total];
@@ -898,7 +899,12 @@ export function ShopTable({
           </tfoot>
         </table>
       </div>
-      {excluded ? <span className={`text-xs ${MUTED}`}>{t(`${NS}.companyExcludes`, { names: excluded })}</span> : null}
+      {weekExcluded ? (
+        <span className={`text-xs ${MUTED}`}>{t(`${NS}.companyExcludes`, { names: weekExcluded })}</span>
+      ) : null}
+      {prevExcluded ? (
+        <span className={`text-xs ${MUTED}`}>{t(`${NS}.companyPrevExcludes`, { names: prevExcluded })}</span>
+      ) : null}
       {table.idle.length ? (
         <button
           type="button"

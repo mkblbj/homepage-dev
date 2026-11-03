@@ -492,8 +492,9 @@ test("the month view adds counts and lists each platform's yen", () => {
   assert.equal(alone.metrics, monthly.metrics);
 });
 
-// two au PAY shops beside the 楽天 fixture; one shares 楽天 shop A's name
-function aupayOf() {
+// two au PAY shops beside the 楽天 fixture; one shares 楽天 shop A's name. By
+// default the server is the older one with no last month; `previousMonth` adds it.
+function aupayOf({ previousMonth = false } = {}) {
   const row = (configId, shopName, extra) => ({
     configId,
     shopName,
@@ -528,6 +529,14 @@ function aupayOf() {
       row("1", "A", { month: "2026-10", totals: totals(1300, 20, 13) }),
       row("2", "幸田良品", { month: "2026-10", totals: totals(1600, 30, 27) }),
     ]),
+    ...(previousMonth
+      ? {
+          previousMonth: period([
+            row("1", "A", { month: "2026-09", totals: totals(1500, 30, 15) }),
+            row("2", "幸田良品", { month: "2026-09", totals: totals(1500, 45, 45) }),
+          ]),
+        }
+      : {}),
   });
 }
 
@@ -560,7 +569,8 @@ test("the footer closes with a line per platform and the company adds all their 
   assert.deepEqual(t.total.today, { sales: null, units: 14, orders: 12 });
   assert.equal(t.total.month.orders, 10 + 20 + 40);
   assert.equal(t.total.month.sales, null);
-  assert.deepEqual(t.compareExcludes, ["aupay"]);
+  assert.deepEqual(t.weekExcludes, ["aupay"]);
+  assert.deepEqual(t.prevExcludes, ["aupay"]);
 });
 
 test("the company's comparisons leave out a platform with no week or last month", () => {
@@ -626,6 +636,29 @@ test("the month view lists au PAY's yen and leaves it out of the comparison", ()
   );
   assert.equal(view.platforms[2].metrics.sales.paceDeltaPct, null);
   assert.deepEqual(view.current.coverage.total, without.current.coverage.total + 2);
+});
+
+test("with au PAY's last month the company's comparison covers it too", () => {
+  const { monthly } = fixture();
+  const view = buildMonthView(monthly, [amazonOf(), aupayOf({ previousMonth: true })]);
+  const without = buildMonthView(monthly, [amazonOf()]);
+  // September: au PAY's 60 orders join last month's total and its daily pace
+  assert.equal(view.metrics.orders.previous, without.metrics.orders.previous + 60);
+  assert.equal(view.metrics.orders.prevPace, without.metrics.orders.prevPace + 60 / 30);
+  assert.equal(view.metrics.orders.pace, without.metrics.orders.pace + 36 / 24);
+  assert.equal(view.metrics.orders.paceDeltaPct, (view.metrics.orders.pace / view.metrics.orders.prevPace - 1) * 100);
+  assert.equal(view.metrics.orders.vsPrevPct, (70 / view.metrics.orders.previous) * 100);
+  assert.deepEqual(view.prevExcludes, []);
+  // and au PAY's own month compares with its own last month
+  assert.notEqual(view.platforms[2].metrics.sales.paceDeltaPct, null);
+
+  const t = buildShopTable({ ...fixture(), others: [amazonOf(), aupayOf({ previousMonth: true })] });
+  assert.deepEqual(t.weekExcludes, ["aupay"]);
+  assert.deepEqual(t.prevExcludes, []);
+  const au = t.rows.find((r) => r.key === "aupay:1");
+  assert.deepEqual(au.previous, { sales: 1500, units: 30, orders: 15 });
+  assert.notEqual(au.monthDelta.orders, null);
+  assert.equal(t.total.previous.orders, without.metrics.orders.previous + 60);
 });
 
 // ---- one shop's visit read failing must not read as every shop stopping ----
