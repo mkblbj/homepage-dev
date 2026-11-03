@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { buildPerformanceModel } from "widgets/uoperformance/performance-model.mjs";
 
+import { visitsFromFreshShops } from "./daily-check-model.mjs";
 import { ShopVisitsTable } from "./insight-section";
 
 const t = (key, opts) =>
@@ -71,6 +72,37 @@ describe("widgets/uorakutensales/insight-section", () => {
     expect(within(rows[1]).getAllByText("—")).toHaveLength(5);
     // the logo is the 楽天 shop's alone
     expect(container.querySelectorAll('img[src="https://example.test/a.png"]')).toHaveLength(1);
+  });
+
+  it("a stopped shop's row carries its own day, and the header stays on the latest", () => {
+    const partly = visitsFromFreshShops(
+      buildPerformanceModel({
+        traffic: { dataDateJST: "2026-10-27", visitCount: 999, sampleCount: 0 },
+        sources: { traffic: { stale: true } },
+        shops: [
+          {
+            shopName: "A",
+            traffic: { dataDateJST: "2026-11-02", visitCount: 200, sampleCount: 4, visitDeltaPercent: 5 },
+          },
+          {
+            shopName: "S",
+            traffic: { dataDateJST: "2026-10-27", visitCount: 40, sampleCount: 4, visitDeltaPercent: 47.5 },
+            sources: { traffic: { stale: true } },
+          },
+        ],
+      }),
+    );
+    const { container } = render(
+      <ShopVisitsTable performance={partly} shops={[{ name: "A" }, { name: "S" }]} shopColors={{}} t={t} />,
+    );
+
+    expect(screen.queryByText("uorakutensales.visitsStale")).not.toBeInTheDocument();
+    expect(container).toHaveTextContent("11/2");
+    const row = screen.getByRole("row", { name: /^S/ });
+    expect(within(row).getByText("10/27")).toBeInTheDocument();
+    expect(within(row).queryByText("+47.5%")).not.toBeInTheDocument();
+    expect(within(screen.getByRole("row", { name: /^A/ })).queryByText("10/27")).not.toBeInTheDocument();
+    expect(container).toHaveTextContent("uorakutensales.visitsStoppedNote");
   });
 
   it("each shop's logo sits beside its name", () => {

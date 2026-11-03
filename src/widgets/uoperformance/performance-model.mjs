@@ -207,6 +207,11 @@ export function buildPerformanceModel(data, logos) {
         delta: toNullableNumber(shopTraffic.visitDeltaPercent),
         newSalesShare: toNullableNumber(shopMix.new?.salesSharePercent),
         newOrderShare: toNullableNumber(shopMix.new?.orderSharePercent),
+        // each shop's read succeeds or fails on its own, with its own day
+        dataDateJST: shopTraffic.dataDateJST || null,
+        stale: shop.sources?.traffic?.stale === true,
+        mix: buildMix(shopMix),
+        mixStale: shop.sources?.customerMix?.stale === true,
       };
     }),
     sources: data.sources || {},

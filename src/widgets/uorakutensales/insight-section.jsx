@@ -3,13 +3,14 @@
 // 経営表現 widget's wording, since they show the same figures it did.
 import { DASH, mdLabel } from "widgets/uoperformance/performance-model.mjs";
 
-import { Delta, ShopName, visitDayLabel, visitsStale } from "./daily-check-section";
+import { Delta, ShopName, stoppedShopsNote, VisitDayLine, VisitFigure } from "./daily-check-section";
 import { PlatformName, ScopeName } from "./platform-mark";
 import { FALLBACK_SHOP_COLOR } from "./sales-model.mjs";
 
 const NS = "uorakutensales";
 const PERF = "uoperformance";
 const MUTED = "text-theme-600 dark:text-theme-300";
+const WARNING = "text-amber-700 dark:text-amber-300";
 
 function fmt(t, value) {
   return t("common.number", { value: Number(value) || 0 });
@@ -41,6 +42,7 @@ export function CustomerMixCard({ performance, scope = "", cardCls = "", t }) {
   ];
   const total = (mix.newYen || 0) + (mix.repYen || 0);
   const max = Math.max(1, ...rows.map((r) => r.yen || 0));
+  const stoppedNote = stoppedShopsNote(performance, t);
   return (
     <section className={`flex min-w-0 flex-col gap-3 p-5 ${cardCls}`}>
       <span className="flex flex-wrap items-baseline gap-x-2">
@@ -50,8 +52,10 @@ export function CustomerMixCard({ performance, scope = "", cardCls = "", t }) {
         </span>
         <span className={`text-xs ${MUTED}`}>
           {periodLabel(mix.period)} · {t(`${NS}.sortSales`)}
+          {performance.coverage ? ` · ${t(`${NS}.shopCoverage`, performance.coverage)}` : ""}
         </span>
       </span>
+      {stoppedNote ? <span className={`text-xs ${WARNING}`}>{stoppedNote}</span> : null}
       <span className="flex h-8 overflow-hidden rounded-lg text-xs font-extrabold">
         <span
           className="flex items-center whitespace-nowrap bg-[#2E7DF6] px-3 text-white"
@@ -122,6 +126,7 @@ export function ShopVisitsTable({
   const listed = new Set(shops.filter(isRakuten).map((shop) => shop.name));
   const omitted = performance.shops.filter((s) => !listed.has(s.name)).map((s) => s.name);
   const companyDelta = performance.sampleCount >= 3 ? performance.delta : null;
+  const stoppedNote = stoppedShopsNote(performance, t);
   const cell = "px-2 py-2 text-right text-sm tabular-nums";
   const headBase = "px-2 py-2 text-xs font-semibold text-theme-600 dark:text-theme-300";
   const head = `${headBase} text-right`;
@@ -130,12 +135,7 @@ export function ShopVisitsTable({
       <span className="flex flex-wrap items-baseline gap-x-2">
         <span className="text-base font-extrabold text-theme-900 dark:text-theme-50">{t(`${NS}.shopVisits`)}</span>
         <span className={`text-xs ${MUTED}`}>
-          {visitDayLabel(performance.dataDateJST)} ·{" "}
-          {visitsStale(performance) ? (
-            <span className="text-amber-700 dark:text-amber-300">{t(`${NS}.visitsStale`)}</span>
-          ) : (
-            t(`${NS}.confirmed`)
-          )}
+          <VisitDayLine performance={performance} t={t} />
         </span>
       </span>
       <div className="overflow-x-auto">
@@ -175,7 +175,7 @@ export function ShopVisitsTable({
                   />
                 </th>
                 <td className={`${cell} font-bold text-theme-900 dark:text-theme-50`}>
-                  {s.visit === null ? DASH : fmt(t, s.visit)}
+                  <VisitFigure value={s.visit} stoppedAt={s.stoppedAt} t={t} />
                 </td>
                 <td className={`${cell} ${MUTED}`}>{s.uu === null ? DASH : fmt(t, s.uu)}</td>
                 <td className={`${cell} ${MUTED}`}>{s.expected === null ? DASH : fmt(t, s.expected)}</td>
@@ -210,6 +210,7 @@ export function ShopVisitsTable({
           </tfoot>
         </table>
       </div>
+      {stoppedNote ? <span className={`text-xs ${WARNING}`}>{stoppedNote}</span> : null}
       <span className={`text-xs ${MUTED}`}>
         {t(`${NS}.visitsNote`)}
         {omitted.length ? ` · ${t(`${NS}.idleLeftOut`, { names: omitted.join("・") })}` : ""}

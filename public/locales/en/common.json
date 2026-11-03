@@ -1591,7 +1591,7 @@
         "colShop": "Shop",
         "colToday": "Today",
         "colWeek": "Last 7 days",
-        "colMonth": "This month",
+        "colMonth": "This & last month",
         "colVisits": "Visits",
         "share": "Share",
         "vsAvg": "vs 7-day avg",
@@ -1628,7 +1628,11 @@
         "weekExcludes": "{{names}} is missing from the past 7 days, their average and this ratio (no history)",
         "prevExcludes": "{{names}} is missing from last month's figures and the comparison (no data)",
         "companyExcludes": "Company total: today and this month cover every shop; {{names}} is missing from the 7-day average, its ratio and the last-month comparison (no data)",
-        "noWeekLeftOut": "{{names}} left out: no history"
+        "noWeekLeftOut": "{{names}} left out: no history",
+        "stoppedSince": "{{names}} (up to {{md}})",
+        "visitsStoppedNote": "{{shops}} stopped updating (left out of the total)",
+        "prevPaceBasis": "(daily pace)",
+        "prevTotal": "Last month's total {{prev}}"
     },
     "uoshippingdashboard": {
         "allPlatforms": "All",

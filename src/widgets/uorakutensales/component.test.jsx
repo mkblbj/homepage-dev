@@ -360,6 +360,36 @@ describe("widgets/uorakutensales/component", () => {
     expect(screen.getByText("amazon-sku")).toBeInTheDocument();
   });
 
+  it("does not call the whole visits column stopped when one shop's read failed", () => {
+    const performance = {
+      ok: true,
+      partial: true,
+      traffic: { dataDateJST: "2026-10-27", visitCount: 999, sampleCount: 0 },
+      sources: { traffic: { stale: true } },
+      shops: [
+        { shopName: "shop-a", traffic: { dataDateJST: "2026-11-02", visitCount: 200, sampleCount: 4 } },
+        {
+          shopName: "shop-s",
+          traffic: { dataDateJST: "2026-10-27", visitCount: 40, sampleCount: 4 },
+          sources: { traffic: { stale: true } },
+        },
+      ],
+    };
+    useWidgetAPI.mockImplementation((_widget, endpoint) => {
+      if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
+      if (endpoint === "performance") return { data: performance, error: undefined, mutate: vi.fn() };
+      return { data: undefined, error: undefined, mutate: vi.fn() };
+    });
+
+    const { container } = renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
+
+    expect(container).not.toHaveTextContent("uorakutensales.visitsStale");
+    expect(container).toHaveTextContent("uorakutensales.visitsStoppedNote");
+    // the company line adds up the shop that is up to date, not the server's fallback day
+    expect(screen.getAllByText("200").length).toBeGreaterThan(0);
+    expect(screen.queryByText("999")).not.toBeInTheDocument();
+  });
+
   it("reads both device boards on the widget's own interval", () => {
     useWidgetAPI.mockImplementation((_widget, endpoint) => {
       if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };

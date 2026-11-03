@@ -210,6 +210,10 @@ const REQUIRED_KEYS = [
   "shopVisits",
   "idleLeftOut",
   "visitsNote",
+  "stoppedSince",
+  "prevPaceBasis",
+  "prevTotal",
+  "visitsStoppedNote",
   "manYen",
   // what the page cannot vouch for: missing shops and stopped history
   "notFetched",
@@ -279,6 +283,15 @@ test("daily check placeholders are preserved across locales", () => {
     assert.match(ns.rankedBy, /\{\{metric\}\}/, `${locale}.rankedBy needs {{metric}}`);
     assert.match(ns.activeShops, /\{\{count\}\}/, `${locale}.activeShops needs {{count}}`);
     assert.match(ns.idleLeftOut, /\{\{names\}\}/, `${locale}.idleLeftOut needs {{names}}`);
+  }
+});
+
+test("stopped-shop placeholders are preserved across locales", () => {
+  for (const locale of LOCALES) {
+    const ns = loadNamespace(locale);
+    assert.match(ns.stoppedSince, /\{\{names\}\}.*\{\{md\}\}/, `${locale}.stoppedSince needs {{names}} then {{md}}`);
+    assert.match(ns.visitsStoppedNote, /\{\{shops\}\}/, `${locale}.visitsStoppedNote needs {{shops}}`);
+    assert.match(ns.prevTotal, /\{\{prev\}\}/, `${locale}.prevTotal needs {{prev}}`);
   }
 });
 

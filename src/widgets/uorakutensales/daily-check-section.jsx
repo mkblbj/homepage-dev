@@ -382,6 +382,9 @@ export function MonthCard({ monthly, metric, cardCls = "", t }) {
                     pace: shortText(metric, pm.pace, t),
                     prev: shortText(metric, pm.prevPace, t),
                   })}
+                  {pm.previous === null || pm.previous === undefined
+                    ? ""
+                    : ` · ${t(`${NS}.prevTotal`, { prev: shortText(metric, pm.previous, t) })}`}
                 </span>
               </span>
             );
@@ -408,12 +411,48 @@ export function visitsStale(performance) {
   return performance?.sources?.traffic?.stale === true;
 }
 
+// Names the shops whose visits stopped, grouped by the day each stopped at.
+export function stoppedShopsNote(performance, t) {
+  const stopped = performance?.stoppedShops;
+  if (!stopped?.length) return null;
+  const namesByDate = new Map();
+  stopped.forEach(({ name, date }) => namesByDate.set(date, [...(namesByDate.get(date) ?? []), name]));
+  const shops = [...namesByDate]
+    .map(([date, names]) => t(`${NS}.stoppedSince`, { names: names.join("・"), md: mdLabel(date) }))
+    .join("、");
+  return t(`${NS}.visitsStoppedNote`, { shops });
+}
+
+// The date, the shop coverage when some shops stopped, and whether it is final.
+export function VisitDayLine({ performance, t }) {
+  const stale = visitsStale(performance);
+  return (
+    <>
+      {visitDayLabel(performance.dataDateJST)} ·{" "}
+      {performance.coverage ? `${t(`${NS}.shopCoverage`, performance.coverage)} · ` : ""}
+      {stale ? <span className={WARN}>{t(`${NS}.visitsStale`)}</span> : t(`${NS}.confirmed`)}
+    </>
+  );
+}
+
+// A shop's visits. One that stopped keeps its last figure, with that day under it.
+export function VisitFigure({ value, stoppedAt, t }) {
+  if (value === null || value === undefined) return DASH;
+  if (!stoppedAt) return fmt(t, value);
+  return (
+    <span className="inline-flex flex-col items-end leading-tight">
+      <span className="text-theme-500 dark:text-theme-400">{fmt(t, value)}</span>
+      <span className={`text-xs ${WARN}`}>{mdLabel(stoppedAt)}</span>
+    </span>
+  );
+}
+
 // `scope` names the platform the visits belong to once the board shows several
 export function VisitCard({ performance, scope = "", cardCls = "", t }) {
   if (!performance || performance.visit === null) return null;
   // fewer than 3 same-weekday samples means there is no median to compare with
   const delta = performance.sampleCount >= 3 ? performance.delta : null;
-  const stale = visitsStale(performance);
+  const note = stoppedShopsNote(performance, t);
   return (
     <section className={`flex min-w-0 flex-col gap-2 p-5 ${cardCls}`}>
       <span className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
@@ -421,8 +460,7 @@ export function VisitCard({ performance, scope = "", cardCls = "", t }) {
           <ScopeName scope={scope} />
           {t(`${NS}.visitsTitle`)}{" "}
           <span className={`text-xs font-medium ${MUTED}`}>
-            {visitDayLabel(performance.dataDateJST)} ·{" "}
-            {stale ? <span className={WARN}>{t(`${NS}.visitsStale`)}</span> : t(`${NS}.confirmed`)}
+            <VisitDayLine performance={performance} t={t} />
           </span>
         </span>
         <span className={`text-xs ${MUTED}`}>
@@ -439,6 +477,7 @@ export function VisitCard({ performance, scope = "", cardCls = "", t }) {
           uu: performance.uu === null ? DASH : fmt(t, performance.uu),
         })}
       </span>
+      {note ? <span className={`text-xs ${WARN}`}>{note}</span> : null}
     </section>
   );
 }
@@ -448,11 +487,11 @@ const TD = "px-2 py-2.5 text-sm tabular-nums text-right";
 
 // Ten figures side by side only read as four groups when the groups show:
 // each one opens with a rule, and every other group sits on a faint band.
-const COL_GROUP = [null, "today", "today", "today", "week", "week", "month", "month", "visits", "visits"];
-const GROUP_START = { 1: "today", 4: "week", 6: "month", 8: "visits" };
+const COL_GROUP = [null, "today", "today", "today", "week", "week", "month", "month", "month", "visits", "visits"];
+const GROUP_START = { 1: "today", 4: "week", 6: "month", 9: "visits" };
 const BANDED = new Set(["week", "visits"]);
 // shop, 今日 (takes the rest), share, vs 7-day, avg/day, CVR, to date, vs last month, visits, vs median
-const COL_WIDTHS = [176, null, 76, 140, 112, 84, 120, 100, 104, 100];
+const COL_WIDTHS = [168, null, 68, 120, 108, 68, 108, 104, 84, 100, 88];
 const BAND = "bg-theme-200/40 dark:bg-white/[0.035]";
 const GROUP_BAR = { today: "#F0857A", week: "#7FB2E8", month: "#E8B26A", visits: "#7DDBB0" };
 
@@ -650,30 +689,37 @@ function ShopRow({ row, metric, shareBase, maxToday, color, logoUrl, t, label = 
       <Cell i={6} className="font-bold text-theme-900 dark:text-theme-50">
         {bareText(metric, row.month?.[metric], t)}
       </Cell>
-      <Cell i={7}>
+      <Cell i={7} className={MUTED}>
+        {bareText(metric, row.previous?.[metric], t)}
+      </Cell>
+      <Cell i={8}>
         <DeltaCell value={row.monthDelta?.[metric] ?? null} />
       </Cell>
-      <Cell i={8} className="text-theme-800 dark:text-theme-100">
-        {row.visits === null ? DASH : fmt(t, row.visits)}
+      <Cell i={9} className="text-theme-800 dark:text-theme-100">
+        <VisitFigure value={row.visits} stoppedAt={row.visitsStoppedAt} t={t} />
       </Cell>
-      <Cell i={9} className="pr-3">
+      <Cell i={10} className="pr-3">
         <DeltaCell value={row.visitDelta} />
       </Cell>
     </tr>
   );
 }
 
-function IdleRow({ row, color, logoUrl, t }) {
+function IdleRow({ row, metric, color, logoUrl, t }) {
   return (
     <tr className="border-b border-theme-300/30 text-theme-500 dark:border-white/[0.07] dark:text-theme-400">
       <th scope="row" className="px-2 py-2 text-left text-sm">
         <ShopName name={row.name} color={color} logoUrl={logoUrl} platform={row.platform} t={t} />
       </th>
-      <td colSpan={7} {...colProps(1)} className={`${colProps(1).className} px-2 py-2 text-xs`}>
+      <td colSpan={6} {...colProps(1)} className={`${colProps(1).className} px-2 py-2 text-xs`}>
         {t(`${NS}.idleNote`)}
       </td>
-      <Cell i={8}>{row.visits === null ? DASH : fmt(t, row.visits)}</Cell>
-      <Cell i={9} className="pr-3">
+      <Cell i={7}>{bareText(metric, row.previous?.[metric], t)}</Cell>
+      <Cell i={8}>{DASH}</Cell>
+      <Cell i={9}>
+        <VisitFigure value={row.visits} stoppedAt={row.visitsStoppedAt} t={t} />
+      </Cell>
+      <Cell i={10} className="pr-3">
         <DeltaCell value={row.visitDelta} />
       </Cell>
     </tr>
@@ -759,7 +805,7 @@ export function ShopTable({
         </span>
       ))}
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1040px] table-fixed border-collapse">
+        <table className="w-full min-w-[1240px] table-fixed border-collapse">
           {/* figure columns keep their width; any spare width goes to 今日, so a
               group's figures never drift apart on a wide screen */}
           <colgroup>
@@ -772,8 +818,8 @@ export function ShopTable({
               <th aria-hidden="true" />
               {group("colToday", 1, 3)}
               {group("colWeek", 4, 2)}
-              {group("colMonth", 6, 2)}
-              {group("colVisits", 8, 2)}
+              {group("colMonth", 6, 3)}
+              {group("colVisits", 9, 2)}
             </tr>
             <tr className="border-b border-theme-300/50 dark:border-white/10">
               <th scope="col" className={`${TH} text-left`}>
@@ -785,9 +831,16 @@ export function ShopTable({
               {head(4, withUnit(t(`${NS}.perDayAvg`), unit), "text-right")}
               {head(5, "CVR", "text-right")}
               {head(6, withUnit(t(`${NS}.cumulative`), unit), "text-right")}
-              {head(7, t(`${NS}.vsPrev`), "text-right")}
-              {head(8, withUnit(t(`${NS}.visits`), t(`${NS}.peopleUnit`).trim()), "text-right")}
-              {head(9, t(`${NS}.vsMedian`), "text-right pr-3")}
+              {head(7, withUnit(t(`${NS}.lastMonth`), unit), "text-right")}
+              {head(
+                8,
+                <>
+                  {t(`${NS}.vsPrev`)} <span className="block font-medium">{t(`${NS}.prevPaceBasis`)}</span>
+                </>,
+                "text-right",
+              )}
+              {head(9, withUnit(t(`${NS}.visits`), t(`${NS}.peopleUnit`).trim()), "text-right")}
+              {head(10, t(`${NS}.vsMedian`), "text-right pr-3")}
             </tr>
           </thead>
           <tbody>
@@ -805,7 +858,14 @@ export function ShopTable({
             ))}
             {showIdle
               ? table.idle.map((row) => (
-                  <IdleRow key={row.key ?? row.name} row={row} color={colorOf(row.name)} logoUrl={logoOf(row)} t={t} />
+                  <IdleRow
+                    metric={metric}
+                    key={row.key ?? row.name}
+                    row={row}
+                    color={colorOf(row.name)}
+                    logoUrl={logoOf(row)}
+                    t={t}
+                  />
                 ))
               : null}
           </tbody>
