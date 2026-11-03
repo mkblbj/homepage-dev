@@ -300,6 +300,18 @@ export function TodayCard({ view, metric, shopColors, cardCls = "", t }) {
   );
 }
 
+// Last month's total, a figure in its own right rather than a line of small print.
+function LastMonthFigure({ metric, value, t }) {
+  return (
+    <span data-testid="last-month" className="flex items-baseline gap-1.5 whitespace-nowrap">
+      <span className={`text-xs font-semibold ${MUTED}`}>{t(`${NS}.lastMonth`)}</span>
+      <span className="text-xl font-extrabold tabular-nums text-theme-800 dark:text-theme-100">
+        {shortText(metric, value, t)}
+      </span>
+    </span>
+  );
+}
+
 // `monthly` is buildMonthView's. Across platforms the 売上 metric is null: each
 // platform's yen get a line of their own instead of one company figure.
 export function MonthCard({ monthly, metric, cardCls = "", t }) {
@@ -330,8 +342,11 @@ export function MonthCard({ monthly, metric, cardCls = "", t }) {
       </span>
       {m ? (
         <>
-          <span className="text-[32px] font-extrabold leading-tight tabular-nums text-theme-900 dark:text-theme-50">
-            {shortText(metric, m.current, t)}
+          <span className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
+            <span className="text-[32px] font-extrabold leading-tight tabular-nums text-theme-900 dark:text-theme-50">
+              {shortText(metric, m.current, t)}
+            </span>
+            <LastMonthFigure metric={metric} value={m.previous} t={t} />
           </span>
           <span className="text-sm tabular-nums text-theme-700 dark:text-theme-200">
             {t(`${NS}.dailyAvgVsPrev`, { pace: shortText(metric, m.pace, t), prev: shortText(metric, m.prevPace, t) })}
@@ -349,9 +364,7 @@ export function MonthCard({ monthly, metric, cardCls = "", t }) {
                 />
               </span>
               <span className={`flex flex-wrap justify-between gap-x-3 text-xs tabular-nums ${MUTED}`}>
-                <span>
-                  {t(`${NS}.reachOfPrev`, { prev: shortText(metric, m.previous, t), pct: m.vsPrevPct.toFixed(1) })}
-                </span>
+                <span>{t(`${NS}.reachOfPrev`, { pct: m.vsPrevPct.toFixed(1) })}</span>
                 <span>{t(`${NS}.monthElapsed`, { pct: Math.round(cur.progressPct) })}</span>
               </span>
             </>
@@ -364,27 +377,26 @@ export function MonthCard({ monthly, metric, cardCls = "", t }) {
             const pm = metrics[metric];
             return (
               <span key={platform} className="flex flex-col gap-0.5">
-                <span className="flex flex-wrap items-baseline justify-between gap-x-3">
-                  <span className="flex items-baseline gap-3">
-                    <span className="w-20 shrink-0 text-sm font-bold text-theme-800 dark:text-theme-100">
-                      <PlatformName platform={platform} label={platformLabel(platform, t)} />
-                    </span>
-                    <span className="text-[26px] font-extrabold leading-tight tabular-nums text-theme-900 dark:text-theme-50">
-                      {shortText(metric, pm.current, t)}
-                    </span>
+                <span className="flex flex-wrap items-baseline gap-x-3">
+                  <span className="w-20 shrink-0 text-sm font-bold text-theme-800 dark:text-theme-100">
+                    <PlatformName platform={platform} label={platformLabel(platform, t)} />
                   </span>
-                  <span className={`text-xs ${MUTED}`}>
+                  <span className="text-[26px] font-extrabold leading-tight tabular-nums text-theme-900 dark:text-theme-50">
+                    {shortText(metric, pm.current, t)}
+                  </span>
+                  <LastMonthFigure metric={metric} value={pm.previous} t={t} />
+                </span>
+                {/* the comparison shares this line on every platform, so they all line up */}
+                <span className="flex flex-wrap items-baseline justify-between gap-x-3 pl-[92px] text-xs">
+                  <span className="tabular-nums text-theme-700 dark:text-theme-200">
+                    {t(`${NS}.dailyAvgVsPrev`, {
+                      pace: shortText(metric, pm.pace, t),
+                      prev: shortText(metric, pm.prevPace, t),
+                    })}
+                  </span>
+                  <span className={MUTED}>
                     {t(`${NS}.prevPaceDelta`)} <Delta value={pm.paceDeltaPct} className="ml-1 text-sm font-extrabold" />
                   </span>
-                </span>
-                <span className="pl-[92px] text-xs tabular-nums text-theme-700 dark:text-theme-200">
-                  {t(`${NS}.dailyAvgVsPrev`, {
-                    pace: shortText(metric, pm.pace, t),
-                    prev: shortText(metric, pm.prevPace, t),
-                  })}
-                  {pm.previous === null || pm.previous === undefined
-                    ? ""
-                    : ` · ${t(`${NS}.prevTotal`, { prev: shortText(metric, pm.previous, t) })}`}
                 </span>
               </span>
             );

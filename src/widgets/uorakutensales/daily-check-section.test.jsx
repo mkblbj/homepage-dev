@@ -267,7 +267,7 @@ describe("widgets/uorakutensales/daily-check-section", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("the yen month card gives each platform last month's total, where it has one", () => {
+  it("the yen month card gives each platform last month's total as a figure of its own", () => {
     const counts = { current: 9, previous: 9, pace: 1, prevPace: 1, paceDeltaPct: 0, vsPrevPct: 100 };
     const yen = (previous) => ({ sales: { current: 900, previous, pace: 30, prevPace: 32, paceDeltaPct: -6 } });
     const monthly = {
@@ -278,10 +278,28 @@ describe("widgets/uorakutensales/daily-check-section", () => {
         { platform: "aupay", metrics: yen(null) },
       ],
     };
-    const tp = (key, opts) => (key === `${NS}.prevTotal` ? `prev ${opts.prev}` : t(key, opts));
-    render(<MonthCard monthly={monthly} metric="sales" t={tp} />);
+    render(<MonthCard monthly={monthly} metric="sales" t={t} />);
 
-    expect(screen.getAllByText(/prev ¥2731\.3/)).toHaveLength(1);
+    expect(screen.getByText(`¥2731.3${NS}.manUnit`)).toBeInTheDocument();
+    // a platform with no last month says so instead of leaving a gap
+    expect(screen.getAllByTestId("last-month").map((el) => el.textContent)).toEqual([
+      `${NS}.lastMonth¥2731.3${NS}.manUnit`,
+      `${NS}.lastMonth—`,
+    ]);
+  });
+
+  it("the count month card shows last month's total as a figure, not inside the caption", () => {
+    const metric = { current: 1580, previous: 21660, pace: 727, prevPace: 699, paceDeltaPct: 3, vsPrevPct: 7.2 };
+    const monthly = {
+      current: { month: "2026-11", completedDays: 2, hasLiveDay: true, progressPct: 7 },
+      metrics: { sales: null, units: metric, orders: metric },
+      platforms: [],
+    };
+    const tc = (key, opts) => (key === `${NS}.reachOfPrev` ? `reach ${JSON.stringify(opts)}` : t(key, opts));
+    render(<MonthCard monthly={monthly} metric="orders" t={tc} />);
+
+    expect(screen.getByText(`21660${NS}.ordersUnit`)).toBeInTheDocument();
+    expect(screen.getByText('reach {"pct":"7.2"}')).toBeInTheDocument();
   });
 
   it("the month card names the shop coverage only when shops are missing", () => {

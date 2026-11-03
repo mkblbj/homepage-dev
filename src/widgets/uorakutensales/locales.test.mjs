@@ -212,7 +212,6 @@ const REQUIRED_KEYS = [
   "visitsNote",
   "stoppedSince",
   "prevPaceBasis",
-  "prevTotal",
   "visitsStoppedNote",
   "manYen",
   // what the page cannot vouch for: missing shops and stopped history
@@ -273,7 +272,6 @@ test("daily check placeholders are preserved across locales", () => {
       /\{\{pace\}\}.*\{\{prev\}\}/,
       `${locale}.dailyAvgVsPrev needs {{pace}} then {{prev}}`,
     );
-    assert.match(ns.reachOfPrev, /\{\{prev\}\}/, `${locale}.reachOfPrev needs {{prev}}`);
     assert.match(ns.reachOfPrev, /\{\{pct\}\}/, `${locale}.reachOfPrev needs {{pct}}`);
     assert.match(ns.monthElapsed, /\{\{pct\}\}/, `${locale}.monthElapsed needs {{pct}}`);
     assert.match(ns.visitDetail, /\{\{median\}\}.*\{\{uu\}\}/, `${locale}.visitDetail needs {{median}} then {{uu}}`);
@@ -291,7 +289,6 @@ test("stopped-shop placeholders are preserved across locales", () => {
     const ns = loadNamespace(locale);
     assert.match(ns.stoppedSince, /\{\{names\}\}.*\{\{md\}\}/, `${locale}.stoppedSince needs {{names}} then {{md}}`);
     assert.match(ns.visitsStoppedNote, /\{\{shops\}\}/, `${locale}.visitsStoppedNote needs {{shops}}`);
-    assert.match(ns.prevTotal, /\{\{prev\}\}/, `${locale}.prevTotal needs {{prev}}`);
   }
 });
 

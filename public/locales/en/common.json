@@ -1579,7 +1579,7 @@
         "avgLine": "Dotted line = 7-day average",
         "prevPaceDelta": "vs last month (daily pace)",
         "dailyAvgVsPrev": "Daily pace {{pace}} · last month {{prev}}",
-        "reachOfPrev": "{{pct}}% of last month's {{prev}}",
+        "reachOfPrev": "{{pct}}% of last month's total",
         "monthElapsed": "Marker = {{pct}}% of the month gone",
         "visitsTitle": "Visits",
         "confirmed": "final",
@@ -1631,8 +1631,7 @@
         "noWeekLeftOut": "{{names}} left out: no history",
         "stoppedSince": "{{names}} (up to {{md}})",
         "visitsStoppedNote": "{{shops}} stopped updating (left out of the total)",
-        "prevPaceBasis": "(daily pace)",
-        "prevTotal": "Last month's total {{prev}}"
+        "prevPaceBasis": "(daily pace)"
     },
     "uoshippingdashboard": {
         "allPlatforms": "All",

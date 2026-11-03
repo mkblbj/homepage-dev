@@ -1592,7 +1592,7 @@
         "avgLine": "虚线 = 7日平均",
         "prevPaceDelta": "比上月（日均）",
         "dailyAvgVsPrev": "日均 {{pace}} · 上月 {{prev}}",
-        "reachOfPrev": "达到上月合计 {{prev}} 的 {{pct}}%",
+        "reachOfPrev": "达到上月合计的 {{pct}}%",
         "monthElapsed": "白线 = 本月已过 {{pct}}%",
         "visitsTitle": "访问人数",
         "confirmed": "确定值",
@@ -1644,8 +1644,7 @@
         "noWeekLeftOut": "{{names}} 无历史数据，已省略",
         "stoppedSince": "{{names}}（截至 {{md}}）",
         "visitsStoppedNote": "{{shops}} 已停止更新（不计入合计）",
-        "prevPaceBasis": "（日均）",
-        "prevTotal": "上月合计 {{prev}}"
+        "prevPaceBasis": "（日均）"
     },
     "uoshippingdashboard": {
         "allPlatforms": "全部",
