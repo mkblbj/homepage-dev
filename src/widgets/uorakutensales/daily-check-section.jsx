@@ -301,13 +301,15 @@ export function TodayCard({ view, metric, shopColors, cardCls = "", t }) {
 }
 
 // Last month's total, a figure in its own right rather than a line of small print.
+// Blue sets it apart from this month's figure; red, green and amber already mean
+// a drop, a rise and a warning on this card.
+const LAST_MONTH = "text-sky-700 dark:text-sky-300";
+
 function LastMonthFigure({ metric, value, t }) {
   return (
     <span data-testid="last-month" className="flex items-baseline gap-1.5 whitespace-nowrap">
-      <span className={`text-xs font-semibold ${MUTED}`}>{t(`${NS}.lastMonth`)}</span>
-      <span className="text-xl font-extrabold tabular-nums text-theme-800 dark:text-theme-100">
-        {shortText(metric, value, t)}
-      </span>
+      <span className={`text-xs font-semibold ${LAST_MONTH}`}>{t(`${NS}.lastMonth`)}</span>
+      <span className={`text-xl font-extrabold tabular-nums ${LAST_MONTH}`}>{shortText(metric, value, t)}</span>
     </span>
   );
 }
