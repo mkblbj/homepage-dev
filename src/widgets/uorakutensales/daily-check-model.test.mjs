@@ -211,6 +211,26 @@ test("month columns carry this month's total and the pace against last month", (
   assert.equal(t.total.month.sales, 3660);
 });
 
+test("each row carries last month's actual figures", () => {
+  const t = buildShopTable(fixture());
+  const a = t.rows.find((r) => r.name === "A");
+  assert.equal(a.previous.sales, 3000);
+  assert.equal(a.previous.orders, 30);
+  assert.equal(t.total.previous.sales, 4500);
+});
+
+test("a shop with no line on last month's board reads unknown, not zero", () => {
+  const t = buildShopTable(fixture({ prevShops: [shopNow("B", 1500, 15)] }));
+  assert.equal(t.rows.find((r) => r.name === "A").previous.sales, null);
+  assert.equal(t.rows.find((r) => r.name === "B").previous.sales, 1500);
+});
+
+test("without the month board there is no last month either", () => {
+  const t = buildShopTable({ ...fixture(), monthly: null });
+  assert.equal(t.rows[0].previous, null);
+  assert.equal(t.total.previous, null);
+});
+
 test("month columns stay unknown when pace is unknown", () => {
   const f = fixture();
   const monthly = {

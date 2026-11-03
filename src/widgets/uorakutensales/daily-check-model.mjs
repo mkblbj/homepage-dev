@@ -67,10 +67,19 @@ function deltasOf(metrics) {
   return metrics ? triple(metrics.sales.paceDeltaPct, metrics.units.paceDeltaPct, metrics.orders.paceDeltaPct) : null;
 }
 
+// last month's actual figures; null where the board has none, never zero
+function previousOf(metrics) {
+  return metrics ? triple(metrics.sales.previous, metrics.units.previous, metrics.orders.previous) : null;
+}
+
 function monthOf(shop) {
-  if (!shop) return { month: null, monthDelta: null };
+  if (!shop) return { month: null, monthDelta: null, previous: null };
   const m = shop.metrics;
-  return { month: triple(m.sales.current, m.units.current, m.orders.current), monthDelta: deltasOf(m) };
+  return {
+    month: triple(m.sales.current, m.units.current, m.orders.current),
+    monthDelta: deltasOf(m),
+    previous: previousOf(m),
+  };
 }
 
 const sumAll = (values) => (values.every(known) ? values.reduce((a, b) => a + b, 0) : null);
@@ -203,6 +212,7 @@ function otherShopRow(shop) {
     cvr: null,
     month: shop.month,
     monthDelta: deltasOf(shop.metrics),
+    previous: previousOf(shop.metrics),
     visits: null,
     visitDelta: null,
   };
@@ -281,6 +291,7 @@ export function buildShopTable({ model, monthly, performance, others = [] }) {
     cvr: hasHistory ? model.grandCvr : null,
     month: m ? triple(m.sales.current, m.units.current, m.orders.current) : null,
     monthDelta: deltasOf(m),
+    previous: previousOf(m),
     visits: performance?.visit ?? null,
     visitDelta: medianDelta(performance),
   };
@@ -297,6 +308,7 @@ export function buildShopTable({ model, monthly, performance, others = [] }) {
       cvr: null,
       month: a.month,
       monthDelta: deltasOf(a.metrics),
+      previous: previousOf(a.metrics),
       visits: null,
       visitDelta: null,
     };
@@ -318,6 +330,7 @@ export function buildShopTable({ model, monthly, performance, others = [] }) {
     cvr: null,
     month: units && orders ? triple(null, units.current, orders.current) : null,
     monthDelta: units && orders ? triple(null, units.paceDeltaPct, orders.paceDeltaPct) : null,
+    previous: units && orders ? triple(null, units.previous, orders.previous) : null,
     // visits are 楽天's alone and sit on its own line
     visits: null,
     visitDelta: null,

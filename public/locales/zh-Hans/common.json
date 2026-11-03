@@ -1604,7 +1604,7 @@
         "colShop": "店铺",
         "colToday": "今日",
         "colWeek": "近7日",
-        "colMonth": "本月",
+        "colMonth": "本月・上月",
         "colVisits": "访问",
         "share": "占比",
         "vsAvg": "比7日平均",
@@ -1643,7 +1643,9 @@
         "companyExcludes": "全公司合计的今日、本月含所有店铺；7 日均值及其比率、上月比不含 {{names}}（无历史和上月数据）",
         "noWeekLeftOut": "{{names}} 无历史数据，已省略",
         "stoppedSince": "{{names}}（截至 {{md}}）",
-        "visitsStoppedNote": "{{shops}} 已停止更新（不计入合计）"
+        "visitsStoppedNote": "{{shops}} 已停止更新（不计入合计）",
+        "prevPaceBasis": "（日均）",
+        "prevTotal": "上月合计 {{prev}}"
     },
     "uoshippingdashboard": {
         "allPlatforms": "全部",

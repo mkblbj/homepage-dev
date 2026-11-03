@@ -1591,7 +1591,7 @@
         "colShop": "店舗",
         "colToday": "今日",
         "colWeek": "直近7日",
-        "colMonth": "今月",
+        "colMonth": "今月・先月",
         "colVisits": "訪問",
         "share": "シェア",
         "vsAvg": "7日平均比",
@@ -1630,7 +1630,9 @@
         "companyExcludes": "全社 計の今日・今月は全店舗。7日平均とその比率・先月比に {{names}} は含みません（履歴・先月データなし）",
         "noWeekLeftOut": "{{names}} は履歴がないため省略",
         "stoppedSince": "{{names}}（{{md}}まで）",
-        "visitsStoppedNote": "{{shops}} は更新停止中（合計に含みません）"
+        "visitsStoppedNote": "{{shops}} は更新停止中（合計に含みません）",
+        "prevPaceBasis": "（日平均）",
+        "prevTotal": "先月合計 {{prev}}"
     },
     "uoshippingdashboard": {
         "allPlatforms": "全部",

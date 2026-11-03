@@ -32,6 +32,7 @@ function shopRow(name, overrides = {}) {
     avg: { sales: 3000, units: 30, orders: 25 },
     cvr: 2.5,
     month: { sales: 90000, units: 900, orders: 800 },
+    previous: { sales: 120000, units: 1500, orders: 1400 },
     monthDelta: { sales: -12.5, units: -21, orders: 3 },
     visits: 700,
     visitDelta: -8.3,
@@ -125,6 +126,35 @@ describe("widgets/uorakutensales/daily-check-section", () => {
       const line = header.querySelector("[data-group-line]");
       expect(label.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING, header.textContent).toBeTruthy();
     }
+  });
+
+  it("last month's actual figure sits beside this month's, unit in the header", () => {
+    render(<ShopTable table={table} metric="orders" shopColors={{}} t={t} />);
+
+    expect(screen.getByRole("columnheader", { name: `${NS}.lastMonth（${NS}.ordersUnit）` })).toBeInTheDocument();
+    expect(within(screen.getByRole("row", { name: /^A/ })).getByText("1400")).toBeInTheDocument();
+  });
+
+  it("last month reads in 万 in yen mode, and as a dash when unknown", () => {
+    const unknown = { ...table, rows: [shopRow("U", { previous: null })] };
+    const { rerender } = render(<ShopTable table={table} metric="sales" shopColors={{}} t={t} />);
+    expect(within(screen.getByRole("row", { name: /^A/ })).getByText("12.0")).toBeInTheDocument();
+
+    rerender(<ShopTable table={unknown} metric="sales" shopColors={{}} t={t} />);
+    expect(within(screen.getByRole("row", { name: /^U/ })).getByText("—")).toBeInTheDocument();
+  });
+
+  it("says the 先月比 column compares daily paces, not the two totals beside it", () => {
+    render(<ShopTable table={table} metric="orders" shopColors={{}} t={t} />);
+
+    expect(screen.getByRole("columnheader", { name: `${NS}.vsPrev ${NS}.prevPaceBasis` })).toBeInTheDocument();
+  });
+
+  it("an idle shop still shows what it sold last month", () => {
+    render(<ShopTable table={table} metric="orders" shopColors={{}} t={t} />);
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(`${NS}.idleShow`) }));
+
+    expect(within(screen.getByRole("row", { name: /^Z/ })).getByText("1400")).toBeInTheDocument();
   });
 
   it("idle shops stay folded until asked", () => {
@@ -235,6 +265,23 @@ describe("widgets/uorakutensales/daily-check-section", () => {
   it("the month card says nothing without the month board", () => {
     const { container } = render(<MonthCard monthly={null} metric="sales" t={t} />);
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it("the yen month card gives each platform last month's total, where it has one", () => {
+    const counts = { current: 9, previous: 9, pace: 1, prevPace: 1, paceDeltaPct: 0, vsPrevPct: 100 };
+    const yen = (previous) => ({ sales: { current: 900, previous, pace: 30, prevPace: 32, paceDeltaPct: -6 } });
+    const monthly = {
+      current: { month: "2026-11", completedDays: 2, hasLiveDay: true, progressPct: 7 },
+      metrics: { sales: null, units: counts, orders: counts },
+      platforms: [
+        { platform: "rakuten", metrics: yen(27313296) },
+        { platform: "aupay", metrics: yen(null) },
+      ],
+    };
+    const tp = (key, opts) => (key === `${NS}.prevTotal` ? `prev ${opts.prev}` : t(key, opts));
+    render(<MonthCard monthly={monthly} metric="sales" t={tp} />);
+
+    expect(screen.getAllByText(/prev ¥2731\.3/)).toHaveLength(1);
   });
 
   it("the month card names the shop coverage only when shops are missing", () => {
