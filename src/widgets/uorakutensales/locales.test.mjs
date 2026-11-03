@@ -227,6 +227,7 @@ const REQUIRED_KEYS = [
   "weekExcludes",
   "prevExcludes",
   "companyExcludes",
+  "companyPrevExcludes",
   "noWeekLeftOut",
   "platformTotal",
   "companyTotal",

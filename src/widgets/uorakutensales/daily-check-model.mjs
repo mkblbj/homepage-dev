@@ -187,10 +187,14 @@ function combineMonth(parts, comparable) {
   };
 }
 
+// A platform joins the company's last-month comparison when it serves a last
+// month and this one was read; otherwise it is left out, and the page says so.
+const hasPrevious = (other) => other.provides.previous && other.company.previous !== null;
+
 // The company's unit and order metrics: 楽天 plus each platform with a month to add.
 function companyMonth(rakutenMetrics, others) {
   const present = others.filter((o) => o.company.metrics);
-  const comparable = present.filter((o) => o.provides.previous);
+  const comparable = present.filter(hasPrevious);
   const dim = (key) =>
     rakutenMetrics
       ? combineMonth(
@@ -341,7 +345,8 @@ export function buildShopTable({ model, monthly, performance, others = [] }) {
     total: company,
     totals: [rakuten, ...otherTotals, company],
     // the platforms the company's 7-day and last-month comparisons leave out
-    compareExcludes: others.filter((o) => !o.provides.week || !o.provides.previous).map((o) => o.platform),
+    weekExcludes: others.filter((o) => !o.provides.week).map((o) => o.platform),
+    prevExcludes: others.filter((o) => o.company.metrics && !hasPrevious(o)).map((o) => o.platform),
   };
 }
 
@@ -452,7 +457,7 @@ export function buildMonthView(monthly, others = []) {
       ...present.map((o) => ({ platform: o.platform, metrics: o.company.metrics })),
     ],
     // the platforms with no last month, left out of the comparison
-    prevExcludes: present.filter((o) => !o.provides.previous).map((o) => o.platform),
+    prevExcludes: present.filter((o) => !hasPrevious(o)).map((o) => o.platform),
   };
 }
 

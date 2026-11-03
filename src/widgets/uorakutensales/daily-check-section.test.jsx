@@ -505,13 +505,34 @@ describe("widgets/uorakutensales/daily-check-section", () => {
   it("the shop table says which platform the company's comparisons leave out", () => {
     const tn = (key, opts) =>
       key === `${NS}.companyExcludes`
-        ? `excludes ${opts.names}`
-        : key === `${NS}.platformAupay`
-          ? "au PAY"
-          : tl(key, opts);
-    render(<ShopTable table={{ ...multiTable, compareExcludes: ["aupay"] }} metric="orders" shopColors={{}} t={tn} />);
+        ? `week excludes ${opts.names}`
+        : key === `${NS}.companyPrevExcludes`
+          ? `last month excludes ${opts.names}`
+          : key === `${NS}.platformAupay`
+            ? "au PAY"
+            : tl(key, opts);
+    const { rerender } = render(
+      <ShopTable
+        table={{ ...multiTable, weekExcludes: ["aupay"], prevExcludes: ["aupay"] }}
+        metric="orders"
+        shopColors={{}}
+        t={tn}
+      />,
+    );
+    expect(screen.getByText("week excludes au PAY")).toBeInTheDocument();
+    expect(screen.getByText("last month excludes au PAY")).toBeInTheDocument();
 
-    expect(screen.getByText("excludes au PAY")).toBeInTheDocument();
+    // once au PAY serves a last month, only the week note is left
+    rerender(
+      <ShopTable
+        table={{ ...multiTable, weekExcludes: ["aupay"], prevExcludes: [] }}
+        metric="orders"
+        shopColors={{}}
+        t={tn}
+      />,
+    );
+    expect(screen.getByText("week excludes au PAY")).toBeInTheDocument();
+    expect(screen.queryByText("last month excludes au PAY")).not.toBeInTheDocument();
   });
 
   it("the company's 7-day ratio sets only the platforms with a week against it", () => {

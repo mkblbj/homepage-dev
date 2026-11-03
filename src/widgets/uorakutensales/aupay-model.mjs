@@ -1,13 +1,14 @@
 // The au PAY Market shops on the company sales board, read from one snapshot:
-//   aupaySales → GET /api/aupay/sales  today and this month
+//   aupaySales → GET /api/aupay/sales  today, this month and last month
 //
-// That is all au PAY serves: no last month, history, records, item boards or
-// logos, so those figures stay unknown here rather than zero. Its yen are its own
-// order amounts (tax included, before points and coupons, no shipping), shown
-// beside the other platforms' and never added to them.
+// That is all au PAY serves: no history, records, item boards or logos, so those
+// figures stay unknown here rather than zero. Last month arrived on 2026-11-03;
+// an older server sends none, and a month that could not be read is unknown too.
+// Its yen are its own order amounts (tax included, before points and coupons, no
+// shipping), shown beside the other platforms' and never added to them.
 
 import { companyTotals, coverageOf, finishedDays, jstStamp, latest, periodOf, rowsByKey } from "./amazon-model.mjs";
-import { monthMetrics } from "./sales-model.mjs";
+import { daysInMonth, monthMetrics } from "./sales-model.mjs";
 
 // configId is opaque but stable; a shop's name can match a 楽天 shop's (3911 does)
 export function aupayKey(row) {
@@ -19,13 +20,15 @@ export function buildAupay(sales) {
   if (!sales || sales.error || !sales.today) return null;
   const today = rowsByKey(sales.today, aupayKey);
   const month = rowsByKey(sales.month, aupayKey);
-  const keys = [...new Set([...today.keys(), ...month.keys()])];
+  const previous = rowsByKey(sales.previousMonth, aupayKey);
+  const keys = [...new Set([...today.keys(), ...month.keys(), ...previous.keys()])];
   if (!keys.length) return null;
 
   const shops = keys.map((key) => {
-    const row = today.get(key) || month.get(key);
+    const row = today.get(key) || month.get(key) || previous.get(key);
     const t = periodOf(today.get(key));
     const m = periodOf(month.get(key));
+    const p = periodOf(previous.get(key));
     return {
       key,
       name: row.shopName,
@@ -33,8 +36,16 @@ export function buildAupay(sales) {
       currency: row.currency,
       today: t,
       month: m,
-      previous: null,
-      metrics: m ? monthMetrics(m, null, t, finishedDays(today.get(key)?.date, month.get(key)?.month, t), 0) : null,
+      previous: p,
+      metrics: m
+        ? monthMetrics(
+            m,
+            p,
+            t,
+            finishedDays(today.get(key)?.date, month.get(key)?.month, t),
+            daysInMonth(previous.get(key)?.month),
+          )
+        : null,
       week: null,
       avg: null,
       daily: [],
@@ -46,18 +57,27 @@ export function buildAupay(sales) {
   // every shop reports in Japan time, so the finished days are the same for all
   const todayTotals = companyTotals(sales.today);
   const monthTotals = companyTotals(sales.month);
+  const previousTotals = companyTotals(sales.previousMonth);
   const anyToday = [...today.values()].find((row) => row.date);
   const anyMonth = [...month.values()].find((row) => row.month);
+  const anyPrevious = [...previous.values()].find((row) => row.month);
   return {
     platform: "aupay",
-    provides: { week: false, previous: false },
+    // no week to compare with; a last month once the server sends one
+    provides: { week: false, previous: Boolean(sales.previousMonth) },
     shops,
     company: {
       today: todayTotals,
       month: monthTotals,
-      previous: null,
+      previous: previousTotals,
       metrics: monthTotals
-        ? monthMetrics(monthTotals, null, todayTotals, finishedDays(anyToday?.date, anyMonth?.month, todayTotals), 0)
+        ? monthMetrics(
+            monthTotals,
+            previousTotals,
+            todayTotals,
+            finishedDays(anyToday?.date, anyMonth?.month, todayTotals),
+            daysInMonth(anyPrevious?.month),
+          )
         : null,
       avg: null,
       daily: [],
