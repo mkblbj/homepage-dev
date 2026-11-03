@@ -152,6 +152,7 @@ import uoperformance from "./uoperformance/widget";
 import uoprinters from "./uoprinters/widget";
 import uorakutensales from "./uorakutensales/widget";
 import uoshippingdashboard from "./uoshippingdashboard/widget";
+import uovacuum from "./uovacuum/widget";
 import uptimekuma from "./uptimekuma/widget";
 import uptimerobot from "./uptimerobot/widget";
 import urbackup from "./urbackup/widget";
@@ -321,6 +322,7 @@ const widgets = {
   uoprinters,
   uorakutensales,
   uoshippingdashboard,
+  uovacuum,
   unifi,
   unifi_console: unifi,
   unifi_drive,

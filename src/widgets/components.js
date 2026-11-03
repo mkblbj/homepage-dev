@@ -158,6 +158,7 @@ const components = {
   uoprinters: dynamic(() => import("./uoprinters/component")),
   uorakutensales: dynamic(() => import("./uorakutensales/component")),
   uoshippingdashboard: dynamic(() => import("./uoshippingdashboard/component")),
+  uovacuum: dynamic(() => import("./uovacuum/component")),
   unifi: dynamic(() => import("./unifi/component")),
   unifi_drive: dynamic(() => import("./unifi_drive/component")),
   unmanic: dynamic(() => import("./unmanic/component")),

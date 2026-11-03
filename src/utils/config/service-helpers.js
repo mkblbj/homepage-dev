@@ -666,6 +666,10 @@ export function cleanServiceGroups(groups) {
         if (type === "uorakutensales") {
           if (refreshInterval) widget.refreshInterval = refreshInterval;
         }
+        if (type === "uovacuum") {
+          // url, key (HA token) and device stay server-side for the proxy
+          if (refreshInterval) widget.refreshInterval = refreshInterval;
+        }
         if (type === "calendar") {
           if (integrations) {
             if (Array.isArray(integrations)) {
