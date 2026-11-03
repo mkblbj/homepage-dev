@@ -1579,7 +1579,7 @@
         "avgLine": "点線 = 7日平均",
         "prevPaceDelta": "先月比（日平均）",
         "dailyAvgVsPrev": "日平均 {{pace}} · 先月 {{prev}}",
-        "reachOfPrev": "先月合計 {{prev}} の {{pct}}%",
+        "reachOfPrev": "先月合計の {{pct}}%",
         "monthElapsed": "白線 = 月の {{pct}}% 経過",
         "visitsTitle": "訪問人数",
         "confirmed": "確定値",
@@ -1631,8 +1631,7 @@
         "noWeekLeftOut": "{{names}} は履歴がないため省略",
         "stoppedSince": "{{names}}（{{md}}まで）",
         "visitsStoppedNote": "{{shops}} は更新停止中（合計に含みません）",
-        "prevPaceBasis": "（日平均）",
-        "prevTotal": "先月合計 {{prev}}"
+        "prevPaceBasis": "（日平均）"
     },
     "uoshippingdashboard": {
         "allPlatforms": "全部",
