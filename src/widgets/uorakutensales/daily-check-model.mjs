@@ -75,6 +75,81 @@ function monthOf(shop) {
 
 const sumAll = (values) => (values.every(known) ? values.reduce((a, b) => a + b, 0) : null);
 
+// The new / repeat mix of the shops in `shops`, over their own period.
+function sumMix(shops, fallback) {
+  if (shops.some((shop) => shop.mixStale || !shop.mix)) return fallback;
+  const sum = (read) => sumAll(shops.map(read));
+  const newYen = sum((shop) => shop.mix.newYen);
+  const repYen = sum((shop) => shop.mix.repYen);
+  const newOrders = sum((shop) => shop.mix.newOrders);
+  const repOrders = sum((shop) => shop.mix.repOrders);
+  const share = (part, other) =>
+    part !== null && other !== null && part + other > 0 ? (part / (part + other)) * 100 : null;
+  return {
+    dataDateJST: shops[0].mix.dataDateJST,
+    period: shops[0].mix.period,
+    newYen,
+    newOrders,
+    newSalesShare: share(newYen, repYen),
+    newOrderShare: share(newOrders, repOrders),
+    repYen,
+    repOrders,
+    repSalesShare: share(repYen, newYen),
+    repOrderShare: share(repOrders, newOrders),
+    buckets: shops[0].mix.buckets.map((bucket, i) => ({
+      key: bucket.key,
+      color: bucket.color,
+      yen: sum((shop) => shop.mix.buckets[i].yen),
+      orders: sum((shop) => shop.mix.buckets[i].orders),
+    })),
+  };
+}
+
+// Each shop's visit read succeeds or fails on its own. When one fails, the
+// server's company block falls back to the last day every shop has and reads
+// stale as a whole, though the other shops are up to date. So the company line
+// adds up the shops on the latest day, the way the sales totals leave a stale
+// shop out, and a stopped shop is marked on its own row. The server's median is
+// for all shops together, so the comparison stays unknown until they are back.
+export function visitsFromFreshShops(performance) {
+  if (!performance) return null;
+  const shops = performance.shops || [];
+  const latest =
+    shops
+      .filter((shop) => !shop.stale && shop.dataDateJST)
+      .map((shop) => shop.dataDateJST)
+      .sort()
+      .at(-1) ?? null;
+  const isCurrent = (shop) => !shop.stale && shop.dataDateJST === latest;
+  const current = shops.filter(isCurrent);
+  if (!latest || current.length === shops.length) {
+    return {
+      ...performance,
+      stoppedShops: [],
+      coverage: null,
+      shops: shops.map((shop) => ({ ...shop, stoppedAt: null })),
+    };
+  }
+  return {
+    ...performance,
+    dataDateJST: latest,
+    visit: sumAll(current.map((shop) => shop.visit)),
+    uu: sumAll(current.map((shop) => shop.uu)),
+    expected: null,
+    delta: null,
+    sampleCount: 0,
+    mix: sumMix(current, performance.mix),
+    sources: { ...performance.sources, traffic: { ...performance.sources?.traffic, stale: false } },
+    stoppedShops: shops
+      .filter((shop) => !isCurrent(shop) && shop.dataDateJST)
+      .map((shop) => ({ name: shop.name, date: shop.dataDateJST })),
+    coverage: { covered: current.length, total: shops.length },
+    shops: shops.map((shop) =>
+      isCurrent(shop) ? { ...shop, stoppedAt: null } : { ...shop, stoppedAt: shop.dataDateJST, delta: null },
+    ),
+  };
+}
+
 // One company month metric (counts only). This month's total and daily pace add up
 // every platform. Last month and the comparisons add up only `comparable`, the
 // platforms that serve a last month, so both sides cover the same shops. Each
@@ -175,6 +250,7 @@ export function buildShopTable({ model, monthly, performance, others = [] }) {
       ...monthOf(monthByName.get(name)),
       visits: visits?.visit ?? null,
       visitDelta: medianDelta(visits),
+      visitsStoppedAt: visits?.stoppedAt ?? null,
     };
     // nothing known for today or the month: the shop is on the list but not read
     row.unknown = !isKnown(row.today) && !isKnown(row.month);

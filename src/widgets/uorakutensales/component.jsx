@@ -37,13 +37,20 @@ import { buildPerformanceModel, DASH } from "widgets/uoperformance/performance-m
 
 import { buildAmazon, buildAmazonBoards, trendRowOf, withAmazonPeaks } from "./amazon-model.mjs";
 import { buildAupay, withUnrecordedShops } from "./aupay-model.mjs";
-import { buildMonthView, buildShopTable, buildTodayView, RANKING_DIM_BY_METRIC } from "./daily-check-model.mjs";
+import {
+  buildMonthView,
+  buildShopTable,
+  buildTodayView,
+  RANKING_DIM_BY_METRIC,
+  visitsFromFreshShops,
+} from "./daily-check-model.mjs";
 import {
   historyNotes,
   MetricSwitch,
   MonthCard,
   platformLabel,
   ShopTable,
+  stoppedShopsNote,
   TodayCard,
   VisitCard,
   visitDayLabel,
@@ -1312,7 +1319,10 @@ export default function Component({ service }) {
   const monthly = useMemo(() => buildMonthly(monthlyData, sales), [monthlyData, sales]);
   // an older server answers 404, relayed as { error }: that is no snapshot, not an empty one
   const performance = useMemo(
-    () => (performanceData && !performanceData.error ? buildPerformanceModel(performanceData, logos) : null),
+    () =>
+      performanceData && !performanceData.error
+        ? visitsFromFreshShops(buildPerformanceModel(performanceData, logos))
+        : null,
     [performanceData, logos],
   );
   const table = useMemo(
@@ -1406,7 +1416,8 @@ export default function Component({ service }) {
     .join("・");
   // with other platforms beside it, 楽天-only figures say whose they are
   const rakutenScope = others.length ? t(`${NS}.platformRakuten`) : "";
-  const notes = historyNotes(model.week, t);
+  const visitsNote = stoppedShopsNote(performance, t);
+  const notes = [...historyNotes(model.week, t), ...(visitsNote ? [`${t(`${NS}.colVisits`)}：${visitsNote}`] : [])];
   const periods = {
     colToday: model.time ? t(`${NS}.asOf`, { time: model.time }) : "",
     colWeek: model.week?.label ?? "",
@@ -1416,7 +1427,13 @@ export default function Component({ service }) {
         }`
       : "",
     colVisits: performance
-      ? `${visitDayLabel(performance.dataDateJST)}${visitsStale(performance) ? ` · ${t(`${NS}.visitsStale`)}` : ""}`
+      ? [
+          visitDayLabel(performance.dataDateJST),
+          performance.coverage ? t(`${NS}.shopCoverage`, performance.coverage) : "",
+          visitsStale(performance) ? t(`${NS}.visitsStale`) : "",
+        ]
+          .filter(Boolean)
+          .join(" · ")
       : "",
   };
   const toggleAnalysis = (e) => {

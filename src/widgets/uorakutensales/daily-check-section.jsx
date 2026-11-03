@@ -408,12 +408,48 @@ export function visitsStale(performance) {
   return performance?.sources?.traffic?.stale === true;
 }
 
+// Names the shops whose visits stopped, grouped by the day each stopped at.
+export function stoppedShopsNote(performance, t) {
+  const stopped = performance?.stoppedShops;
+  if (!stopped?.length) return null;
+  const namesByDate = new Map();
+  stopped.forEach(({ name, date }) => namesByDate.set(date, [...(namesByDate.get(date) ?? []), name]));
+  const shops = [...namesByDate]
+    .map(([date, names]) => t(`${NS}.stoppedSince`, { names: names.join("・"), md: mdLabel(date) }))
+    .join("、");
+  return t(`${NS}.visitsStoppedNote`, { shops });
+}
+
+// The date, the shop coverage when some shops stopped, and whether it is final.
+export function VisitDayLine({ performance, t }) {
+  const stale = visitsStale(performance);
+  return (
+    <>
+      {visitDayLabel(performance.dataDateJST)} ·{" "}
+      {performance.coverage ? `${t(`${NS}.shopCoverage`, performance.coverage)} · ` : ""}
+      {stale ? <span className={WARN}>{t(`${NS}.visitsStale`)}</span> : t(`${NS}.confirmed`)}
+    </>
+  );
+}
+
+// A shop's visits. One that stopped keeps its last figure, with that day under it.
+export function VisitFigure({ value, stoppedAt, t }) {
+  if (value === null || value === undefined) return DASH;
+  if (!stoppedAt) return fmt(t, value);
+  return (
+    <span className="inline-flex flex-col items-end leading-tight">
+      <span className="text-theme-500 dark:text-theme-400">{fmt(t, value)}</span>
+      <span className={`text-xs ${WARN}`}>{mdLabel(stoppedAt)}</span>
+    </span>
+  );
+}
+
 // `scope` names the platform the visits belong to once the board shows several
 export function VisitCard({ performance, scope = "", cardCls = "", t }) {
   if (!performance || performance.visit === null) return null;
   // fewer than 3 same-weekday samples means there is no median to compare with
   const delta = performance.sampleCount >= 3 ? performance.delta : null;
-  const stale = visitsStale(performance);
+  const note = stoppedShopsNote(performance, t);
   return (
     <section className={`flex min-w-0 flex-col gap-2 p-5 ${cardCls}`}>
       <span className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
@@ -421,8 +457,7 @@ export function VisitCard({ performance, scope = "", cardCls = "", t }) {
           <ScopeName scope={scope} />
           {t(`${NS}.visitsTitle`)}{" "}
           <span className={`text-xs font-medium ${MUTED}`}>
-            {visitDayLabel(performance.dataDateJST)} ·{" "}
-            {stale ? <span className={WARN}>{t(`${NS}.visitsStale`)}</span> : t(`${NS}.confirmed`)}
+            <VisitDayLine performance={performance} t={t} />
           </span>
         </span>
         <span className={`text-xs ${MUTED}`}>
@@ -439,6 +474,7 @@ export function VisitCard({ performance, scope = "", cardCls = "", t }) {
           uu: performance.uu === null ? DASH : fmt(t, performance.uu),
         })}
       </span>
+      {note ? <span className={`text-xs ${WARN}`}>{note}</span> : null}
     </section>
   );
 }
@@ -654,7 +690,7 @@ function ShopRow({ row, metric, shareBase, maxToday, color, logoUrl, t, label = 
         <DeltaCell value={row.monthDelta?.[metric] ?? null} />
       </Cell>
       <Cell i={8} className="text-theme-800 dark:text-theme-100">
-        {row.visits === null ? DASH : fmt(t, row.visits)}
+        <VisitFigure value={row.visits} stoppedAt={row.visitsStoppedAt} t={t} />
       </Cell>
       <Cell i={9} className="pr-3">
         <DeltaCell value={row.visitDelta} />
@@ -672,7 +708,9 @@ function IdleRow({ row, color, logoUrl, t }) {
       <td colSpan={7} {...colProps(1)} className={`${colProps(1).className} px-2 py-2 text-xs`}>
         {t(`${NS}.idleNote`)}
       </td>
-      <Cell i={8}>{row.visits === null ? DASH : fmt(t, row.visits)}</Cell>
+      <Cell i={8}>
+        <VisitFigure value={row.visits} stoppedAt={row.visitsStoppedAt} t={t} />
+      </Cell>
       <Cell i={9} className="pr-3">
         <DeltaCell value={row.visitDelta} />
       </Cell>

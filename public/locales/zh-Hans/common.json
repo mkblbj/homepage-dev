@@ -1641,7 +1641,9 @@
         "weekExcludes": "过去 7 日柱状图、7 日均值及其比率不含 {{names}}（无历史数据）",
         "prevExcludes": "上月数字和上月比不含 {{names}}（无上月数据）",
         "companyExcludes": "全公司合计的今日、本月含所有店铺；7 日均值及其比率、上月比不含 {{names}}（无历史和上月数据）",
-        "noWeekLeftOut": "{{names}} 无历史数据，已省略"
+        "noWeekLeftOut": "{{names}} 无历史数据，已省略",
+        "stoppedSince": "{{names}}（截至 {{md}}）",
+        "visitsStoppedNote": "{{shops}} 已停止更新（不计入合计）"
     },
     "uoshippingdashboard": {
         "allPlatforms": "全部",

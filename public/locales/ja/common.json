@@ -1628,7 +1628,9 @@
         "weekExcludes": "過去7日の棒・7日平均とその比率に {{names}} は含みません（履歴なし）",
         "prevExcludes": "先月の数字と先月比に {{names}} は含みません（先月データなし）",
         "companyExcludes": "全社 計の今日・今月は全店舗。7日平均とその比率・先月比に {{names}} は含みません（履歴・先月データなし）",
-        "noWeekLeftOut": "{{names}} は履歴がないため省略"
+        "noWeekLeftOut": "{{names}} は履歴がないため省略",
+        "stoppedSince": "{{names}}（{{md}}まで）",
+        "visitsStoppedNote": "{{shops}} は更新停止中（合計に含みません）"
     },
     "uoshippingdashboard": {
         "allPlatforms": "全部",

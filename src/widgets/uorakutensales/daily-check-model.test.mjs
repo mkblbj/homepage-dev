@@ -12,6 +12,7 @@ import {
   deltaTone,
   RANKING_DIM_BY_METRIC,
   todayVsAverage,
+  visitsFromFreshShops,
 } from "./daily-check-model.mjs";
 import { buildModel, buildMonthly } from "./sales-model.mjs";
 
@@ -605,4 +606,140 @@ test("the month view lists au PAY's yen and leaves it out of the comparison", ()
   );
   assert.equal(view.platforms[2].metrics.sales.paceDeltaPct, null);
   assert.deepEqual(view.current.coverage.total, without.current.coverage.total + 2);
+});
+
+// ---- one shop's visit read failing must not read as every shop stopping ----
+
+function mixOf(newYen, repeatYen) {
+  return {
+    new: { salesYen: newYen, orderCount: 1 },
+    repeat: { salesYen: repeatYen, orderCount: 1 },
+    repeatBuckets: {
+      repeat1: { salesYen: repeatYen, orderCount: 1 },
+      repeat2: { salesYen: 0, orderCount: 0 },
+      repeat3: { salesYen: 0, orderCount: 0 },
+      repeatOver4: { salesYen: 0, orderCount: 0 },
+    },
+    period: { startDateJST: "2026-10-27", endDateJST: "2026-11-02" },
+  };
+}
+
+function trafficShop(shopName, date, stale, visitCount, delta = 5) {
+  return {
+    shopName,
+    traffic: {
+      dataDateJST: date,
+      visitCount,
+      uniqueVisitorCount: visitCount - 10,
+      expectedVisitCount: visitCount,
+      visitDeltaPercent: delta,
+      sampleCount: 4,
+    },
+    customerMix: mixOf(300, 100),
+    sources: { traffic: { ok: true, stale }, customerMix: { ok: true, stale } },
+  };
+}
+
+// what the server sends with two shops stuck: the company block falls back to
+// the last day every shop has, and the company source reads stale
+const partlyStopped = () =>
+  buildPerformanceModel({
+    ok: true,
+    partial: true,
+    traffic: { dataDateJST: "2026-10-27", visitCount: 22133, uniqueVisitorCount: 20000, sampleCount: 0 },
+    customerMix: { ...mixOf(1, 1), period: { startDateJST: "2026-10-27", endDateJST: "2026-10-27" } },
+    sources: { traffic: { ok: true, stale: true, dataDateJST: "2026-10-27" }, customerMix: { ok: true, stale: true } },
+    shops: [
+      trafficShop("A", "2026-11-02", false, 100),
+      trafficShop("B", "2026-11-02", false, 50),
+      trafficShop("S", "2026-10-27", true, 40, 47.5),
+    ],
+  });
+
+test("the company visits add up the shops that are up to date, on their own day", () => {
+  const v = visitsFromFreshShops(partlyStopped());
+  assert.equal(v.dataDateJST, "2026-11-02");
+  assert.equal(v.visit, 150);
+  assert.equal(v.uu, 130);
+  assert.deepEqual(v.coverage, { covered: 2, total: 3 });
+  assert.equal(v.sources.traffic.stale, false);
+});
+
+test("the company median comparison is unknown while shops are missing from it", () => {
+  const v = visitsFromFreshShops(partlyStopped());
+  assert.equal(v.expected, null);
+  assert.equal(v.delta, null);
+});
+
+test("a stopped shop is named with the day it stopped, and keeps no live comparison", () => {
+  const v = visitsFromFreshShops(partlyStopped());
+  assert.deepEqual(v.stoppedShops, [{ name: "S", date: "2026-10-27" }]);
+  const s = v.shops.find((shop) => shop.name === "S");
+  assert.equal(s.visit, 40);
+  assert.equal(s.stoppedAt, "2026-10-27");
+  assert.equal(s.delta, null);
+  assert.equal(v.shops.find((shop) => shop.name === "A").stoppedAt, null);
+});
+
+test("the customer mix adds up the same shops over their own period", () => {
+  const { mix } = visitsFromFreshShops(partlyStopped());
+  assert.equal(mix.newYen, 600);
+  assert.equal(mix.repYen, 200);
+  assert.equal(mix.newSalesShare, 75);
+  assert.equal(mix.buckets[0].yen, 200);
+  assert.deepEqual(mix.period, { startDateJST: "2026-10-27", endDateJST: "2026-11-02" });
+});
+
+test("the shop table totals read the fresh shops and mark the stopped row", () => {
+  const f = fixture();
+  const performance = visitsFromFreshShops(
+    buildPerformanceModel({
+      traffic: { dataDateJST: "2026-10-27", visitCount: 999, sampleCount: 0 },
+      sources: { traffic: { stale: true } },
+      shops: [trafficShop("A", "2026-11-02", false, 100), trafficShop("B", "2026-10-27", true, 40, 47.5)],
+    }),
+  );
+  const t = buildShopTable({ ...f, performance });
+  assert.equal(t.total.visits, 100);
+  assert.equal(t.total.visitDelta, null);
+  const b = t.rows.find((r) => r.name === "B");
+  assert.equal(b.visits, 40);
+  assert.equal(b.visitDelta, null);
+  assert.equal(b.visitsStoppedAt, "2026-10-27");
+  assert.equal(t.rows.find((r) => r.name === "A").visitsStoppedAt, null);
+});
+
+test("with every shop up to date the server's company figures stand untouched", () => {
+  const performance = buildPerformanceModel({
+    traffic: {
+      dataDateJST: "2026-11-02",
+      visitCount: 160,
+      expectedVisitCount: 170,
+      visitDeltaPercent: -6,
+      sampleCount: 4,
+    },
+    shops: [trafficShop("A", "2026-11-02", false, 100), trafficShop("B", "2026-11-02", false, 50)],
+  });
+  const v = visitsFromFreshShops(performance);
+  assert.equal(v.visit, 160);
+  assert.equal(v.expected, 170);
+  assert.equal(v.delta, -6);
+  assert.deepEqual(v.stoppedShops, []);
+  assert.equal(v.coverage, null);
+});
+
+test("when every shop has stopped the company still reads as stopped", () => {
+  const performance = buildPerformanceModel({
+    traffic: { dataDateJST: "2026-10-27", visitCount: 90, sampleCount: 0 },
+    sources: { traffic: { stale: true } },
+    shops: [trafficShop("A", "2026-10-27", true, 50), trafficShop("B", "2026-10-27", true, 40)],
+  });
+  const v = visitsFromFreshShops(performance);
+  assert.equal(v.visit, 90);
+  assert.equal(v.sources.traffic.stale, true);
+  assert.deepEqual(v.stoppedShops, []);
+});
+
+test("no snapshot stays no snapshot", () => {
+  assert.equal(visitsFromFreshShops(null), null);
 });

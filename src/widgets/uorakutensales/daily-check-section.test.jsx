@@ -10,6 +10,7 @@ import {
   MetricSwitch,
   MonthCard,
   ShopTable,
+  stoppedShopsNote,
   TodayCard,
   valueText,
   VisitCard,
@@ -140,6 +141,62 @@ describe("widgets/uorakutensales/daily-check-section", () => {
     const row = screen.getByRole("row", { name: /^B/ });
     expect(within(row).getAllByText("—")).toHaveLength(2);
     expect(within(row).queryByText("0")).not.toBeInTheDocument();
+  });
+
+  it("a shop whose visits stopped keeps its old figure, marked with its own day", () => {
+    const stopped = {
+      ...table,
+      rows: [shopRow("S", { visits: 4071, visitDelta: null, visitsStoppedAt: "2026-10-27" })],
+    };
+    render(<ShopTable table={stopped} metric="orders" shopColors={{}} t={t} />);
+
+    const row = screen.getByRole("row", { name: /^S/ });
+    expect(within(row).getByText("4071")).toBeInTheDocument();
+    expect(within(row).getByText("10/27")).toBeInTheDocument();
+    expect(within(row).getAllByText("—")).toHaveLength(1);
+  });
+
+  it("an up-to-date shop carries no date mark", () => {
+    render(<ShopTable table={table} metric="orders" shopColors={{}} t={t} />);
+
+    expect(within(screen.getByRole("row", { name: /^A/ })).queryByText(/^\d+\/\d+$/)).not.toBeInTheDocument();
+  });
+
+  it("names the stopped shops, one date at a time, and says nothing when all is well", () => {
+    const tn = (key, opts) => {
+      if (key === `${NS}.stoppedSince`) return `${opts.names}（${opts.md}まで）`;
+      if (key === `${NS}.visitsStoppedNote`) return `${opts.shops} は更新停止中`;
+      return t(key, opts);
+    };
+    const stoppedShops = [
+      { name: "0406", date: "2026-10-27" },
+      { name: "allcase", date: "2026-10-27" },
+      { name: "S", date: "2026-10-30" },
+    ];
+    expect(stoppedShopsNote({ stoppedShops }, tn)).toBe("0406・allcase（10/27まで）、S（10/30まで） は更新停止中");
+    expect(stoppedShopsNote({ stoppedShops: [] }, tn)).toBeNull();
+    expect(stoppedShopsNote(null, tn)).toBeNull();
+  });
+
+  it("the visit card reads up to date when only some shops stopped", () => {
+    const performance = {
+      visit: 21135,
+      uu: 20000,
+      expected: null,
+      delta: null,
+      sampleCount: 0,
+      dataDateJST: "2026-11-02",
+      sources: { traffic: { stale: false } },
+      stoppedShops: [{ name: "0406", date: "2026-10-27" }],
+      coverage: { covered: 7, total: 9 },
+      shops: [],
+    };
+    const { container } = render(<VisitCard performance={performance} t={t} />);
+
+    expect(screen.queryByText(`${NS}.visitsStale`)).not.toBeInTheDocument();
+    expect(container).toHaveTextContent(`${NS}.confirmed`);
+    expect(container).toHaveTextContent(`${NS}.shopCoverage`);
+    expect(container).toHaveTextContent(`${NS}.visitsStoppedNote`);
   });
 
   it("a shop missing from the live snapshot reads dashes, not ¥0", () => {
