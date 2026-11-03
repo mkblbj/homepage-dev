@@ -760,4 +760,32 @@ describe("utils/config/service-helpers", () => {
     expect(group.services[0].widgets[0]).not.toHaveProperty("model");
     expect(group.services[0].widgets[0]).not.toHaveProperty("reasoningEffort");
   });
+
+  it("keeps the uovacuum Home Assistant token and device on the server", async () => {
+    const mod = await import("./service-helpers");
+    const { cleanServiceGroups } = mod;
+    const [group] = cleanServiceGroups([
+      {
+        name: "g",
+        services: [
+          {
+            name: "お掃除ロボット",
+            widget: {
+              type: "uovacuum",
+              url: "http://ha.example.test:8123",
+              key: "secret-token",
+              device: "xiaomi_sg_1_c102gl",
+              refreshInterval: 20000,
+            },
+          },
+        ],
+        groups: [],
+      },
+    ]);
+
+    expect(group.services[0].widgets[0]).toMatchObject({ type: "uovacuum", refreshInterval: 20000 });
+    expect(group.services[0].widgets[0]).not.toHaveProperty("url");
+    expect(group.services[0].widgets[0]).not.toHaveProperty("key");
+    expect(group.services[0].widgets[0]).not.toHaveProperty("device");
+  });
 });

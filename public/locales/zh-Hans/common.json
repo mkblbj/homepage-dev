@@ -1692,5 +1692,78 @@
         "tomorrowPending": "明日午后确定",
         "forecast": "预测",
         "collapse": "收起"
+    },
+    "uovacuum": {
+        "status": {
+            "docked": "在座上待机",
+            "charging": "充电中",
+            "preparing": "准备清扫",
+            "washingMidway": "清扫中",
+            "cleaning": "清扫中",
+            "paused": "已暂停",
+            "returning": "正在回座",
+            "idle": "已停止",
+            "error": "需要处理",
+            "offline": "无法连接"
+        },
+        "detail": {
+            "docked": "随时可以开始清扫",
+            "charging": "正在座上充电",
+            "preparing": "出发前先清洗拖布",
+            "washingMidway": "清扫途中回来清洗拖布",
+            "cleaning": "正在清扫",
+            "paused": "「停止」结束任务，「继续」接着扫",
+            "returning": "正在回座充电",
+            "idle": "停在原地",
+            "error": "错误码 {{code}} · 请在米家 App 查看",
+            "errorNoCode": "请在米家 App 查看详情",
+            "offline": "Home Assistant 没有响应"
+        },
+        "battery": "电量",
+        "currentTime": "本次清扫时长",
+        "lastTime": "上次清扫时长",
+        "currentArea": "本次清扫面积",
+        "lastArea": "上次清扫面积",
+        "minutes": "分钟",
+        "squareMeters": "㎡",
+        "start": "开始清扫",
+        "confirmStart": "再按一次开始",
+        "resume": "继续",
+        "cleaningNow": "清扫中",
+        "stop": "停止",
+        "dock": "回座",
+        "suction": "吸力",
+        "suctionOptions": {
+            "quiet": "静音",
+            "standard": "标准",
+            "strong": "强力",
+            "max": "最大"
+        },
+        "dust": "集尘",
+        "wash": "洗拖布",
+        "dry": "烘干",
+        "dryStart": "开始",
+        "dryStop": "停止",
+        "locate": "发声找机器",
+        "sent": {
+            "start": "已发送开始清扫",
+            "stop": "已结束清扫",
+            "dock": "已让它回座",
+            "suction": "吸力已切换",
+            "dust": "已开始集尘",
+            "wash": "已开始洗拖布",
+            "dryStart": "已开始烘干",
+            "dryStop": "已停止烘干",
+            "locate": "机器正在发声"
+        },
+        "failed": "发送失败",
+        "consumables": {
+            "ok": "耗材状态良好",
+            "low": "{{part}}剩余 {{percent}}%，请更换",
+            "mainBrush": "主刷",
+            "sideBrush": "边刷",
+            "filter": "滤网",
+            "mop": "拖布"
+        }
     }
 }
