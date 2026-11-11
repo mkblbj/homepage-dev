@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { trendRowOf } from "./amazon-model.mjs";
 import { aupayKey, buildAupay, withUnrecordedShops } from "./aupay-model.mjs";
 
 const SOURCE = "2026-10-31T04:57:28.128Z"; // 13:57:28 JST
@@ -113,19 +112,23 @@ test("au PAY aligns history by config ID and date, leaving stale or absent dates
     },
   });
 
-  const [first, second] = shops.map(trendRowOf);
+  const [first, second] = shops;
   assert.equal(first.key, "aupay:cfg-1");
-  assert.deepEqual(first.daily.map((day) => [day.date, day.sales]), [
-    ["2026-10-24", 0],
-    ["2026-10-25", null],
-    ["2026-10-26", null],
-    ["2026-10-27", null],
-    ["2026-10-28", null],
-    ["2026-10-29", null],
-    ["2026-10-30", 1800],
-  ]);
-  assert.deepEqual([first.h7Total, first.h7Orders, first.h7Units], [null, null, null]);
-  assert.deepEqual([second.h7Total, second.h7Orders, second.h7Units], [14000, 14, 21]);
+  assert.deepEqual(
+    first.trend.daily.map((day) => [day.date, day.sales]),
+    [
+      ["2026-10-24", 0],
+      ["2026-10-25", null],
+      ["2026-10-26", null],
+      ["2026-10-27", null],
+      ["2026-10-28", null],
+      ["2026-10-29", null],
+      ["2026-10-30", 1800],
+    ],
+  );
+  // a week is only summed when all seven days have the figure
+  assert.deepEqual(first.trend.week, { sales: null, units: null, orders: null });
+  assert.deepEqual(second.trend.week, { sales: 14000, units: 21, orders: 14 });
   assert.equal(company.avg, null);
 });
 

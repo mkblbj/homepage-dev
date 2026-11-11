@@ -25,15 +25,7 @@ const sales = {
   shops: [],
 };
 
-const trendDates = [
-  "2026-07-21",
-  "2026-07-22",
-  "2026-07-23",
-  "2026-07-24",
-  "2026-07-25",
-  "2026-07-26",
-  "2026-07-27",
-];
+const trendDates = ["2026-07-21", "2026-07-22", "2026-07-23", "2026-07-24", "2026-07-25", "2026-07-26", "2026-07-27"];
 const trendSource = "2026-07-28T05:00:00.000Z";
 const trendDay = (date, salesAmount) => ({
   date,
@@ -88,7 +80,7 @@ describe("widgets/uorakutensales/component", () => {
     localStorage.clear();
   });
 
-  it("shows au PAY and TEMU shop trends even when the Rakuten history is unavailable", () => {
+  it("draws au PAY and TEMU days in the shop table even when the Rakuten history is unavailable", () => {
     const auShop = { configId: "cfg-1", shopName: "3911", currency: "JPY", enabled: true };
     const temuShop = { shopName: "UO world", currency: "JPY", enabled: true };
     const responses = {
@@ -115,19 +107,30 @@ describe("widgets/uorakutensales/component", () => {
 
     renderWithProviders(<Component service={service} />);
 
-    const trends = within(screen.getByRole("region", { name: "uorakutensales.shopTrend" }));
-    const auPay = within(trends.getByRole("article", { name: /3911.*platformAupay/ }));
-    const temuCard = trends.getByRole("article", { name: /UO world.*platformTemu/ });
-    const temu = within(temuCard);
-    expect(auPay.getByText("1.4")).toBeInTheDocument();
-    expect(temu.getByText("—", { exact: true })).toBeInTheDocument();
-    expect(temu.getByText(/14uorakutensales.ordersUnit · 21uorakutensales.unitsShort/)).toBeInTheDocument();
-    expect(temu.getByText("uorakutensales.weekOrdersTrend")).toBeInTheDocument();
-    fireEvent.mouseEnter(temuCard.querySelector(".cursor-crosshair"));
-    expect(temu.getByText(/2uorakutensales.ordersUnit · 3uorakutensales.unitsShort/)).toBeInTheDocument();
+    // the analysis section no longer repeats each shop's week as cards
+    expect(screen.queryByRole("region", { name: "uorakutensales.shopTrend" })).not.toBeInTheDocument();
+    const trendOf = (name) => screen.getByRole("row", { name }).querySelector("[data-col='trend']");
+    // 件数 by default: both shops draw their seven days
+    expect(within(trendOf(/^3911/)).getByRole("img")).toHaveAttribute(
+      "aria-label",
+      expect.stringContaining("7/21(火) 2uorakutensales.ordersUnit"),
+    );
+    expect(
+      within(trendOf(/^UO world/))
+        .getByRole("img")
+        .querySelectorAll("[data-point]"),
+    ).toHaveLength(7);
+
+    // in 売上 TEMU has no yen to draw, while au PAY draws its own
+    fireEvent.click(screen.getByRole("button", { name: "uorakutensales.sortSales" }));
+    expect(within(trendOf(/^UO world/)).getByText("—")).toBeInTheDocument();
+    expect(within(trendOf(/^3911/)).getByRole("img")).toHaveAttribute(
+      "aria-label",
+      expect.stringMatching(/7\/21\(火\) ¥2,?000/),
+    );
   });
 
-  it("breaks the shop trend across a stale day and withholds the seven-day totals", () => {
+  it("a stale day leaves its slot empty in the shop table's 7-day line", () => {
     const shop = { configId: "cfg-1", shopName: "3911", currency: "JPY", enabled: true };
     const staleDate = "2026-07-24";
     const daily = trendDates.map((date) => ({
@@ -146,19 +149,12 @@ describe("widgets/uorakutensales/component", () => {
 
     renderWithProviders(<Component service={service} />);
 
-    const card = screen.getByRole("article", { name: /3911.*platformAupay/ });
-    const content = within(card);
-    expect(content.getByText("—", { exact: true })).toBeInTheDocument();
-    expect(content.getByText(/—uorakutensales.ordersUnit · —uorakutensales.unitsShort/)).toBeInTheDocument();
-    expect(content.queryByText(/⌀/)).not.toBeInTheDocument();
-    const line = card.querySelector('path[stroke="url(#uors-stroke)"]');
-    expect(line.getAttribute("d").match(/M /g)).toHaveLength(2);
-
-    fireEvent.click(screen.getByRole("button", { name: "uorakutensales.chartBar" }));
-    const bars = card.querySelectorAll("span.transition-opacity");
-    expect(bars).toHaveLength(7);
-    expect(bars[2].style.height).toBe("100%");
-    expect(bars[3].style.height).toBe("");
+    const cell = screen.getByRole("row", { name: /^3911/ }).querySelector("[data-col='trend']");
+    const chart = within(cell).getByRole("img");
+    expect(chart.querySelectorAll("[data-point]")).toHaveLength(6);
+    // the line breaks at the stale day rather than bridging it
+    expect(chart.querySelector("[data-line]").getAttribute("d").match(/M/g)).toHaveLength(2);
+    expect(chart).toHaveAttribute("aria-label", expect.stringContaining("7/24(金) —"));
   });
 
   it("falls back to the overall ranking when the selected shop disappears after refresh", () => {

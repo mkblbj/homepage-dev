@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { trendRowOf } from "./amazon-model.mjs";
 import { buildTemu, temuKey } from "./temu-model.mjs";
 
 const SOURCE = "2026-11-11T01:18:06.164Z"; // 10:18:06 JST
@@ -86,10 +85,10 @@ test("TEMU's complete shop trend preserves counts while buyer-paid amounts are u
     },
   });
   const { shops, provides } = buildTemu(data);
-  const row = trendRowOf(shops[0]);
-  assert.equal(row.key, "temu:UO world");
-  assert.deepEqual([row.h7Total, row.h7Orders, row.h7Units], [null, 14, 21]);
-  assert.deepEqual([row.daily[0].sales, row.daily[0].orders, row.daily[0].units], [null, 2, 3]);
+  const [shop] = shops;
+  assert.equal(shop.key, "temu:UO world");
+  assert.deepEqual(shop.trend.week, { sales: null, units: 21, orders: 14 });
+  assert.deepEqual([shop.trend.daily[0].sales, shop.trend.daily[0].orders, shop.trend.daily[0].units], [null, 2, 3]);
   assert.equal(provides.week, false);
 });
 

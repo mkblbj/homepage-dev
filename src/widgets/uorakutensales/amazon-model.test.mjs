@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { amazonKey, buildAmazon, buildAmazonBoards, jstStamp, trendRowOf, withAmazonPeaks } from "./amazon-model.mjs";
+import { amazonKey, buildAmazon, buildAmazonBoards, jstStamp, withAmazonPeaks } from "./amazon-model.mjs";
 
 const SOURCE = "2026-10-30T04:55:45.603Z"; // 13:55:45 JST
 
@@ -180,21 +180,19 @@ test("buildAmazonBoards gives each shop a board per dimension in the 楽天 item
   assert.equal(buildAmazonBoards({ error: "x" }), null);
 });
 
-test("an Amazon shop's 7-day card has its week and no CVR", () => {
-  const row = trendRowOf(buildAmazon(salesOf(), history).shops[0]);
-  assert.equal(row.platform, "amazon");
-  assert.equal(row.h7Total, 70000);
-  assert.equal(row.h7Orders, 63);
-  assert.equal(row.cvr, null);
-  assert.equal(row.daily.length, 7);
-  assert.deepEqual(row.daily[0], {
+test("an Amazon shop carries its week and its seven days", () => {
+  const shop = buildAmazon(salesOf(), history).shops[0];
+  assert.equal(shop.platform, "amazon");
+  assert.equal(shop.week.sales, 70000);
+  assert.equal(shop.week.orders, 63);
+  assert.equal(shop.daily.length, 7);
+  assert.deepEqual(shop.daily[0], {
     date: "2026-10-23",
     md: "10/23",
     wd: "金",
     sales: 9306,
     units: 12,
     orders: 12,
-    cvr: null,
   });
 });
 

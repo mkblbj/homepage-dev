@@ -36,7 +36,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { buildPerformanceModel, DASH } from "widgets/uoperformance/performance-model.mjs";
 
-import { buildAmazon, buildAmazonBoards, trendRowOf, withAmazonPeaks } from "./amazon-model.mjs";
+import { buildAmazon, buildAmazonBoards, withAmazonPeaks } from "./amazon-model.mjs";
 import { buildAupay, withUnrecordedShops } from "./aupay-model.mjs";
 import {
   buildMonthView,
@@ -77,7 +77,6 @@ import {
   man,
   PEAK_DIMS,
   RANKING_STEPS,
-  spark,
 } from "./sales-model.mjs";
 import { buildTemu } from "./temu-model.mjs";
 
@@ -96,10 +95,6 @@ const ACCENT_TEXT = "text-[#C6362B] dark:text-[#F0857A]";
 
 function fmt(t, value) {
   return t("common.number", { value: Number(value) || 0 });
-}
-
-function fmtKnown(t, value) {
-  return value == null ? DASH : fmt(t, value);
 }
 
 // Shared gradient defs for every sparkline (referenced by id across the widget).
@@ -185,7 +180,7 @@ function RefreshButton({ onRefresh, t }) {
   );
 }
 
-// line ↔ bar toggle for the per-shop 7-day mini charts
+// line ↔ bar toggle for the company's 7-day chart
 function ChartModeToggle({ mode, onChange, t }) {
   const button = (m, label, children) => (
     <button
@@ -234,169 +229,6 @@ function ChartModeToggle({ mode, onChange, t }) {
   );
 }
 
-// per-shop 7-day mini chart: line (sparkline) or bars, both with hover detail.
-// points = [{ md, wd, sales, orders }]. x uses segment centers so the hover dot
-// / highlighted bar / tooltip all line up with the equal-width hover zones.
-// A dashed line marks the shop's average when every day has the plotted value.
-function ShopMiniChart({ points, mode, ordersTrend, cvr = 0, t, height = 32 }) {
-  const [hover, setHover] = useState(null);
-  const [avgHover, setAvgHover] = useState(false);
-  const n = points.length;
-  const vals = useMemo(() => points.map((p) => (ordersTrend ? p.orders : p.sales)), [points, ordersTrend]);
-  const known = vals.filter(Number.isFinite);
-  const minV = known.length ? Math.min(...known) : 0;
-  const maxV = known.length ? Math.max(...known) : 0;
-  const span = maxV - minV || 1;
-  const barMax = Math.max(1, maxV);
-  const { line, area } = useMemo(() => spark(vals, 100, height, false, true), [vals, height]);
-
-  const average = n && known.length === n ? known.reduce((s, v) => s + v, 0) / n : null;
-  const avgOrders =
-    n && points.every((p) => Number.isFinite(p.orders)) ? points.reduce((s, p) => s + p.orders, 0) / n : null;
-  const yPct = (value) => ((5 + (1 - (value - minV) / span) * (height - 10)) / height) * 100;
-  // avg line y matches the active scale: sparkline is min..max, bars are 0..max
-  const avgTopPct =
-    average === null ? undefined : mode === "bar" ? (1 - average / barMax) * 100 : yPct(average);
-
-  const hp = hover != null && !avgHover ? points[hover] : null;
-  const on = hp != null;
-  const xPct = on ? ((hover + 0.5) / n) * 100 : 0;
-  const hoverValue = on ? vals[hover] : null;
-  const tipTx = hover === 0 ? "0%" : hover === n - 1 ? "-100%" : "-50%";
-
-  if (!n) {
-    return <span className="block w-full rounded bg-theme-200/40 dark:bg-white/[0.04]" style={{ height }} />;
-  }
-
-  return (
-    <div className="relative w-full" style={{ height }}>
-      {mode === "bar" ? (
-        <div className="absolute inset-0 flex items-end gap-[3px]">
-          {points.map((p, i) => (
-            <span
-              key={p.date ?? i}
-              className="block flex-1 rounded-[2px] transition-opacity"
-              style={
-                Number.isFinite(vals[i])
-                  ? {
-                      height: `${Math.max(10, (vals[i] / barMax) * 100)}%`,
-                      backgroundColor: DOT,
-                      opacity: on ? (i === hover ? 1 : 0.3) : 0.7,
-                    }
-                  : undefined
-              }
-            />
-          ))}
-        </div>
-      ) : (
-        <svg
-          viewBox={`0 0 100 ${height}`}
-          preserveAspectRatio="none"
-          width="100%"
-          height="100%"
-          className="block overflow-visible"
-        >
-          <path d={area} fill="url(#uors-area)" />
-          <path
-            d={line}
-            fill="none"
-            stroke="url(#uors-stroke)"
-            strokeWidth={2.4}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            vectorEffect="non-scaling-stroke"
-            style={{ filter: "drop-shadow(0 1px 3px rgba(59,130,246,.35))" }}
-          />
-        </svg>
-      )}
-
-      {mode === "line"
-        ? points.map((p, i) =>
-            Number.isFinite(vals[i]) && !Number.isFinite(vals[i - 1]) && !Number.isFinite(vals[i + 1]) ? (
-              <span
-                key={p.date ?? i}
-                className="pointer-events-none absolute h-1 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full"
-                style={{ left: `${((i + 0.5) / n) * 100}%`, top: `${yPct(vals[i])}%`, backgroundColor: DOT }}
-              />
-            ) : null,
-          )
-        : null}
-
-      {/* hover zones (per day) */}
-      <div className="absolute inset-0 z-[3] flex" onMouseLeave={() => setHover(null)}>
-        {points.map((p, i) => (
-          <div key={p.date ?? i} className="flex-1 cursor-crosshair" onMouseEnter={() => setHover(i)} />
-        ))}
-      </div>
-
-      {average !== null ? (
-        <>
-          <span
-            className="pointer-events-none absolute inset-x-0 z-[2] border-t border-dashed"
-            style={{ top: `${avgTopPct}%`, borderColor: "rgba(198,54,43,.55)" }}
-          />
-          <span
-            className="absolute right-0 z-[4] flex -translate-y-1/2 cursor-help items-center rounded-[3px] bg-slate-900/75 px-1 text-[7px] font-bold leading-[1.4] text-white/90 tabular-nums"
-            style={{ top: `${avgTopPct}%` }}
-            onMouseEnter={() => setAvgHover(true)}
-            onMouseLeave={() => setAvgHover(false)}
-          >
-            ⌀
-            {ordersTrend
-              ? `${fmt(t, Number(average.toFixed(1)))}${t(`${NS}.ordersUnit`)}`
-              : `${man(average)}${t(`${NS}.manUnit`)}`}
-          </span>
-        </>
-      ) : null}
-
-      {average !== null && avgHover ? (
-        <div className="pointer-events-none absolute bottom-full right-0 z-20 mb-1 whitespace-nowrap rounded-[6px] bg-slate-900 px-2 py-1 text-right shadow-lg">
-          <span className="block text-[8.5px] font-bold text-slate-300">{t(`${NS}.avgLabel`)}</span>
-          {ordersTrend ? null : (
-            <span className="block text-[11px] font-extrabold tabular-nums text-white">
-              ¥{fmt(t, Math.round(average))}
-              {t(`${NS}.perDay`)}
-            </span>
-          )}
-          <span className="block text-[8.5px] font-medium tabular-nums text-slate-400">
-            {avgOrders === null ? DASH : fmt(t, Math.round(avgOrders))}
-            {t(`${NS}.ordersUnit`)}
-            {t(`${NS}.perDay`)} · CVR {cvr === null ? DASH : `${cvr.toFixed(2)}%`}
-          </span>
-        </div>
-      ) : null}
-
-      {on ? (
-        <>
-          {mode === "line" && Number.isFinite(hoverValue) ? (
-            <span
-              className="pointer-events-none absolute h-[7px] w-[7px] -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white"
-              style={{ left: `${xPct}%`, top: `${yPct(hoverValue)}%`, backgroundColor: DOT }}
-            />
-          ) : null}
-          <div
-            className="pointer-events-none absolute bottom-full z-20 mb-1 whitespace-nowrap rounded-[6px] bg-slate-900 px-2 py-1 text-center shadow-lg"
-            style={{ left: `${xPct}%`, transform: `translateX(${tipTx})` }}
-          >
-            <span className="block text-[9px] font-bold text-slate-300">
-              {hp.md}（{hp.wd}）
-            </span>
-            <span className="block text-[11px] font-extrabold tabular-nums text-white">
-              {hp.sales === null ? DASH : `¥${fmt(t, hp.sales)}`}
-            </span>
-            <span className="block text-[8.5px] font-medium tabular-nums text-slate-400">
-              {fmtKnown(t, hp.orders)}
-              {t(`${NS}.ordersUnit`)} · {fmtKnown(t, hp.units)}
-              {t(`${NS}.unitsShort`)}
-              {hp.cvr > 0 ? ` · CVR ${hp.cvr.toFixed(2)}%` : ""}
-            </span>
-          </div>
-        </>
-      ) : null}
-    </div>
-  );
-}
-
 // ---- daily area chart with hover (aggregate across shops) ----
 // `scope` names whose chart it is once the board shows several platforms
 function DailyChart({ model, mode, onModeChange, scope = "", t }) {
@@ -428,7 +260,6 @@ function DailyChart({ model, mode, onModeChange, scope = "", t }) {
             />
             {t(`${NS}.avgLabel`)}
           </span>
-          {/* drives both this chart and the per-shop mini charts */}
           <ChartModeToggle mode={mode} onChange={onModeChange} t={t} />
         </span>
       </div>
@@ -437,7 +268,7 @@ function DailyChart({ model, mode, onModeChange, scope = "", t }) {
           className="pointer-events-none absolute inset-x-0 z-[3] border-t-[1.5px] border-dashed"
           style={{ top: `${avgTopPct}%`, borderColor: "rgba(198,54,43,.7)" }}
         />
-        {/* ⌀ average tag on the line — same affordance as the per-shop mini charts */}
+        {/* ⌀ average tag on the line, with the figures behind it on hover */}
         <span
           className="absolute right-0 z-[9] flex -translate-y-1/2 cursor-help items-center rounded-[3px] bg-slate-900/75 px-1.5 text-[8px] font-bold leading-[1.5] tabular-nums text-white/90"
           style={{ top: `${avgTopPct}%` }}
@@ -1141,61 +972,6 @@ function LoadingSkeleton() {
   );
 }
 
-// one shop's last 7 days: total, a mini chart, orders · units · CVR
-function ShopTrendCard({ row: r, mode, t }) {
-  const label = r.platform ? platformLabel(r.platform, t) : "";
-  const ordersTrend =
-    !r.daily.some((day) => Number.isFinite(day.sales)) && r.daily.some((day) => Number.isFinite(day.orders));
-  return (
-    <article
-      aria-label={label ? `${r.name} (${label})` : r.name}
-      className="relative flex min-w-0 flex-col rounded-xl border border-theme-300/30 bg-theme-100/60 p-2.5 dark:border-white/[0.06] dark:bg-white/[0.03]"
-    >
-      {/* corner-bleed logo watermark — clipped by its OWN layer so the mini-chart
-          hover tooltip can still escape the (unclipped) card */}
-      {r.logoUrl ? (
-        <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl">
-          <img
-            src={r.logoUrl}
-            alt=""
-            aria-hidden="true"
-            loading="lazy"
-            className="absolute -top-2 -right-2 h-[68px] w-[68px] object-contain opacity-[0.12] blur-[4px] dark:opacity-[0.15]"
-          />
-        </span>
-      ) : null}
-      <div className="relative flex min-w-0 flex-col gap-1.5">
-        <span className="flex min-w-0 items-center gap-1">
-          {r.platform ? <PlatformMark platform={r.platform} size={12} /> : null}
-          <span className="truncate text-[11px] font-semibold text-theme-900 dark:text-theme-50">{r.name}</span>
-          {label ? <PlatformSuffix label={label} /> : null}
-        </span>
-        <span className="flex items-baseline gap-0.5">
-          <span className="text-[9px] font-bold text-theme-600 dark:text-theme-300">¥</span>
-          <span className="text-[15px] font-bold leading-none tabular-nums text-theme-900 dark:text-theme-50">
-            {r.h7Total === null ? DASH : man(r.h7Total)}
-          </span>
-          <span className="text-[9px] font-medium text-theme-600 dark:text-theme-300">{t(`${NS}.manUnit`)}</span>
-        </span>
-        {ordersTrend ? (
-          <span className="text-[9px] font-medium text-theme-600 dark:text-theme-300">{t(`${NS}.weekOrdersTrend`)}</span>
-        ) : null}
-        <ShopMiniChart points={r.daily} mode={mode} ordersTrend={ordersTrend} cvr={r.cvr} t={t} />
-        <span className="border-t border-theme-300/30 pt-1.5 text-[9px] font-medium tabular-nums text-theme-600 dark:border-white/10 dark:text-theme-300">
-          {fmtKnown(t, r.h7Orders)}
-          {t(`${NS}.ordersUnit`)} · {fmtKnown(t, r.h7Units)}
-          {t(`${NS}.unitsShort`)} · CVR {r.cvr === null ? DASH : `${r.cvr.toFixed(2)}%`}
-        </span>
-        {r.historyDays != null && r.historyDays < r.daily.length ? (
-          <span className="text-[9px] font-medium text-theme-600 dark:text-theme-300">
-            {t(`${NS}.weekDaysAvailable`, { count: r.historyDays, total: r.daily.length })}
-          </span>
-        ) : null}
-      </div>
-    </article>
-  );
-}
-
 const ANALYSIS_OPEN_KEY = "uorakutensales.analysisOpen";
 const DAILY_ID = "uorakutensales-daily";
 const ANALYSIS_ID = "uorakutensales-analysis";
@@ -1443,9 +1219,6 @@ export default function Component({ service }) {
   }
 
   const cardCls = "rounded-2xl border border-theme-300/40 bg-theme-200/30 dark:border-theme-600/40 dark:bg-white/10";
-  // by key: a name can stand for two shops (3911 is on 楽天 and au PAY)
-  const activeKeys = new Set(table.rows.map((r) => r.key));
-  const idleNames = table.idle.map((r) => r.name).join("・");
   const hasSide = Boolean(monthView) || (performance && performance.visit !== null);
   // a shop on the list whose today and month are both unknown is not counted as 稼働
   const activeCount = table.rows.filter((r) => !r.unknown).length;
@@ -1461,13 +1234,6 @@ export default function Component({ service }) {
     ...others.flatMap((other) => other.company.missing.map((name) => `${name}（${platformLabel(other.platform, t)}）`)),
   ];
   const hasRakutenHistory = model.hasHistory && model.days.length > 0;
-  const otherTrends = others
-    .flatMap((other) => other.shops)
-    .filter((shop) => activeKeys.has(shop.key) && (shop.trend || (hasRakutenHistory && shop.week)));
-  const noWeek = others
-    .filter((other) => !other.provides.week && !other.shops.some((shop) => shop.trend))
-    .map((other) => platformLabel(other.platform, t))
-    .join("・");
   // with other platforms beside it, 楽天-only figures say whose they are
   const rakutenScope = others.length ? t(`${NS}.platformRakuten`) : "";
   const visitsNote = stoppedShopsNote(performance, t);
@@ -1622,49 +1388,11 @@ export default function Component({ service }) {
               />
             ) : null}
 
-            {hasRakutenHistory || otherTrends.length > 0 ? (
-              <section
-                className={`grid grid-cols-1 gap-x-5 gap-y-4 p-4 ${hasRakutenHistory ? "@4xl:grid-cols-[300px_1fr]" : ""} ${cardCls}`}
-              >
-                {hasRakutenHistory ? (
-                  <div className="min-w-0 @4xl:border-r @4xl:border-theme-300/30 dark:@4xl:border-white/10 @4xl:pr-5">
-                    <DailyChart model={model} mode={chartMode} onModeChange={setChartMode} scope={rakutenScope} t={t} />
-                  </div>
-                ) : null}
-                <section aria-label={t(`${NS}.shopTrend`)} className="flex min-w-0 flex-col gap-2.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="min-w-0 text-xs font-bold tracking-wide text-theme-600 dark:text-theme-300">
-                      {t(`${NS}.shopTrend`)}{" "}
-                      <span className="font-medium text-theme-500 dark:text-theme-400">
-                        · {t(`${NS}.excludesToday`)}
-                        {idleNames ? ` · ${t(`${NS}.idleLeftOut`, { names: idleNames })}` : ""}
-                        {noWeek ? ` · ${t(`${NS}.noWeekLeftOut`, { names: noWeek })}` : ""}
-                      </span>
-                    </span>
-                    {hasRakutenHistory ? null : <ChartModeToggle mode={chartMode} onChange={setChartMode} t={t} />}
-                  </div>
-                  {notes.map((note) => (
-                    <span key={note} role="note" className="text-xs font-semibold text-amber-700 dark:text-amber-300">
-                      {note}
-                    </span>
-                  ))}
-                  <div className="grid grid-cols-[repeat(auto-fit,minmax(104px,1fr))] gap-2.5">
-                    {/* a shop whose week the server could not count has no trend to draw */}
-                    {model.rows
-                      .filter((r) => activeKeys.has(`rakuten:${r.name}`) && r.h7Total !== null)
-                      .map((r) => (
-                        <ShopTrendCard
-                          key={r.name}
-                          row={others.length ? { ...r, platform: "rakuten" } : r}
-                          mode={chartMode}
-                          t={t}
-                        />
-                      ))}
-                    {otherTrends.map((shop) => (
-                      <ShopTrendCard key={shop.key} row={trendRowOf(shop)} mode={chartMode} t={t} />
-                    ))}
-                  </div>
-                </section>
+            {/* the company's days; each shop's sit in the 7-day group of the table above.
+                Held to a chart's width: across a whole row it flattens into a strip. */}
+            {hasRakutenHistory ? (
+              <section className={`w-full max-w-[640px] p-4 ${cardCls}`}>
+                <DailyChart model={model} mode={chartMode} onModeChange={setChartMode} scope={rakutenScope} t={t} />
               </section>
             ) : null}
 

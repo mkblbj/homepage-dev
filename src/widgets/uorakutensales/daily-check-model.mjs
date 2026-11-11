@@ -208,6 +208,49 @@ function companyMonth(rakutenMetrics, others) {
   return { units: dim("units"), orders: dim("orders"), present };
 }
 
+// A shop's last finished days: au PAY's and TEMU's come with their own history,
+// Amazon's with its week. None when there is nothing to draw.
+function shopDays(shop) {
+  return shop.trend?.daily ?? (shop.daily?.length ? shop.daily : null);
+}
+
+// A platform whose server adds up no days of its own (au PAY, TEMU): its shops'
+// days added up by date, a figure only where every shop has one. A shop without
+// days leaves the platform without them, rather than with a smaller sum.
+function platformDays(shops) {
+  const lists = shops.map(shopDays);
+  if (!lists.length || lists.some((days) => !days)) return null;
+  const [first] = lists;
+  if (lists.some((days) => days.length !== first.length || days.some((d, i) => d.date !== first[i].date))) {
+    return null;
+  }
+  const add = (i, key) => {
+    const values = lists.map((days) => days[i][key]);
+    return values.every(known) ? values.reduce((a, b) => a + b, 0) : null;
+  };
+  return first.map((day, i) => ({ ...day, sales: add(i, "sales"), units: add(i, "units"), orders: add(i, "orders") }));
+}
+
+// The company's finished days across platforms, as counts: only the platforms
+// that serve a week, and only the days every one of their histories holds.
+function companyDays(model, others) {
+  const withWeek = others.filter((o) => o.provides.week);
+  const histories = withWeek.filter((o) => o.company.daily.length);
+  // a platform counted today without its week leaves no honest bars, while one
+  // with nothing today adds nothing to them
+  if (withWeek.some((o) => !o.company.daily.length && o.company.today)) return [];
+  return model.days
+    .map((d) => {
+      const matches = histories.map((o) => o.company.daily.find((day) => day.date === d.date));
+      if (matches.some((day) => !day)) return null;
+      const add = (key) => matches.reduce((total, day) => total + (day[key] ?? 0), d[key]);
+      return { ...d, sales: null, units: add("units"), orders: add("orders") };
+    })
+    .filter(Boolean);
+}
+
+const daysOrNull = (days) => (days?.length ? days : null);
+
 function otherShopRow(shop) {
   const row = {
     key: shop.key,
@@ -215,6 +258,7 @@ function otherShopRow(shop) {
     platform: shop.platform,
     today: isKnown(shop.today) ? shop.today : null,
     avg: shop.avg,
+    days: shopDays(shop),
     // no other platform reports visits, so no CVR either
     cvr: null,
     month: shop.month,
@@ -263,6 +307,8 @@ export function buildShopTable({ model, monthly, performance, others = [] }) {
         hasHistory && live && live.h7Total !== null
           ? triple(live.h7Total / nDays, live.h7Units / nDays, live.h7Orders / nDays)
           : null,
+      // the same days the average is taken over
+      days: hasHistory && live && live.h7Total !== null ? daysOrNull(live.daily) : null,
       cvr: hasHistory && live ? live.cvr : null,
       ...monthOf(monthByName.get(name)),
       visits: visits?.visit ?? null,
@@ -295,6 +341,7 @@ export function buildShopTable({ model, monthly, performance, others = [] }) {
     platform: "rakuten",
     today: isKnown(rakutenToday) ? rakutenToday : null,
     avg: hasHistory ? triple(model.avg, model.avgUnits, model.avgOrders) : null,
+    days: hasHistory ? daysOrNull(model.days) : null,
     cvr: hasHistory ? model.grandCvr : null,
     month: m ? triple(m.sales.current, m.units.current, m.orders.current) : null,
     monthDelta: deltasOf(m),
@@ -312,6 +359,7 @@ export function buildShopTable({ model, monthly, performance, others = [] }) {
       platform: other.platform,
       today: isKnown(a.today) ? a.today : null,
       avg: a.avg,
+      days: daysOrNull(a.daily) ?? platformDays(other.shops),
       cvr: null,
       month: a.month,
       monthDelta: deltasOf(a.metrics),
@@ -334,6 +382,7 @@ export function buildShopTable({ model, monthly, performance, others = [] }) {
       rakuten.avg && withWeek.every((o) => o.avg || !o.today)
         ? addCounts([rakuten.avg, ...withWeek.map((o) => o.avg)])
         : null,
+    days: hasHistory ? daysOrNull(companyDays(model, others)) : null,
     cvr: null,
     month: units && orders ? triple(null, units.current, orders.current) : null,
     monthDelta: units && orders ? triple(null, units.paceDeltaPct, orders.paceDeltaPct) : null,
@@ -386,21 +435,6 @@ export function buildTodayView(model, others = []) {
 
   const rakutenValues = model.rtTotal === null ? null : rakuten.values;
   const withWeek = others.filter((o) => o.provides.week);
-  // the days every history holds; a platform counted today without its week
-  // leaves no honest bars, while one with nothing today adds nothing to them
-  const histories = withWeek.filter((o) => o.company.daily.length);
-  const missingWeek = withWeek.some((o) => !o.company.daily.length && o.company.today);
-  const days = missingWeek
-    ? []
-    : model.days
-        .map((d) => {
-          const matches = histories.map((o) => o.company.daily.find((day) => day.date === d.date));
-          if (matches.some((day) => !day)) return null;
-          if (!histories.length) return d;
-          const add = (key) => matches.reduce((total, day) => total + (day[key] ?? 0), d[key]);
-          return { ...d, sales: null, units: add("units"), orders: add("orders") };
-        })
-        .filter(Boolean);
   return {
     multi: true,
     platforms: [
@@ -423,7 +457,7 @@ export function buildTodayView(model, others = []) {
         ? addCounts([rakutenAvg, ...withWeek.map((o) => o.company.avg)])
         : null,
     weekExcludes: others.filter((o) => !o.provides.week).map((o) => o.platform),
-    days,
+    days: companyDays(model, others),
     // 売上 bars stay 楽天's: no other platform's yen are added to them
     salesDays: model.days,
     coverage: others.reduce((coverage, o) => addCoverage(coverage, o.company.coverage.today), model.coverage),
