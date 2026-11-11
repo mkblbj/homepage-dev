@@ -7,7 +7,7 @@ import { DASH, mdLabel, weekdayJp } from "widgets/uoperformance/performance-mode
 
 import { deltaTone, METRICS, todayVsAverage } from "./daily-check-model.mjs";
 import { PlatformMark, PlatformName, PlatformSuffix, ScopeName } from "./platform-mark";
-import { FALLBACK_SHOP_COLOR, man } from "./sales-model.mjs";
+import { FALLBACK_SHOP_COLOR, man, spark } from "./sales-model.mjs";
 
 const NS = "uorakutensales";
 const METRIC_LABEL = { sales: "sortSales", units: "sortUnits", orders: "sortOrders" };
@@ -509,8 +509,17 @@ const TD = "px-2 py-2.5 text-sm tabular-nums text-right";
 const COL_GROUP = [null, "today", "today", "today", "week", "week", "month", "month", "month", "visits", "visits"];
 const GROUP_START = { 1: "today", 4: "week", 6: "month", 9: "visits" };
 const BANDED = new Set(["week", "visits"]);
-// shop, 今日 (takes the rest), share, vs 7-day, avg/day, CVR, to date, vs last month, visits, vs median
-const COL_WIDTHS = [168, null, 68, 120, 108, 68, 108, 104, 84, 100, 88];
+// shop, 今日, share, vs 7-day, avg/day, 7-day line, to date, last month, vs last month, visits,
+// vs median. 今日 and the line split whatever width is left.
+const COL_WIDTHS = [168, null, 68, 120, 108, null, 108, 104, 84, 100, 88];
+// a row's 7-day line: room for its figures above, then the line's own box,
+// which runs 0..100 across and 0..WAVE_HEIGHT down
+const WAVE_FIGURES = 10;
+const WAVE_HEIGHT = 32;
+// the old trend cards' blue, light to deep
+const WAVE_FROM = "#7DB8FB";
+const WAVE_TO = "#2E7DF6";
+const WAVE_AREA = "rgba(59,130,246,";
 const BAND = "bg-theme-200/40 dark:bg-white/[0.035]";
 const GROUP_BAR = { today: "#F0857A", week: "#7FB2E8", month: "#E8B26A", visits: "#7DDBB0" };
 
@@ -619,15 +628,17 @@ function TodayCell({ row, metric, maxToday, color, t }) {
           beside them, so the bar fills the gap up to シェア. The figures keep a
           fixed width there, so every row's bar starts at the same x. */}
       <div className="@container/today">
-        <div className="flex flex-col gap-1.5 @min-[460px]/today:flex-row @min-[460px]/today:items-center @min-[460px]/today:gap-4">
-          <span className="flex items-baseline gap-2.5 @min-[460px]/today:w-[230px] @min-[460px]/today:shrink-0">
-            <span className={`text-base font-extrabold tabular-nums ${ACCENT_TEXT}`}>
+        <div className="flex flex-col gap-1.5 @min-[340px]/today:flex-row @min-[340px]/today:items-center @min-[340px]/today:gap-4">
+          {/* in a narrow column the smaller figures move under the main one,
+              rather than splitting it from its unit */}
+          <span className="flex flex-wrap items-baseline gap-x-2.5 @min-[340px]/today:w-[230px] @min-[340px]/today:shrink-0">
+            <span className={`whitespace-nowrap text-base font-extrabold tabular-nums ${ACCENT_TEXT}`}>
               {valueText(metric, row.today[metric], t)}
             </span>
             <span className={`whitespace-nowrap text-xs tabular-nums ${MUTED}`}>{others}</span>
           </span>
           {color ? (
-            <span className="block h-1.5 w-full overflow-hidden rounded-full bg-theme-400/40 @min-[460px]/today:flex-1 dark:bg-white/10">
+            <span className="block h-1.5 w-full overflow-hidden rounded-full bg-theme-400/40 @min-[340px]/today:flex-1 dark:bg-white/10">
               <span
                 className="block h-full rounded-full"
                 style={{ width: `${Math.max(2, (row.today[metric] / maxToday) * 100)}%`, backgroundColor: color }}
@@ -663,6 +674,180 @@ function AvgRatioCell({ row, metric }) {
   );
 }
 
+// The days every row's line runs over, so a day sits at the same x on every row
+// and the header can name it once. Platforms share their finished days, but a
+// row missing one still keeps its slot.
+function trendDaysOf(rows) {
+  const byDate = new Map();
+  rows.forEach((row) => (row.days ?? []).forEach((d) => byDate.has(d.date) || byDate.set(d.date, d)));
+  return [...byDate.keys()].sort().map((date) => byDate.get(date));
+}
+
+const has = (v) => v !== null && v !== undefined;
+
+// The gradients every row's line is drawn with, in the line box's own units:
+// a gradient sized to each path's bounds would vanish on a perfectly flat week.
+function WaveDefs() {
+  return (
+    <svg width="0" height="0" aria-hidden="true" className="absolute">
+      <defs>
+        <linearGradient id="uors-wave-stroke" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="100" y2="0">
+          <stop offset="0" stopColor={WAVE_FROM} />
+          <stop offset="1" stopColor={WAVE_TO} />
+        </linearGradient>
+        <linearGradient id="uors-wave-area" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={WAVE_HEIGHT}>
+          <stop offset="0" stopColor={`${WAVE_AREA}0.28)`} />
+          <stop offset="1" stopColor={`${WAVE_AREA}0)`} />
+        </linearGradient>
+      </defs>
+    </svg>
+  );
+}
+
+// A day's three figures over its point on the line, the picked one in white.
+function DayTip({ day, metric, top, t }) {
+  return (
+    <span
+      data-tip=""
+      className="pointer-events-none absolute left-1/2 z-30 hidden -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md bg-slate-900 px-2 py-1.5 text-left shadow-lg group-hover:block"
+      style={{ top: top - 7 }}
+    >
+      <span className="mb-0.5 block text-[11px] font-bold text-slate-300">{`${day.md}(${day.wd})`}</span>
+      {METRICS.map((m) => (
+        <span key={m} className="flex items-baseline justify-between gap-4 text-xs leading-snug tabular-nums">
+          <span className="text-slate-400">{t(`${NS}.${METRIC_LABEL[m]}`)}</span>
+          <span
+            data-picked={m === metric ? "" : undefined}
+            className={m === metric ? "font-extrabold text-white" : "font-medium text-slate-200"}
+          >
+            {valueText(m, day[m], t)}
+          </span>
+        </span>
+      ))}
+    </span>
+  );
+}
+
+// A row's finished days as a smooth line, stretched from its slowest day to its
+// best so the week's shape shows even for a steady shop. Each row is scaled to
+// itself: the line shows the shape of a shop's week, while 今日 and シェア compare
+// shops. Today stays out: a day still running would read as a fall. Every day
+// is marked with a dot, and hovering one shows its three figures; the first and
+// last days carry the picked figure. A day with no figure breaks the line and
+// keeps its slot, under its date.
+function TrendCell({ row, metric, trendDays, t }) {
+  const { className, ...props } = colProps(5);
+  const byDate = new Map((row.days ?? []).map((d) => [d.date, d]));
+  const values = trendDays.map((d) => byDate.get(d.date)?.[metric] ?? null);
+  const known = values.filter(has);
+  if (!known.length) {
+    return (
+      <td {...props} data-col="trend" className={`${className} px-2 py-2`}>
+        <span className="text-sm text-theme-500 dark:text-theme-400">{DASH}</span>
+      </td>
+    );
+  }
+  const labels = trendDays.map((d, i) => `${d.md}(${d.wd}) ${valueText(metric, values[i], t)}`);
+  const { line, area } = spark(values, 100, WAVE_HEIGHT, false, true);
+  const min = Math.min(...known);
+  const span = Math.max(...known) - min || 1;
+  // where spark puts a value in the line's box, from the top of the cell
+  const at = (v) => WAVE_FIGURES + 5 + (1 - (v - min) / span) * (WAVE_HEIGHT - 10);
+  const first = values.findIndex(has);
+  const last = values.findLastIndex(has);
+  const endOf = (i) => (i === first ? "start" : i === last ? "end" : undefined);
+  const figure =
+    "pointer-events-none absolute left-1/2 -translate-y-full whitespace-nowrap text-[10px] leading-none tabular-nums";
+  // the line leaves the first day rightwards and reaches the last from the left,
+  // so their figures lean the other way, clear of it
+  const lean = { start: "-translate-x-full ml-[3px]", end: "-ml-[3px]" };
+  const dot =
+    "pointer-events-none absolute left-1/2 block h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full transition-transform group-hover:scale-[1.7]";
+  return (
+    <td {...props} data-col="trend" className={`${className} px-2 py-2`}>
+      <span
+        role="img"
+        aria-label={labels.join(" · ")}
+        className="relative block"
+        style={{ height: WAVE_FIGURES + WAVE_HEIGHT }}
+      >
+        <svg
+          aria-hidden="true"
+          viewBox={`0 0 100 ${WAVE_HEIGHT}`}
+          preserveAspectRatio="none"
+          className="absolute inset-x-0 bottom-0 block w-full overflow-visible"
+          style={{ height: WAVE_HEIGHT }}
+        >
+          <path d={area} fill="url(#uors-wave-area)" />
+          <path
+            data-line=""
+            d={line}
+            fill="none"
+            stroke="url(#uors-wave-stroke)"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke"
+          />
+        </svg>
+        {/* one slot per day, under the header's dates, the whole slot its
+            hover target: its dot, its tip and, at the ends, its figure */}
+        <span className="absolute inset-0 flex">
+          {trendDays.map((d, i) => (
+            <span key={d.date} className="group relative h-full flex-1">
+              {has(values[i]) ? (
+                <>
+                  <span
+                    data-point=""
+                    data-dot={endOf(i)}
+                    className={dot}
+                    style={{ top: at(values[i]), backgroundColor: WAVE_TO }}
+                  />
+                  {endOf(i) ? (
+                    <span
+                      data-figure={endOf(i)}
+                      className={`${figure} ${MUTED} ${lean[endOf(i)]}`}
+                      style={{ top: at(values[i]) - 4 }}
+                    >
+                      {barLabel(metric, values[i], t)}
+                    </span>
+                  ) : null}
+                  <DayTip day={byDate.get(d.date)} metric={metric} top={at(values[i])} t={t} />
+                </>
+              ) : null}
+            </span>
+          ))}
+        </span>
+      </span>
+    </td>
+  );
+}
+
+// The trend column's header: each day over its point, as the today card names
+// them, or just the column's name while it is too narrow for them.
+function TrendHead({ trendDays, t }) {
+  const { className, ...props } = colProps(5);
+  return (
+    <th scope="col" aria-label={t(`${NS}.colTrend`)} {...props} className={`${TH} ${className} text-left`}>
+      <div className="@container/trendhead">
+        <span className={trendDays.length ? "@min-[300px]/trendhead:hidden" : ""}>{t(`${NS}.colTrend`)}</span>
+        {trendDays.length ? (
+          // no gaps, so each date sits over the middle of its slot below
+          <span aria-hidden="true" className="hidden text-center leading-tight @min-[300px]/trendhead:flex">
+            {trendDays.map((d) => (
+              <span key={d.date} className="flex-1 font-medium">
+                {d.md}
+                <br />
+                {d.wd}
+              </span>
+            ))}
+          </span>
+        ) : null}
+      </div>
+    </th>
+  );
+}
+
 // one body cell of column `i`, carrying its group's rule and band
 function Cell({ i, className = "", children }) {
   const { className: groupCls, ...props } = colProps(i);
@@ -674,7 +859,7 @@ function Cell({ i, className = "", children }) {
 }
 
 // `shareBase` is what the row's share is of; `label` names a footer row
-function ShopRow({ row, metric, shareBase, maxToday, color, logoUrl, t, label = null }) {
+function ShopRow({ row, metric, shareBase, maxToday, color, logoUrl, trendDays, t, label = null }) {
   const isTotal = label !== null;
   const value = row.today?.[metric];
   const share =
@@ -702,9 +887,7 @@ function ShopRow({ row, metric, shareBase, maxToday, color, logoUrl, t, label = 
       <Cell i={4} className="text-theme-800 dark:text-theme-100">
         {bareText(metric, row.avg?.[metric], t)}
       </Cell>
-      <Cell i={5} className={MUTED}>
-        {row.cvr === null ? DASH : `${row.cvr.toFixed(2)}%`}
-      </Cell>
+      <TrendCell row={row} metric={metric} trendDays={trendDays} t={t} />
       <Cell i={6} className="font-bold text-theme-900 dark:text-theme-50">
         {bareText(metric, row.month?.[metric], t)}
       </Cell>
@@ -783,6 +966,7 @@ export function ShopTable({
     );
   };
   const unit = unitOf(metric, t);
+  const trendDays = trendDaysOf([...table.rows, ...totals]);
 
   // a group's header opens its band: its name and period, underlined in the group's colour
   const group = (key, firstCol, span) => {
@@ -824,10 +1008,12 @@ export function ShopTable({
           {note}
         </span>
       ))}
+      <WaveDefs />
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1240px] table-fixed border-collapse">
-          {/* figure columns keep their width; any spare width goes to 今日, so a
-              group's figures never drift apart on a wide screen */}
+        <table className="w-full min-w-[1300px] table-fixed border-collapse">
+          {/* figure columns keep their width; any spare width is split between
+              今日 and the 7-day line, so a group's figures never drift apart and
+              today's bar never runs the width of a wide screen */}
           <colgroup>
             {COL_WIDTHS.map((width, i) => (
               <col key={COL_GROUP[i] ? `${COL_GROUP[i]}-${i}` : "shop"} style={width ? { width } : undefined} />
@@ -849,7 +1035,7 @@ export function ShopTable({
               {head(2, t(`${NS}.share`), "text-right")}
               {head(3, t(`${NS}.vsAvg`), "text-left")}
               {head(4, withUnit(t(`${NS}.perDayAvg`), unit), "text-right")}
-              {head(5, "CVR", "text-right")}
+              <TrendHead trendDays={trendDays} t={t} />
               {head(6, withUnit(t(`${NS}.cumulative`), unit), "text-right")}
               {head(7, withUnit(t(`${NS}.lastMonth`), unit), "text-right")}
               {head(
@@ -871,6 +1057,7 @@ export function ShopTable({
                 metric={metric}
                 shareBase={shareBaseOf(row.platform)}
                 maxToday={maxToday}
+                trendDays={trendDays}
                 color={colorOf(row.name)}
                 logoUrl={logoOf(row)}
                 t={t}
@@ -897,6 +1084,7 @@ export function ShopTable({
                 metric={metric}
                 shareBase={row.platform ? shareBaseOf(row.platform) : companyToday}
                 maxToday={maxToday}
+                trendDays={trendDays}
                 t={t}
                 label={footerLabel(row)}
               />

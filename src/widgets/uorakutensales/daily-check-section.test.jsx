@@ -30,6 +30,10 @@ function shopRow(name, overrides = {}) {
     name,
     today: { sales: 1200, units: 14, orders: 12 },
     avg: { sales: 3000, units: 30, orders: 25 },
+    days: [
+      { date: "2026-10-28", md: "10/28", wd: "水", sales: 2000, units: 20, orders: 18 },
+      { date: "2026-10-29", md: "10/29", wd: "木", sales: 4000, units: 40, orders: 32 },
+    ],
     cvr: 2.5,
     month: { sales: 90000, units: 900, orders: 800 },
     previous: { sales: 120000, units: 1500, orders: 1400 },
@@ -107,6 +111,118 @@ describe("widgets/uorakutensales/daily-check-section", () => {
     // ¥3,000 a day and ¥90,000 this month
     expect(within(row).getByText("0.3")).toBeInTheDocument();
     expect(within(row).getByText("9.0")).toBeInTheDocument();
+  });
+
+  it("the 7-day group draws each shop's days as a line that follows the metric", () => {
+    const days = [
+      { date: "2026-11-04", md: "11/4", wd: "水", sales: 100, units: 3, orders: 2 },
+      { date: "2026-11-05", md: "11/5", wd: "木", sales: 0, units: 0, orders: 0 },
+      { date: "2026-11-06", md: "11/6", wd: "金", sales: null, units: null, orders: null },
+    ];
+    const withDays = { ...table, rows: [shopRow("A", { days })], total: { ...table.total, days } };
+    const { rerender } = render(<ShopTable table={withDays} metric="sales" shopColors={{}} t={t} />);
+
+    const chart = within(screen.getByRole("row", { name: /^A/ })).getByRole("img");
+    // the finished days only: today, still running, stays out of the line
+    expect(chart).toHaveAttribute("aria-label", "11/4(水) ¥100 · 11/5(木) ¥0 · 11/6(金) —");
+    // a day with no figure leaves its slot empty: the line stops before it
+    expect(chart.querySelectorAll("[data-point]")).toHaveLength(2);
+    expect(chart.querySelector("[data-line]").getAttribute("d").match(/M/g)).toHaveLength(1);
+
+    rerender(<ShopTable table={withDays} metric="orders" shopColors={{}} t={t} />);
+    expect(within(screen.getByRole("row", { name: /^A/ })).getByRole("img")).toHaveAttribute(
+      "aria-label",
+      `11/4(水) 2${NS}.ordersUnit · 11/5(木) 0${NS}.ordersUnit · 11/6(金) —`,
+    );
+  });
+
+  it("the line stretches from the week's lowest day to its highest, and names its first and last", () => {
+    const day = (date, md, wd, orders) => ({ date, md, wd, sales: orders * 100, units: orders, orders });
+    const days = [
+      day("2026-11-04", "11/4", "水", 40),
+      day("2026-11-05", "11/5", "木", 36),
+      day("2026-11-06", "11/6", "金", 30),
+    ];
+    render(<ShopTable table={{ ...table, rows: [shopRow("A", { days })] }} metric="orders" shopColors={{}} t={t} />);
+
+    const chart = within(screen.getByRole("row", { name: /^A/ })).getByRole("img");
+    expect(chart.querySelector("[data-figure='start']")).toHaveTextContent("40");
+    expect(chart.querySelector("[data-figure='end']")).toHaveTextContent("30");
+    // 30 to 40 fills the box: the best day at its top, the slowest at its bottom
+    const top = (dot) => parseFloat(chart.querySelector(`[data-dot='${dot}']`).style.top);
+    expect(top("end") - top("start")).toBe(22);
+    expect(chart.querySelector("[data-dot='today']")).toBeNull();
+  });
+
+  it("every day is marked on the line, and hovering one names its three figures", () => {
+    const days = [
+      { date: "2026-11-04", md: "11/4", wd: "水", sales: 4000, units: 41, orders: 40 },
+      { date: "2026-11-05", md: "11/5", wd: "木", sales: 3000, units: 33, orders: 30 },
+      { date: "2026-11-06", md: "11/6", wd: "金", sales: null, units: 36, orders: 35 },
+    ];
+    render(<ShopTable table={{ ...table, rows: [shopRow("A", { days })] }} metric="orders" shopColors={{}} t={t} />);
+
+    const chart = within(screen.getByRole("row", { name: /^A/ })).getByRole("img");
+    // not only the ends: each day's point shows
+    const points = chart.querySelectorAll("[data-point]");
+    expect(points).toHaveLength(3);
+    points.forEach((point) => expect(point.className).not.toMatch(/opacity-0/));
+
+    const tips = chart.querySelectorAll("[data-tip]");
+    expect(tips).toHaveLength(3);
+    const middle = within(tips[1]);
+    expect(middle.getByText("11/5(木)")).toBeInTheDocument();
+    expect(middle.getByText("¥3000")).toBeInTheDocument();
+    expect(middle.getByText(`33${NS}.unitsShort`)).toBeInTheDocument();
+    // the picked figure stands out
+    expect(middle.getByText(`30${NS}.ordersUnit`)).toHaveAttribute("data-picked");
+    expect(middle.getByText("¥3000")).not.toHaveAttribute("data-picked");
+    // a figure the day lacks reads a dash
+    expect(within(tips[2]).getByText("—")).toBeInTheDocument();
+  });
+
+  it("a row missing a day keeps its slot, so every row's days line up under the header's dates", () => {
+    const day = (date, md, wd, orders) => ({ date, md, wd, sales: orders * 100, units: orders, orders });
+    const full = [day("2026-11-04", "11/4", "水", 2), day("2026-11-05", "11/5", "木", 3)];
+    const rows = [shopRow("A", { days: full }), shopRow("B", { days: [day("2026-11-05", "11/5", "木", 4)] })];
+    render(
+      <ShopTable
+        table={{ ...table, rows, total: { ...table.total, days: full } }}
+        metric="orders"
+        shopColors={{}}
+        t={t}
+      />,
+    );
+
+    expect(within(screen.getByRole("row", { name: /^B/ })).getByRole("img")).toHaveAttribute(
+      "aria-label",
+      `11/4(水) — · 11/5(木) 4${NS}.ordersUnit`,
+    );
+    // the header names each day once
+    expect(screen.getByRole("columnheader", { name: `${NS}.colTrend` })).toHaveTextContent("11/4水11/5木");
+  });
+
+  it("a row with no days, or none in the picked metric, reads a dash in the trend column", () => {
+    const countsOnly = [{ date: "2026-11-04", md: "11/4", wd: "水", sales: null, units: 3, orders: 2 }];
+    const rows = [shopRow("A", { days: null }), shopRow("B", { days: countsOnly })];
+    const { rerender } = render(<ShopTable table={{ ...table, rows }} metric="sales" shopColors={{}} t={t} />);
+
+    for (const name of [/^A/, /^B/]) {
+      const cell = screen.getByRole("row", { name }).querySelector("[data-col='trend']");
+      expect(within(cell).getByText("—")).toBeInTheDocument();
+      expect(within(cell).queryByRole("img")).not.toBeInTheDocument();
+    }
+
+    rerender(<ShopTable table={{ ...table, rows }} metric="orders" shopColors={{}} t={t} />);
+    expect(within(screen.getByRole("row", { name: /^B/ })).getByRole("img")).toBeInTheDocument();
+  });
+
+  it("the CVR column gives way to the trend column", () => {
+    render(<ShopTable table={table} metric="sales" shopColors={{}} t={t} />);
+
+    expect(screen.queryByRole("columnheader", { name: "CVR" })).not.toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: `${NS}.colTrend` })).toBeInTheDocument();
+    expect(screen.queryByText("2.50%")).not.toBeInTheDocument();
   });
 
   it("each column group starts with a divider the whole way down", () => {

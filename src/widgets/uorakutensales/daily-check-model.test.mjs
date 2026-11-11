@@ -442,6 +442,57 @@ test("without Amazon the table keeps its single 楽天 total", () => {
   assert.equal(t.total, t.totals[0]);
 });
 
+test("each shop row carries its own seven days; a shop without a counted week has none", () => {
+  const t = buildShopTable(fixture());
+  const a = t.rows.find((r) => r.name === "A");
+  assert.equal(a.days.length, 7);
+  assert.deepEqual([a.days[0].date, a.days[0].sales, a.days[0].orders, a.days[0].units], [DATES[0], 100, 1, 1]);
+  // an idle shop keeps its days too, for when it is unfolded
+  assert.equal(t.idle.find((r) => r.name === "Z").days.length, 7);
+
+  const without = buildShopTable(fixture({ historyShops: [shopWeek("A", 100), shopWeek("Z", 0)] }));
+  assert.equal(without.rows.find((r) => r.name === "B").days, null);
+});
+
+test("the 楽天 total carries the company's days, alone or beside other platforms", () => {
+  const [rakuten] = buildShopTable(fixture()).totals;
+  assert.equal(rakuten.days.length, 7);
+  assert.deepEqual([rakuten.days[0].sales, rakuten.days[0].orders], [200, 2]);
+
+  const beside = buildShopTable({ ...fixture(), others: [amazonOf()] }).totals[0];
+  assert.deepEqual([beside.days[0].sales, beside.days[0].orders], [200, 2]);
+});
+
+test("Amazon rows and its total carry their days; the company total adds counts only", () => {
+  const t = buildShopTable({ ...fixture(), others: [amazonOf()] });
+  const az = t.rows.find((r) => r.platform === "amazon");
+  assert.deepEqual([az.days.length, az.days[0].sales, az.days[0].orders], [7, 100, 1]);
+  const [, amazon, company] = t.totals;
+  assert.deepEqual([amazon.days.length, amazon.days[0].sales], [7, 100]);
+  // 楽天's 2 orders and Amazon's 1 each day; the yen are never added across platforms
+  assert.equal(company.days.length, 7);
+  assert.deepEqual([company.days[0].sales, company.days[0].orders, company.days[0].units], [null, 3, 3]);
+});
+
+test("a platform with no daily of its own adds up its shops' days, and has none while a shop lacks them", () => {
+  const temu = buildShopTable({ ...fixture(), others: [temuOf(undefined, { history: true })] });
+  const temuShop = temu.rows.find((r) => r.key === "temu:UO world");
+  assert.deepEqual([temuShop.days[0].sales, temuShop.days[0].orders], [null, 2]);
+  const temuTotal = temu.totals.find((r) => r.key === "total:temu");
+  assert.equal(temuTotal.days.length, 7);
+  assert.deepEqual([temuTotal.days[0].sales, temuTotal.days[0].orders, temuTotal.days[0].units], [null, 2, 3]);
+  // TEMU serves no week, so the company's days stay 楽天's counts
+  assert.deepEqual([temu.total.days[0].sales, temu.total.days[0].orders], [null, 2]);
+
+  const both = buildShopTable({ ...fixture(), others: [aupayOf({ historyOf: ["1", "2"] })] });
+  const aupay = both.totals.find((r) => r.key === "total:aupay");
+  assert.deepEqual([aupay.days[0].sales, aupay.days[0].orders, aupay.days[0].units], [400, 2, 4]);
+
+  const one = buildShopTable({ ...fixture(), others: [aupayOf({ historyOf: ["1"] })] });
+  assert.equal(one.rows.find((r) => r.key === "aupay:2").days, null);
+  assert.equal(one.totals.find((r) => r.key === "total:aupay").days, null);
+});
+
 test("the today view adds counts across platforms and keeps each platform's yen apart", () => {
   const { model } = fixture();
   const view = buildTodayView(model, [amazonOf()]);
@@ -495,7 +546,8 @@ test("the month view adds counts and lists each platform's yen", () => {
 
 // two au PAY shops beside the 楽天 fixture; one shares 楽天 shop A's name. By
 // default the server is the older one with no last month; `previousMonth` adds it.
-function aupayOf({ previousMonth = false } = {}) {
+// `historyOf` names the config IDs whose seven days the server sends.
+function aupayOf({ previousMonth = false, historyOf: withHistory = [] } = {}) {
   const row = (configId, shopName, extra) => ({
     configId,
     shopName,
@@ -538,6 +590,14 @@ function aupayOf({ previousMonth = false } = {}) {
           ]),
         }
       : {}),
+    history: {
+      dates: DATES,
+      shops: withHistory.map((configId) =>
+        row(configId, configId === "1" ? "A" : "幸田良品", {
+          daily: DATES.map((date) => ({ date, status: "ready", totals: totals(200, 2, 1) })),
+        }),
+      ),
+    },
   });
 }
 
@@ -662,8 +722,12 @@ test("with au PAY's last month the company's comparison covers it too", () => {
   assert.equal(t.total.previous.orders, without.metrics.orders.previous + 60);
 });
 
-// TEMU's one shop beside the 楽天 fixture, as it answers without the amount scope
-function temuOf(today = { status: "ready", totals: { salesAmount: null, unitsSold: 2, orderCount: 2 } }) {
+// TEMU's one shop beside the 楽天 fixture, as it answers without the amount scope;
+// `history` adds its seven days
+function temuOf(
+  today = { status: "ready", totals: { salesAmount: null, unitsSold: 2, orderCount: 2 } },
+  { history = false } = {},
+) {
   const period = (key, extra) => ({
     key,
     sourceUpdatedAt: "2026-10-25T01:18:00.000Z",
@@ -678,6 +742,25 @@ function temuOf(today = { status: "ready", totals: { salesAmount: null, unitsSol
     today: period("2026-10-25", today),
     month: period("2026-10", { status: "ready", totals: { salesAmount: null, unitsSold: 26, orderCount: 25 } }),
     previousMonth: period("2026-09", { status: "ready", totals: { salesAmount: null, unitsSold: 31, orderCount: 30 } }),
+    ...(history
+      ? {
+          history: {
+            dates: DATES,
+            shops: [
+              {
+                shopName: "UO world",
+                currency: "JPY",
+                enabled: true,
+                daily: DATES.map((date) => ({
+                  date,
+                  status: "ready",
+                  totals: { salesAmount: null, unitsSold: 3, orderCount: 2 },
+                })),
+              },
+            ],
+          },
+        }
+      : {}),
   });
 }
 
