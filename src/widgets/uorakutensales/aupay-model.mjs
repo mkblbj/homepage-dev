@@ -88,7 +88,7 @@ export function buildAupay(sales) {
   };
 }
 
-// au PAY has no records to show: its shops still get their place on the list of
+// au PAY and TEMU have no records to show: their shops still get their place on the list of
 // shop bests, as an unknown after everyone with a figure.
 export function withUnrecordedShops(peaks, shops) {
   if (!peaks || !shops?.length) return peaks;

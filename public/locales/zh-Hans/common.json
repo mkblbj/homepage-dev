@@ -1637,6 +1637,7 @@
         "peaksCoverageAmazon": "Amazon 自 {{date}} 起",
         "lastDays": "近{{count}}日",
         "platformAupay": "au PAY",
+        "platformTemu": "TEMU",
         "platformCount": "{{platform}} {{count}}",
         "weekExcludes": "过去 7 日柱状图、7 日均值及其比率不含 {{names}}（无历史数据）",
         "prevExcludes": "上月数字和上月比不含 {{names}}（无上月数据）",

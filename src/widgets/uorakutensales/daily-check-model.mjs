@@ -1,12 +1,12 @@
-// View model for the sales tab's daily check: one row per shop — 楽天, Amazon and
-// au PAY side by side — with today, the last 7 days, this month and yesterday's
+// View model for the sales tab's daily check: one row per shop — 楽天, Amazon,
+// au PAY and TEMU side by side — with today, the last 7 days, this month and yesterday's
 // visits. Unknown stays null all the way to the screen — a missing board is
 // never drawn as zero.
 //
 // Order and unit counts add up across platforms; yen never do. Each platform
 // counts its amounts its own way, so 売上 stays per platform and the company row
 // leaves it empty. Comparisons need the same shops on both sides: a platform
-// without a week or a last month (au PAY) counts in the company's figures but
+// without a week or a last month (au PAY, TEMU without one) counts in the company's figures but
 // stays out of its 7-day and last-month comparisons.
 
 export const METRICS = Object.freeze(["sales", "units", "orders"]);
@@ -36,8 +36,11 @@ function medianDelta(source) {
   return source && source.sampleCount >= MIN_MEDIAN_SAMPLES ? source.delta : null;
 }
 
+// A period was read once its order count is: its yen can still be unknown —
+// TEMU's until its amount scope is granted, another currency's — and then read
+// as a dash beside counts that are real.
 function isKnown(values) {
-  return Boolean(values) && values.sales !== null && values.orders !== null;
+  return Boolean(values) && values.orders !== null && values.orders !== undefined;
 }
 
 function isZero(values) {

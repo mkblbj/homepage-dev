@@ -1,15 +1,20 @@
 // A platform's own mark beside its shops and its name, so a board that mixes
-// platforms reads at a glance. The glyphs are inline SVG from react-icons (nothing
-// is fetched), each on its brand's tile colour like its app icon, which keeps them
-// legible on light and dark themes alike. A faint ring keeps Amazon's navy tile
-// apart from a dark page. react-icons has no au PAY glyph: its "au" is set in type.
+// platforms reads at a glance. 楽天's and Amazon's glyphs are inline SVG from
+// react-icons, each on its brand's tile colour like its app icon, which keeps them
+// legible on light and dark themes alike. react-icons has no au PAY or TEMU glyph,
+// so theirs are their own app icons, inlined as small images (platform-logos).
+// Nothing is fetched. A faint ring keeps a dark tile apart from a dark page and
+// au PAY's white one apart from a light page.
 import { FaAmazon } from "react-icons/fa6";
 import { SiRakuten } from "react-icons/si";
+
+import { AUPAY_LOGO, TEMU_LOGO } from "./platform-logos.mjs";
 
 const MARKS = {
   rakuten: { Icon: SiRakuten, tile: "#BF0000", glyph: "#FFFFFF" },
   amazon: { Icon: FaAmazon, tile: "#232F3E", glyph: "#FF9900" },
-  aupay: { text: "au", tile: "#EB5505", glyph: "#FFFFFF" },
+  aupay: { logo: AUPAY_LOGO, tile: "#FFFFFF" },
+  temu: { logo: TEMU_LOGO, tile: "#FB7701" },
 };
 
 // The mark is decorative: wherever it stands, the platform's name is written
@@ -17,20 +22,18 @@ const MARKS = {
 export function PlatformMark({ platform, size = 14 }) {
   const mark = MARKS[platform];
   if (!mark) return null;
-  const { Icon, text, tile, glyph } = mark;
+  const { Icon, logo, tile, glyph } = mark;
   return (
     <span
       aria-hidden="true"
       data-platform={platform}
-      className="inline-flex shrink-0 items-center justify-center rounded-[4px] align-[-0.15em] ring-1 ring-black/10 dark:ring-white/30"
+      className="inline-flex shrink-0 items-center justify-center overflow-hidden rounded-[4px] align-[-0.15em] ring-1 ring-black/10 dark:ring-white/30"
       style={{ width: size, height: size, backgroundColor: tile }}
     >
       {Icon ? (
         <Icon style={{ width: size * 0.7, height: size * 0.7, color: glyph }} />
       ) : (
-        <span className="font-extrabold leading-none" style={{ fontSize: size * 0.6, color: glyph }}>
-          {text}
-        </span>
+        <img src={logo} alt="" className="h-full w-full object-contain" />
       )}
     </span>
   );

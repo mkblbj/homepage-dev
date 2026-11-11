@@ -32,6 +32,7 @@ const EXPECTED_METHOD_BY_ENDPOINT = {
   amazonRankingMonthly: "GET",
   amazonPeaks: "GET",
   aupaySales: "GET",
+  temuSales: "GET",
 };
 
 function parseResponseData(data) {

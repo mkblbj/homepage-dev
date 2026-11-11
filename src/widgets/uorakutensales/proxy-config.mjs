@@ -34,6 +34,8 @@ const ENDPOINT_PATHS = {
   amazonPeaks: "/api/amazon/history/peaks",
   // au PAY's shops: today and this month are all it serves
   aupaySales: "/api/aupay/sales",
+  // TEMU's one shop: today, this month and last month, counts only until its amount scope is granted
+  temuSales: "/api/temu/sales",
 };
 
 export function normalizeSalesServiceUrl(baseUrl = DEFAULT_SALES_SERVICE_URL) {

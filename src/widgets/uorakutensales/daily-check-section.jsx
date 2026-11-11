@@ -12,7 +12,12 @@ import { FALLBACK_SHOP_COLOR, man } from "./sales-model.mjs";
 const NS = "uorakutensales";
 const METRIC_LABEL = { sales: "sortSales", units: "sortUnits", orders: "sortOrders" };
 const UNIT_KEY = { units: "unitsShort", orders: "ordersUnit" };
-const PLATFORM_KEY = { rakuten: "platformRakuten", amazon: "platformAmazon", aupay: "platformAupay" };
+const PLATFORM_KEY = {
+  rakuten: "platformRakuten",
+  amazon: "platformAmazon",
+  aupay: "platformAupay",
+  temu: "platformTemu",
+};
 
 const TONE_CLASS = {
   down: "font-bold text-rose-600 dark:text-rose-300",
