@@ -18,8 +18,8 @@
  *   "rankingMonthly" / "amazonRankingMonthly" → this and last month's item boards,
  *                     read only while 今月 or 先月 is picked on the best sellers
  *   "amazonPeaks"   → GET /api/amazon/history/peaks  each Amazon shop's best day
- *   "aupaySales"    → GET /api/aupay/sales           au PAY today, this month, last month
- *   "temuSales"     → GET /api/temu/sales            TEMU's one shop, the same three periods
+ *   "aupaySales"    → GET /api/aupay/sales           au PAY today, this month, last month and shop history
+ *   "temuSales"     → GET /api/temu/sales            TEMU's one shop, the same periods and history
  *
  * Amazon's, au PAY's and TEMU's shops sit beside 楽天's as peers. Counts add up across platforms;
  * yen never do, since each platform measures its amounts its own way.
@@ -96,6 +96,10 @@ const ACCENT_TEXT = "text-[#C6362B] dark:text-[#F0857A]";
 
 function fmt(t, value) {
   return t("common.number", { value: Number(value) || 0 });
+}
+
+function fmtKnown(t, value) {
+  return value == null ? DASH : fmt(t, value);
 }
 
 // Shared gradient defs for every sparkline (referenced by id across the widget).
@@ -233,31 +237,31 @@ function ChartModeToggle({ mode, onChange, t }) {
 // per-shop 7-day mini chart: line (sparkline) or bars, both with hover detail.
 // points = [{ md, wd, sales, orders }]. x uses segment centers so the hover dot
 // / highlighted bar / tooltip all line up with the equal-width hover zones.
-// A dashed line marks the shop's daily average; the ⌀ tag (hover) reveals the
-// average sales / orders / CVR. cvr is the shop's trailing-7d conversion rate.
-function ShopMiniChart({ points, mode, cvr = 0, t, height = 32 }) {
+// A dashed line marks the shop's average when every day has the plotted value.
+function ShopMiniChart({ points, mode, ordersTrend, cvr = 0, t, height = 32 }) {
   const [hover, setHover] = useState(null);
   const [avgHover, setAvgHover] = useState(false);
   const n = points.length;
-  const vals = useMemo(() => points.map((p) => p.sales), [points]);
-  const minV = n ? Math.min(...vals) : 0;
-  const maxV = n ? Math.max(...vals) : 0;
+  const vals = useMemo(() => points.map((p) => (ordersTrend ? p.orders : p.sales)), [points, ordersTrend]);
+  const known = vals.filter(Number.isFinite);
+  const minV = known.length ? Math.min(...known) : 0;
+  const maxV = known.length ? Math.max(...known) : 0;
   const span = maxV - minV || 1;
   const barMax = Math.max(1, maxV);
   const { line, area } = useMemo(() => spark(vals, 100, height, false, true), [vals, height]);
 
-  const avgSales = n ? vals.reduce((s, v) => s + v, 0) / n : 0;
-  const avgOrders = n ? points.reduce((s, p) => s + p.orders, 0) / n : 0;
+  const average = n && known.length === n ? known.reduce((s, v) => s + v, 0) / n : null;
+  const avgOrders =
+    n && points.every((p) => Number.isFinite(p.orders)) ? points.reduce((s, p) => s + p.orders, 0) / n : null;
+  const yPct = (value) => ((5 + (1 - (value - minV) / span) * (height - 10)) / height) * 100;
   // avg line y matches the active scale: sparkline is min..max, bars are 0..max
   const avgTopPct =
-    mode === "bar"
-      ? (1 - avgSales / barMax) * 100
-      : ((5 + (1 - (avgSales - minV) / span) * (height - 10)) / height) * 100;
+    average === null ? undefined : mode === "bar" ? (1 - average / barMax) * 100 : yPct(average);
 
   const hp = hover != null && !avgHover ? points[hover] : null;
   const on = hp != null;
   const xPct = on ? ((hover + 0.5) / n) * 100 : 0;
-  const dotYPct = on ? ((5 + (1 - (hp.sales - minV) / span) * (height - 10)) / height) * 100 : 0;
+  const hoverValue = on ? vals[hover] : null;
   const tipTx = hover === 0 ? "0%" : hover === n - 1 ? "-100%" : "-50%";
 
   if (!n) {
@@ -272,11 +276,15 @@ function ShopMiniChart({ points, mode, cvr = 0, t, height = 32 }) {
             <span
               key={p.date ?? i}
               className="block flex-1 rounded-[2px] transition-opacity"
-              style={{
-                height: `${Math.max(10, (p.sales / barMax) * 100)}%`,
-                backgroundColor: DOT,
-                opacity: on ? (i === hover ? 1 : 0.3) : 0.7,
-              }}
+              style={
+                Number.isFinite(vals[i])
+                  ? {
+                      height: `${Math.max(10, (vals[i] / barMax) * 100)}%`,
+                      backgroundColor: DOT,
+                      opacity: on ? (i === hover ? 1 : 0.3) : 0.7,
+                    }
+                  : undefined
+              }
             />
           ))}
         </div>
@@ -302,11 +310,17 @@ function ShopMiniChart({ points, mode, cvr = 0, t, height = 32 }) {
         </svg>
       )}
 
-      {/* daily-average line */}
-      <span
-        className="pointer-events-none absolute inset-x-0 z-[2] border-t border-dashed"
-        style={{ top: `${avgTopPct}%`, borderColor: "rgba(198,54,43,.55)" }}
-      />
+      {mode === "line"
+        ? points.map((p, i) =>
+            Number.isFinite(vals[i]) && !Number.isFinite(vals[i - 1]) && !Number.isFinite(vals[i + 1]) ? (
+              <span
+                key={p.date ?? i}
+                className="pointer-events-none absolute h-1 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full"
+                style={{ left: `${((i + 0.5) / n) * 100}%`, top: `${yPct(vals[i])}%`, backgroundColor: DOT }}
+              />
+            ) : null,
+          )
+        : null}
 
       {/* hover zones (per day) */}
       <div className="absolute inset-0 z-[3] flex" onMouseLeave={() => setHover(null)}>
@@ -315,26 +329,37 @@ function ShopMiniChart({ points, mode, cvr = 0, t, height = 32 }) {
         ))}
       </div>
 
-      {/* ⌀ average tag — always shows daily avg; hover reveals full averages */}
-      <span
-        className="absolute right-0 z-[4] flex -translate-y-1/2 cursor-help items-center rounded-[3px] bg-slate-900/75 px-1 text-[7px] font-bold leading-[1.4] text-white/90 tabular-nums"
-        style={{ top: `${avgTopPct}%` }}
-        onMouseEnter={() => setAvgHover(true)}
-        onMouseLeave={() => setAvgHover(false)}
-      >
-        ⌀{man(avgSales)}
-        {t(`${NS}.manUnit`)}
-      </span>
+      {average !== null ? (
+        <>
+          <span
+            className="pointer-events-none absolute inset-x-0 z-[2] border-t border-dashed"
+            style={{ top: `${avgTopPct}%`, borderColor: "rgba(198,54,43,.55)" }}
+          />
+          <span
+            className="absolute right-0 z-[4] flex -translate-y-1/2 cursor-help items-center rounded-[3px] bg-slate-900/75 px-1 text-[7px] font-bold leading-[1.4] text-white/90 tabular-nums"
+            style={{ top: `${avgTopPct}%` }}
+            onMouseEnter={() => setAvgHover(true)}
+            onMouseLeave={() => setAvgHover(false)}
+          >
+            ⌀
+            {ordersTrend
+              ? `${fmt(t, Number(average.toFixed(1)))}${t(`${NS}.ordersUnit`)}`
+              : `${man(average)}${t(`${NS}.manUnit`)}`}
+          </span>
+        </>
+      ) : null}
 
-      {avgHover ? (
+      {average !== null && avgHover ? (
         <div className="pointer-events-none absolute bottom-full right-0 z-20 mb-1 whitespace-nowrap rounded-[6px] bg-slate-900 px-2 py-1 text-right shadow-lg">
           <span className="block text-[8.5px] font-bold text-slate-300">{t(`${NS}.avgLabel`)}</span>
-          <span className="block text-[11px] font-extrabold tabular-nums text-white">
-            ¥{fmt(t, Math.round(avgSales))}
-            {t(`${NS}.perDay`)}
-          </span>
+          {ordersTrend ? null : (
+            <span className="block text-[11px] font-extrabold tabular-nums text-white">
+              ¥{fmt(t, Math.round(average))}
+              {t(`${NS}.perDay`)}
+            </span>
+          )}
           <span className="block text-[8.5px] font-medium tabular-nums text-slate-400">
-            {fmt(t, Math.round(avgOrders))}
+            {avgOrders === null ? DASH : fmt(t, Math.round(avgOrders))}
             {t(`${NS}.ordersUnit`)}
             {t(`${NS}.perDay`)} · CVR {cvr === null ? DASH : `${cvr.toFixed(2)}%`}
           </span>
@@ -343,10 +368,10 @@ function ShopMiniChart({ points, mode, cvr = 0, t, height = 32 }) {
 
       {on ? (
         <>
-          {mode === "line" ? (
+          {mode === "line" && Number.isFinite(hoverValue) ? (
             <span
               className="pointer-events-none absolute h-[7px] w-[7px] -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white"
-              style={{ left: `${xPct}%`, top: `${dotYPct}%`, backgroundColor: DOT }}
+              style={{ left: `${xPct}%`, top: `${yPct(hoverValue)}%`, backgroundColor: DOT }}
             />
           ) : null}
           <div
@@ -356,10 +381,12 @@ function ShopMiniChart({ points, mode, cvr = 0, t, height = 32 }) {
             <span className="block text-[9px] font-bold text-slate-300">
               {hp.md}（{hp.wd}）
             </span>
-            <span className="block text-[11px] font-extrabold tabular-nums text-white">¥{fmt(t, hp.sales)}</span>
+            <span className="block text-[11px] font-extrabold tabular-nums text-white">
+              {hp.sales === null ? DASH : `¥${fmt(t, hp.sales)}`}
+            </span>
             <span className="block text-[8.5px] font-medium tabular-nums text-slate-400">
-              {fmt(t, hp.orders)}
-              {t(`${NS}.ordersUnit`)} · {fmt(t, hp.units)}
+              {fmtKnown(t, hp.orders)}
+              {t(`${NS}.ordersUnit`)} · {fmtKnown(t, hp.units)}
               {t(`${NS}.unitsShort`)}
               {hp.cvr > 0 ? ` · CVR ${hp.cvr.toFixed(2)}%` : ""}
             </span>
@@ -1116,8 +1143,14 @@ function LoadingSkeleton() {
 
 // one shop's last 7 days: total, a mini chart, orders · units · CVR
 function ShopTrendCard({ row: r, mode, t }) {
+  const label = r.platform ? platformLabel(r.platform, t) : "";
+  const ordersTrend =
+    !r.daily.some((day) => Number.isFinite(day.sales)) && r.daily.some((day) => Number.isFinite(day.orders));
   return (
-    <div className="relative flex min-w-0 flex-col rounded-xl border border-theme-300/30 bg-theme-100/60 p-2.5 dark:border-white/[0.06] dark:bg-white/[0.03]">
+    <article
+      aria-label={label ? `${r.name} (${label})` : r.name}
+      className="relative flex min-w-0 flex-col rounded-xl border border-theme-300/30 bg-theme-100/60 p-2.5 dark:border-white/[0.06] dark:bg-white/[0.03]"
+    >
       {/* corner-bleed logo watermark — clipped by its OWN layer so the mini-chart
           hover tooltip can still escape the (unclipped) card */}
       {r.logoUrl ? (
@@ -1135,7 +1168,7 @@ function ShopTrendCard({ row: r, mode, t }) {
         <span className="flex min-w-0 items-center gap-1">
           {r.platform ? <PlatformMark platform={r.platform} size={12} /> : null}
           <span className="truncate text-[11px] font-semibold text-theme-900 dark:text-theme-50">{r.name}</span>
-          {r.platform ? <PlatformSuffix label={platformLabel(r.platform, t)} /> : null}
+          {label ? <PlatformSuffix label={label} /> : null}
         </span>
         <span className="flex items-baseline gap-0.5">
           <span className="text-[9px] font-bold text-theme-600 dark:text-theme-300">¥</span>
@@ -1144,14 +1177,22 @@ function ShopTrendCard({ row: r, mode, t }) {
           </span>
           <span className="text-[9px] font-medium text-theme-600 dark:text-theme-300">{t(`${NS}.manUnit`)}</span>
         </span>
-        <ShopMiniChart points={r.daily} mode={mode} cvr={r.cvr} t={t} />
+        {ordersTrend ? (
+          <span className="text-[9px] font-medium text-theme-600 dark:text-theme-300">{t(`${NS}.weekOrdersTrend`)}</span>
+        ) : null}
+        <ShopMiniChart points={r.daily} mode={mode} ordersTrend={ordersTrend} cvr={r.cvr} t={t} />
         <span className="border-t border-theme-300/30 pt-1.5 text-[9px] font-medium tabular-nums text-theme-600 dark:border-white/10 dark:text-theme-300">
-          {fmt(t, r.h7Orders)}
-          {t(`${NS}.ordersUnit`)} · {fmt(t, r.h7Units)}
+          {fmtKnown(t, r.h7Orders)}
+          {t(`${NS}.ordersUnit`)} · {fmtKnown(t, r.h7Units)}
           {t(`${NS}.unitsShort`)} · CVR {r.cvr === null ? DASH : `${r.cvr.toFixed(2)}%`}
         </span>
+        {r.historyDays != null && r.historyDays < r.daily.length ? (
+          <span className="text-[9px] font-medium text-theme-600 dark:text-theme-300">
+            {t(`${NS}.weekDaysAvailable`, { count: r.historyDays, total: r.daily.length })}
+          </span>
+        ) : null}
       </div>
-    </div>
+    </article>
   );
 }
 
@@ -1419,9 +1460,12 @@ export default function Component({ service }) {
     ...model.missing,
     ...others.flatMap((other) => other.company.missing.map((name) => `${name}（${platformLabel(other.platform, t)}）`)),
   ];
-  // a platform that serves no week has no card on the 7-day trend
+  const hasRakutenHistory = model.hasHistory && model.days.length > 0;
+  const otherTrends = others
+    .flatMap((other) => other.shops)
+    .filter((shop) => activeKeys.has(shop.key) && (shop.trend || (hasRakutenHistory && shop.week)));
   const noWeek = others
-    .filter((other) => !other.provides.week)
+    .filter((other) => !other.provides.week && !other.shops.some((shop) => shop.trend))
     .map((other) => platformLabel(other.platform, t))
     .join("・");
   // with other platforms beside it, 楽天-only figures say whose they are
@@ -1578,20 +1622,27 @@ export default function Component({ service }) {
               />
             ) : null}
 
-            {model.hasHistory && model.days.length ? (
-              <section className={`grid grid-cols-1 gap-x-5 gap-y-4 p-4 @4xl:grid-cols-[300px_1fr] ${cardCls}`}>
-                <div className="min-w-0 @4xl:border-r @4xl:border-theme-300/30 dark:@4xl:border-white/10 @4xl:pr-5">
-                  <DailyChart model={model} mode={chartMode} onModeChange={setChartMode} scope={rakutenScope} t={t} />
-                </div>
-                <div className="flex min-w-0 flex-col gap-2.5">
-                  <span className="min-w-0 text-xs font-bold tracking-wide text-theme-600 dark:text-theme-300">
-                    {t(`${NS}.shopTrend`)}{" "}
-                    <span className="font-medium text-theme-500 dark:text-theme-400">
-                      · {t(`${NS}.excludesToday`)}
-                      {idleNames ? ` · ${t(`${NS}.idleLeftOut`, { names: idleNames })}` : ""}
-                      {noWeek ? ` · ${t(`${NS}.noWeekLeftOut`, { names: noWeek })}` : ""}
+            {hasRakutenHistory || otherTrends.length > 0 ? (
+              <section
+                className={`grid grid-cols-1 gap-x-5 gap-y-4 p-4 ${hasRakutenHistory ? "@4xl:grid-cols-[300px_1fr]" : ""} ${cardCls}`}
+              >
+                {hasRakutenHistory ? (
+                  <div className="min-w-0 @4xl:border-r @4xl:border-theme-300/30 dark:@4xl:border-white/10 @4xl:pr-5">
+                    <DailyChart model={model} mode={chartMode} onModeChange={setChartMode} scope={rakutenScope} t={t} />
+                  </div>
+                ) : null}
+                <section aria-label={t(`${NS}.shopTrend`)} className="flex min-w-0 flex-col gap-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="min-w-0 text-xs font-bold tracking-wide text-theme-600 dark:text-theme-300">
+                      {t(`${NS}.shopTrend`)}{" "}
+                      <span className="font-medium text-theme-500 dark:text-theme-400">
+                        · {t(`${NS}.excludesToday`)}
+                        {idleNames ? ` · ${t(`${NS}.idleLeftOut`, { names: idleNames })}` : ""}
+                        {noWeek ? ` · ${t(`${NS}.noWeekLeftOut`, { names: noWeek })}` : ""}
+                      </span>
                     </span>
-                  </span>
+                    {hasRakutenHistory ? null : <ChartModeToggle mode={chartMode} onChange={setChartMode} t={t} />}
+                  </div>
                   {notes.map((note) => (
                     <span key={note} role="note" className="text-xs font-semibold text-amber-700 dark:text-amber-300">
                       {note}
@@ -1609,14 +1660,11 @@ export default function Component({ service }) {
                           t={t}
                         />
                       ))}
-                    {others
-                      .flatMap((other) => other.shops)
-                      .filter((s) => activeKeys.has(s.key) && s.week)
-                      .map((s) => (
-                        <ShopTrendCard key={s.key} row={trendRowOf(s)} mode={chartMode} t={t} />
-                      ))}
+                    {otherTrends.map((shop) => (
+                      <ShopTrendCard key={shop.key} row={trendRowOf(shop)} mode={chartMode} t={t} />
+                    ))}
                   </div>
-                </div>
+                </section>
               </section>
             ) : null}
 

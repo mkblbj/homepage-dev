@@ -1,14 +1,14 @@
 // The TEMU shop on the company sales board, read from one snapshot:
-//   temuSales → GET /api/temu/sales  today, this month and last month
+//   temuSales → GET /api/temu/sales  today, this month, last month and shop history
 //
 // TEMU is one shop (UO world, its Japan site), and the server collects it only
 // when someone refreshes it from the shop console. Its order and unit counts are
 // read. Its yen wait on the amount scope of the shop's API grant: until that is
 // granted salesAmount is null, so the yen read as a dash. Once granted they are
 // the buyer-paid totals, TEMU's own basis, shown beside the other platforms' and
-// never added to them. TEMU serves no history, records, item boards or logos.
+// never added to them.
 
-import { finishedDays, jstStamp } from "./amazon-model.mjs";
+import { finishedDays, jstStamp, shopHistoryOf } from "./amazon-model.mjs";
 import { daysInMonth, monthMetrics, numberOrNull } from "./sales-model.mjs";
 
 export function temuKey(shopName) {
@@ -60,12 +60,13 @@ export function buildTemu(sales) {
     week: null,
     avg: null,
     daily: [],
+    trend: shopHistoryOf(sales.history?.dates, sales.history?.shops?.find((row) => row.shopName === name)),
     counted: Boolean(today),
     updatedAt: updatedAt || jstStamp(month ? sales.month.sourceUpdatedAt : ""),
   };
   return {
     platform: "temu",
-    // no week to compare with; a last month whenever it was read
+    // The 7-day history is scoped to the shop card.
     provides: { week: false, previous: true },
     shops: [shop],
     company: {

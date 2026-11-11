@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithProviders } from "test-utils/render-with-providers";
@@ -24,6 +24,23 @@ const sales = {
   totals: { salesYen: 0, orderCount: 0 },
   shops: [],
 };
+
+const trendDates = [
+  "2026-07-21",
+  "2026-07-22",
+  "2026-07-23",
+  "2026-07-24",
+  "2026-07-25",
+  "2026-07-26",
+  "2026-07-27",
+];
+const trendSource = "2026-07-28T05:00:00.000Z";
+const trendDay = (date, salesAmount) => ({
+  date,
+  status: "ready",
+  totals: { salesAmount, orderCount: 2, unitsSold: 3 },
+  sourceUpdatedAt: trendSource,
+});
 
 function rankedItem(mno, shopName) {
   return {
@@ -69,6 +86,79 @@ describe("widgets/uorakutensales/component", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+  });
+
+  it("shows au PAY and TEMU shop trends even when the Rakuten history is unavailable", () => {
+    const auShop = { configId: "cfg-1", shopName: "3911", currency: "JPY", enabled: true };
+    const temuShop = { shopName: "UO world", currency: "JPY", enabled: true };
+    const responses = {
+      sales,
+      aupaySales: {
+        ok: true,
+        today: { shops: [{ ...auShop, ...trendDay("2026-07-28", 2300), includedInTotals: true }] },
+        history: {
+          dates: trendDates,
+          shops: [{ ...auShop, daily: trendDates.map((date) => trendDay(date, 2000)) }],
+        },
+      },
+      temuSales: {
+        ok: true,
+        ...temuShop,
+        today: trendDay("2026-07-28", null),
+        history: {
+          dates: trendDates,
+          shops: [{ ...temuShop, daily: trendDates.map((date) => trendDay(date, null)) }],
+        },
+      },
+    };
+    useWidgetAPI.mockImplementation((_widget, endpoint) => ({ data: responses[endpoint], mutate: vi.fn() }));
+
+    renderWithProviders(<Component service={service} />);
+
+    const trends = within(screen.getByRole("region", { name: "uorakutensales.shopTrend" }));
+    const auPay = within(trends.getByRole("article", { name: /3911.*platformAupay/ }));
+    const temuCard = trends.getByRole("article", { name: /UO world.*platformTemu/ });
+    const temu = within(temuCard);
+    expect(auPay.getByText("1.4")).toBeInTheDocument();
+    expect(temu.getByText("—", { exact: true })).toBeInTheDocument();
+    expect(temu.getByText(/14uorakutensales.ordersUnit · 21uorakutensales.unitsShort/)).toBeInTheDocument();
+    expect(temu.getByText("uorakutensales.weekOrdersTrend")).toBeInTheDocument();
+    fireEvent.mouseEnter(temuCard.querySelector(".cursor-crosshair"));
+    expect(temu.getByText(/2uorakutensales.ordersUnit · 3uorakutensales.unitsShort/)).toBeInTheDocument();
+  });
+
+  it("breaks the shop trend across a stale day and withholds the seven-day totals", () => {
+    const shop = { configId: "cfg-1", shopName: "3911", currency: "JPY", enabled: true };
+    const staleDate = "2026-07-24";
+    const daily = trendDates.map((date) => ({
+      ...trendDay(date, 2400),
+      status: date === staleDate ? "stale" : "ready",
+    }));
+    const responses = {
+      sales,
+      aupaySales: {
+        ok: true,
+        today: { shops: [{ ...shop, ...trendDay("2026-07-28", 2300), includedInTotals: true }] },
+        history: { dates: trendDates, shops: [{ ...shop, daily }] },
+      },
+    };
+    useWidgetAPI.mockImplementation((_widget, endpoint) => ({ data: responses[endpoint], mutate: vi.fn() }));
+
+    renderWithProviders(<Component service={service} />);
+
+    const card = screen.getByRole("article", { name: /3911.*platformAupay/ });
+    const content = within(card);
+    expect(content.getByText("—", { exact: true })).toBeInTheDocument();
+    expect(content.getByText(/—uorakutensales.ordersUnit · —uorakutensales.unitsShort/)).toBeInTheDocument();
+    expect(content.queryByText(/⌀/)).not.toBeInTheDocument();
+    const line = card.querySelector('path[stroke="url(#uors-stroke)"]');
+    expect(line.getAttribute("d").match(/M /g)).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "uorakutensales.chartBar" }));
+    const bars = card.querySelectorAll("span.transition-opacity");
+    expect(bars).toHaveLength(7);
+    expect(bars[2].style.height).toBe("100%");
+    expect(bars[3].style.height).toBe("");
   });
 
   it("falls back to the overall ranking when the selected shop disappears after refresh", () => {

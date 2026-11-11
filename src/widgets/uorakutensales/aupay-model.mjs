@@ -1,13 +1,21 @@
 // The au PAY Market shops on the company sales board, read from one snapshot:
-//   aupaySales → GET /api/aupay/sales  today, this month and last month
+//   aupaySales → GET /api/aupay/sales  today, this month, last month and shop history
 //
-// That is all au PAY serves: no history, records, item boards or logos, so those
-// figures stay unknown here rather than zero. Last month arrived on 2026-11-03;
-// an older server sends none, and a month that could not be read is unknown too.
+// An older server can omit the history or last month. A period that could not
+// be read is unknown.
 // Its yen are its own order amounts (tax included, before points and coupons, no
 // shipping), shown beside the other platforms' and never added to them.
 
-import { companyTotals, coverageOf, finishedDays, jstStamp, latest, periodOf, rowsByKey } from "./amazon-model.mjs";
+import {
+  companyTotals,
+  coverageOf,
+  finishedDays,
+  jstStamp,
+  latest,
+  periodOf,
+  rowsByKey,
+  shopHistoryOf,
+} from "./amazon-model.mjs";
 import { daysInMonth, monthMetrics } from "./sales-model.mjs";
 
 // configId is opaque but stable; a shop's name can match a 楽天 shop's (3911 does)
@@ -21,6 +29,7 @@ export function buildAupay(sales) {
   const today = rowsByKey(sales.today, aupayKey);
   const month = rowsByKey(sales.month, aupayKey);
   const previous = rowsByKey(sales.previousMonth, aupayKey);
+  const history = rowsByKey(sales.history, aupayKey);
   const keys = [...new Set([...today.keys(), ...month.keys(), ...previous.keys()])];
   if (!keys.length) return null;
 
@@ -49,6 +58,7 @@ export function buildAupay(sales) {
       week: null,
       avg: null,
       daily: [],
+      trend: shopHistoryOf(sales.history?.dates, history.get(key)),
       counted: today.get(key)?.includedInTotals === true,
       updatedAt: jstStamp(today.get(key)?.sourceUpdatedAt || month.get(key)?.sourceUpdatedAt),
     };
@@ -63,7 +73,7 @@ export function buildAupay(sales) {
   const anyPrevious = [...previous.values()].find((row) => row.month);
   return {
     platform: "aupay",
-    // no week to compare with; a last month once the server sends one
+    // The 7-day history is scoped to the shop cards.
     provides: { week: false, previous: Boolean(sales.previousMonth) },
     shops,
     company: {

@@ -220,24 +220,41 @@ export function buildAmazon(sales, history) {
   };
 }
 
+// The daily snapshots used only by the shop trend. Each metric can be summed
+// independently, but only when all seven finished days have a value for it.
+export function shopHistoryOf(dates, shop) {
+  if (!shop || shop.enabled === false || dates?.length !== 7 || new Set(dates).size !== 7) return null;
+  const byDate = new Map((shop.daily || []).map((day) => [day.date, day]));
+  const daily = dates.map((date) => {
+    const day = byDate.get(date);
+    const values = day?.status === "ready" ? metricsOf(day.totals, shop.currency) : null;
+    return { date, md: mdLabel(date), wd: weekdayJp(date), ...(values ?? triple(null, null, null)) };
+  });
+  return { daily, week: addTriples(daily) };
+}
+
 // A shop's card for the analysis section's 7-day trend, in the shape the 楽天
-// cards use. Amazon reports no visits, so the CVR is unknown, never 0%.
+// cards use. The other platforms report no visits for CVR.
 export function trendRowOf(shop) {
+  const { week, daily } = shop.trend ?? shop;
   return {
     key: shop.key,
     name: shop.name,
     platform: shop.platform,
-    h7Total: shop.week?.sales ?? null,
-    h7Orders: shop.week?.orders ?? null,
-    h7Units: shop.week?.units ?? null,
+    h7Total: week?.sales ?? null,
+    h7Orders: week?.orders ?? null,
+    h7Units: week?.units ?? null,
     cvr: null,
-    daily: shop.daily.map((d) => ({
+    daily: daily.map((d) => ({
       ...d,
-      sales: d.sales ?? 0,
-      orders: d.orders ?? 0,
-      units: d.units ?? 0,
+      sales: d.sales ?? null,
+      orders: d.orders ?? null,
+      units: d.units ?? null,
       cvr: null,
     })),
+    historyDays: shop.trend
+      ? daily.filter((day) => [day.sales, day.orders, day.units].some((v) => v !== null)).length
+      : null,
     logoUrl: null,
   };
 }

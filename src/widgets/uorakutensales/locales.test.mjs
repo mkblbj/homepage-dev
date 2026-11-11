@@ -27,6 +27,8 @@ const REQUIRED_KEYS = [
   "avgLabel",
   "perDay",
   "shopTrend",
+  "weekOrdersTrend",
+  "weekDaysAvailable",
   "chartLine",
   "chartBar",
   "sevenDayAvgShare",

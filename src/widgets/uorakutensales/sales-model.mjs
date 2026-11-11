@@ -126,21 +126,9 @@ export function pointX(i, n, w, centered) {
   return n === 1 ? w / 2 : i * (w / (n - 1));
 }
 
-// Catmull-Rom → cubic bezier smooth path in a w×h box. Returns { line, area }.
-export function spark(vals, w, h, baseZero, centered = false) {
-  const values = Array.isArray(vals) ? vals.map(toNumber) : [];
-  const n = values.length;
-  if (!n) return { line: "", area: "" };
-  const min = baseZero ? 0 : Math.min(...values);
-  const max = Math.max(...values);
-  const span = max - min || 1;
-  const padT = 5;
-  const padB = 5;
-  const usable = h - padT - padB;
-  const pts = values.map((v, i) => ({
-    x: pointX(i, n, w, centered),
-    y: padT + (1 - (v - min) / span) * usable,
-  }));
+// Catmull-Rom → cubic bezier smooth path through one run of known points.
+function sparkSegment(pts, h) {
+  const n = pts.length;
   let line = `M ${pts[0].x.toFixed(2)} ${pts[0].y.toFixed(2)}`;
   for (let i = 0; i < n - 1; i += 1) {
     const p0 = pts[i - 1] || pts[i];
@@ -157,6 +145,34 @@ export function spark(vals, w, h, baseZero, centered = false) {
   // line does not get stray triangular fills at the edges.
   const area = `${line} L ${pts[n - 1].x.toFixed(2)} ${h.toFixed(2)} L ${pts[0].x.toFixed(2)} ${h.toFixed(2)} Z`;
   return { line, area };
+}
+
+// Every run of known values uses the same scale and keeps its original dates.
+export function spark(vals, w, h, baseZero, centered = false) {
+  const values = Array.isArray(vals) ? vals.map(numberOrNull) : [];
+  const known = values.filter((v) => v !== null);
+  if (!known.length) return { line: "", area: "" };
+  const min = baseZero ? 0 : Math.min(...known);
+  const max = Math.max(...known);
+  const span = max - min || 1;
+  const segments = [];
+  let run = [];
+  values.forEach((value, i) => {
+    if (value === null) {
+      if (run.length) segments.push(sparkSegment(run, h));
+      run = [];
+    } else {
+      run.push({
+        x: pointX(i, values.length, w, centered),
+        y: 5 + (1 - (value - min) / span) * (h - 10),
+      });
+    }
+  });
+  if (run.length) segments.push(sparkSegment(run, h));
+  return {
+    line: segments.map((segment) => segment.line).join(" "),
+    area: segments.map((segment) => segment.area).join(" "),
+  };
 }
 
 // Realtime snapshot freshness: derive live / delayed / stale from its JST timestamp.

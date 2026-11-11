@@ -306,6 +306,14 @@ test("spark produces a smooth path and a closed area, empty for no data", () => 
   assert.deepEqual(spark([], 100, 40, true), { line: "", area: "" });
 });
 
+test("a missing day breaks the sparkline and its fill while keeping subsequent dates in place", () => {
+  const { line, area } = spark([1, 4, null, 0, 3], 100, 40, false, true);
+  assert.deepEqual([...line.matchAll(/M ([\d.]+)/g)].map((match) => match[1]), ["10.00", "70.00"]);
+  assert.equal((area.match(/Z/g) || []).length, 2);
+  assert.doesNotMatch(line, /50\.00/);
+  assert.deepEqual(spark([null, null], 100, 40, false, true), { line: "", area: "" });
+});
+
 test("pointX places points edge-to-edge or at segment centers", () => {
   // edge-to-edge: first at 0, last at w
   assert.equal(pointX(0, 4, 100, false), 0);

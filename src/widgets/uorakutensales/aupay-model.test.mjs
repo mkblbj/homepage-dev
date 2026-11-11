@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { trendRowOf } from "./amazon-model.mjs";
 import { aupayKey, buildAupay, withUnrecordedShops } from "./aupay-model.mjs";
 
 const SOURCE = "2026-10-31T04:57:28.128Z"; // 13:57:28 JST
@@ -89,6 +90,43 @@ test("what au PAY does not serve stays unknown, never zero", () => {
   assert.equal(s.metrics.orders.paceDeltaPct, null);
   assert.equal(a.company.avg, null);
   assert.equal(a.company.previous, null);
+});
+
+test("au PAY aligns history by config ID and date, leaving stale or absent dates unknown", () => {
+  const dates = ["2026-10-24", "2026-10-25", "2026-10-26", "2026-10-27", "2026-10-28", "2026-10-29", "2026-10-30"];
+  const ready = (date, values) => ({ date, status: "ready", totals: values, sourceUpdatedAt: SOURCE });
+  const { shops, company } = buildAupay({
+    ...salesOf(),
+    history: {
+      dates,
+      shops: [
+        shop({ configId: "cfg-2", shopName: "3911", daily: dates.map((date) => ready(date, totals(2000, 3, 2))) }),
+        shop({
+          daily: [
+            ready("2026-10-30", totals(1800, 2, 1)),
+            { date: "2026-10-25", status: "stale", totals: totals(5000, 7, 5), sourceUpdatedAt: SOURCE },
+            ready("2026-10-24", totals(0, 0, 0)),
+            ready("2026-10-31", totals(1000, 1, 1)),
+          ],
+        }),
+      ],
+    },
+  });
+
+  const [first, second] = shops.map(trendRowOf);
+  assert.equal(first.key, "aupay:cfg-1");
+  assert.deepEqual(first.daily.map((day) => [day.date, day.sales]), [
+    ["2026-10-24", 0],
+    ["2026-10-25", null],
+    ["2026-10-26", null],
+    ["2026-10-27", null],
+    ["2026-10-28", null],
+    ["2026-10-29", null],
+    ["2026-10-30", 1800],
+  ]);
+  assert.deepEqual([first.h7Total, first.h7Orders, first.h7Units], [null, null, null]);
+  assert.deepEqual([second.h7Total, second.h7Orders, second.h7Units], [14000, 14, 21]);
+  assert.equal(company.avg, null);
 });
 
 test("the month's daily pace leaves today's half-run day out", () => {
