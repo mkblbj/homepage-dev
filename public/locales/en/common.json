@@ -1624,6 +1624,7 @@
         "peaksCoverageAmazon": "Amazon since {{date}}",
         "lastDays": "Last {{count}} days",
         "platformAupay": "au PAY",
+        "platformTemu": "TEMU",
         "platformCount": "{{platform}} {{count}}",
         "weekExcludes": "{{names}} is missing from the past 7 days, their average and this ratio (no history)",
         "prevExcludes": "{{names}} is missing from last month's figures and the comparison (no data)",

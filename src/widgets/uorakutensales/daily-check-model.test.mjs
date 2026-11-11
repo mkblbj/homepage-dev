@@ -15,6 +15,7 @@ import {
   visitsFromFreshShops,
 } from "./daily-check-model.mjs";
 import { buildModel, buildMonthly } from "./sales-model.mjs";
+import { buildTemu } from "./temu-model.mjs";
 
 const STAMP = "2026-10-25 10:20 JST";
 const DATES = ["2026-10-18", "2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22", "2026-10-23", "2026-10-24"];
@@ -659,6 +660,80 @@ test("with au PAY's last month the company's comparison covers it too", () => {
   assert.deepEqual(au.previous, { sales: 1500, units: 30, orders: 15 });
   assert.notEqual(au.monthDelta.orders, null);
   assert.equal(t.total.previous.orders, without.metrics.orders.previous + 60);
+});
+
+// TEMU's one shop beside the 楽天 fixture, as it answers without the amount scope
+function temuOf(today = { status: "ready", totals: { salesAmount: null, unitsSold: 2, orderCount: 2 } }) {
+  const period = (key, extra) => ({
+    key,
+    sourceUpdatedAt: "2026-10-25T01:18:00.000Z",
+    amountError: "TEMU_AMOUNT_SCOPE_REQUIRED",
+    ...extra,
+  });
+  return buildTemu({
+    ok: true,
+    shopName: "UO world",
+    currency: "JPY",
+    timezone: "Asia/Tokyo",
+    today: period("2026-10-25", today),
+    month: period("2026-10", { status: "ready", totals: { salesAmount: null, unitsSold: 26, orderCount: 25 } }),
+    previousMonth: period("2026-09", { status: "ready", totals: { salesAmount: null, unitsSold: 31, orderCount: 30 } }),
+  });
+}
+
+test("TEMU's shop shows its counts while its yen stay a dash", () => {
+  const t = buildShopTable({ ...fixture(), others: [amazonOf(), aupayOf(), temuOf()] });
+  const temu = t.rows.find((r) => r.key === "temu:UO world");
+  assert.equal(temu.platform, "temu");
+  assert.equal(temu.unknown, false);
+  assert.deepEqual(temu.today, { sales: null, units: 2, orders: 2 });
+  assert.deepEqual(temu.month, { sales: null, units: 26, orders: 25 });
+  assert.equal(temu.monthDelta.sales, null);
+  assert.notEqual(temu.monthDelta.orders, null);
+  const total = t.totals.find((r) => r.key === "total:temu");
+  assert.deepEqual(total.today, { sales: null, units: 2, orders: 2 });
+  // 楽天 6 + Amazon 2 + au PAY 4 + TEMU 2 orders today
+  assert.deepEqual(t.total.today, { sales: null, units: 16, orders: 14 });
+  assert.equal(t.total.month.orders, 10 + 20 + 40 + 25);
+  assert.deepEqual(t.weekExcludes, ["aupay", "temu"]);
+  assert.deepEqual(t.prevExcludes, ["aupay"]);
+});
+
+test("a TEMU day not collected yet is unknown, not a zero day", () => {
+  const t = buildShopTable({ ...fixture(), others: [temuOf({ status: "not_ready", totals: null })] });
+  const temu = t.rows.find((r) => r.key === "temu:UO world");
+  assert.equal(temu.today, null);
+  // the month is still read, so the shop is on the list and not idle
+  assert.equal(temu.unknown, false);
+  assert.equal(
+    t.idle.some((r) => r.key === "temu:UO world"),
+    false,
+  );
+  assert.equal(t.total.today.orders, 6);
+});
+
+test("the today and month cards count TEMU and give it a yen line of dashes", () => {
+  const { model, monthly } = fixture();
+  const today = buildTodayView(model, [aupayOf(), temuOf()]);
+  assert.deepEqual(
+    today.platforms.map((p) => [p.platform, p.values.sales, p.values.orders]),
+    [
+      ["rakuten", 60, 6],
+      ["aupay", 700, 4],
+      ["temu", null, 2],
+    ],
+  );
+  assert.equal(today.platforms[2].aov, null);
+  assert.equal(today.values.orders, 12);
+  assert.deepEqual(today.weekExcludes, ["aupay", "temu"]);
+
+  const month = buildMonthView(monthly, [aupayOf(), temuOf()]);
+  const withoutTemu = buildMonthView(monthly, [aupayOf()]);
+  assert.equal(month.metrics.orders.current, withoutTemu.metrics.orders.current + 25);
+  // TEMU served last month, so it joins the comparison
+  assert.equal(month.metrics.orders.previous, withoutTemu.metrics.orders.previous + 30);
+  assert.equal(month.platforms.find((p) => p.platform === "temu").metrics.sales.current, null);
+  assert.deepEqual(month.prevExcludes, ["aupay"]);
 });
 
 // ---- one shop's visit read failing must not read as every shop stopping ----

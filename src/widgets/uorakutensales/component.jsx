@@ -18,9 +18,10 @@
  *   "rankingMonthly" / "amazonRankingMonthly" → this and last month's item boards,
  *                     read only while 今月 or 先月 is picked on the best sellers
  *   "amazonPeaks"   → GET /api/amazon/history/peaks  each Amazon shop's best day
- *   "aupaySales"    → GET /api/aupay/sales           au PAY today and this month
+ *   "aupaySales"    → GET /api/aupay/sales           au PAY today, this month, last month
+ *   "temuSales"     → GET /api/temu/sales            TEMU's one shop, the same three periods
  *
- * Amazon's and au PAY's shops sit beside 楽天's as peers. Counts add up across platforms;
+ * Amazon's, au PAY's and TEMU's shops sit beside 楽天's as peers. Counts add up across platforms;
  * yen never do, since each platform measures its amounts its own way.
  *
  * No endpoint carries a conversion rate any more: the order API has no visitors,
@@ -78,6 +79,7 @@ import {
   RANKING_STEPS,
   spark,
 } from "./sales-model.mjs";
+import { buildTemu } from "./temu-model.mjs";
 
 import useWidgetAPI from "utils/proxy/use-widget-api";
 
@@ -1265,6 +1267,7 @@ export default function Component({ service }) {
     refreshInterval,
   });
   const { data: aupaySalesData, mutate: mutateAupaySales } = useWidgetAPI(widget, "aupaySales", { refreshInterval });
+  const { data: temuSalesData, mutate: mutateTemuSales } = useWidgetAPI(widget, "temuSales", { refreshInterval });
   // the market reference changes once a day: never read it more than hourly
   const { data: marketData, mutate: mutateMarket } = useWidgetAPI(widget, "market", {
     refreshInterval: Math.max(refreshInterval, MARKET_REFRESH_INTERVAL),
@@ -1287,8 +1290,9 @@ export default function Component({ service }) {
   const model = useMemo(() => buildModel(sales, history, logos), [sales, history, logos]);
   const amazon = useMemo(() => buildAmazon(amazonSalesData, amazonHistoryData), [amazonSalesData, amazonHistoryData]);
   const aupay = useMemo(() => buildAupay(aupaySalesData), [aupaySalesData]);
+  const temu = useMemo(() => buildTemu(temuSalesData), [temuSalesData]);
   // the platforms beside 楽天 that answered, in the order the board names them
-  const others = useMemo(() => [amazon, aupay].filter(Boolean), [amazon, aupay]);
+  const others = useMemo(() => [amazon, aupay, temu].filter(Boolean), [amazon, aupay, temu]);
   const rankingToday = useMemo(
     () => buildRanking(rankingData, buildAmazonBoards(amazonRankingData)),
     [rankingData, amazonRankingData],
@@ -1301,8 +1305,12 @@ export default function Component({ service }) {
   }, [rankingMonthlyData, amazonRankingMonthlyData, rankingPeriod]);
   const ranking = rankingPeriod === "today" ? rankingToday : rankingMonth;
   const peaks = useMemo(
-    () => withUnrecordedShops(withAmazonPeaks(buildPeaks(peaksData), amazonPeaksData), aupay?.shops),
-    [peaksData, amazonPeaksData, aupay],
+    () =>
+      withUnrecordedShops(withAmazonPeaks(buildPeaks(peaksData), amazonPeaksData), [
+        ...(aupay?.shops || []),
+        ...(temu?.shops || []),
+      ]),
+    [peaksData, amazonPeaksData, aupay, temu],
   );
   const devices = useMemo(() => buildDeviceSales(devicesData, devicesMonthlyData), [devicesData, devicesMonthlyData]);
   const market = useMemo(() => buildMarketReference(marketData), [marketData]);
@@ -1365,6 +1373,7 @@ export default function Component({ service }) {
       mutateAmazonHistory();
       mutateAmazonRanking();
       mutateAupaySales();
+      mutateTemuSales();
     },
     [
       mutateSales,
@@ -1379,6 +1388,7 @@ export default function Component({ service }) {
       mutateAmazonHistory,
       mutateAmazonRanking,
       mutateAupaySales,
+      mutateTemuSales,
     ],
   );
 
