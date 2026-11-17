@@ -6,11 +6,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "test-utils/render-with-providers";
 import { SettingsContext } from "utils/contexts/settings";
 
-const { useWidgetAPI } = vi.hoisted(() => ({ useWidgetAPI: vi.fn() }));
+const { useWidgetAPI, useSalesSnapshot, mutateSnapshot } = vi.hoisted(() => ({
+  useWidgetAPI: vi.fn(), useSalesSnapshot: vi.fn(), mutateSnapshot: vi.fn(),
+}));
 
 vi.mock("utils/proxy/use-widget-api", () => ({
   default: useWidgetAPI,
 }));
+
+vi.mock("./use-sales-snapshot", () => ({ default: useSalesSnapshot }));
 
 import Component from "./component";
 import { dailyDeviceSales, marketDeviceModels, monthlyDeviceSales } from "./device-sales.fixtures.mjs";
@@ -78,6 +82,15 @@ describe("widgets/uorakutensales/component", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    // These tests exercise presentation with already-settled fixtures. Real
+    // grouped HTTP/SWR timing and failures are covered by refresh.test.jsx.
+    useSalesSnapshot.mockImplementation((widget) => {
+      const readFixture = useWidgetAPI.getMockImplementation();
+      const sources = Object.fromEntries(["sales", "monthly", "amazonSales", "aupaySales", "temuSales"].map((endpoint) =>
+        [endpoint, readFixture?.(widget, endpoint)?.data],
+      ));
+      return { data: sources.sales ? sources : undefined, mutate: mutateSnapshot };
+    });
   });
 
   it("draws au PAY and TEMU days in the shop table even when the Rakuten history is unavailable", () => {
@@ -241,7 +254,7 @@ describe("widgets/uorakutensales/component", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "uorakutensales.refresh" }));
 
-    expect(mutateSales).toHaveBeenCalledOnce();
+    expect(mutateSnapshot).toHaveBeenCalledOnce();
     expect(mutateHistory).toHaveBeenCalledOnce();
     expect(mutateRanking).toHaveBeenCalledOnce();
   });
@@ -498,7 +511,7 @@ describe("widgets/uorakutensales/component", () => {
     renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
     fireEvent.click(screen.getByRole("button", { name: "uorakutensales.refresh" }));
 
-    expect(mutate.monthly).toHaveBeenCalledOnce();
+    expect(mutateSnapshot).toHaveBeenCalledOnce();
     expect(mutate.devices).toHaveBeenCalledOnce();
     expect(mutate.devicesMonthly).toHaveBeenCalledOnce();
     expect(mutate.market).toHaveBeenCalledOnce();

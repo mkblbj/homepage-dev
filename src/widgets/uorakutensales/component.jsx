@@ -34,8 +34,6 @@ import Container from "components/services/widget/container";
 import { useTranslation } from "next-i18next/pages";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { buildPerformanceModel, DASH } from "widgets/uoperformance/performance-model.mjs";
-
 import { buildAmazon, buildAmazonBoards, withAmazonPeaks } from "./amazon-model.mjs";
 import { buildAupay, withUnrecordedShops } from "./aupay-model.mjs";
 import {
@@ -79,8 +77,10 @@ import {
   RANKING_STEPS,
 } from "./sales-model.mjs";
 import { buildTemu } from "./temu-model.mjs";
+import useSalesSnapshot from "./use-sales-snapshot";
 
 import useWidgetAPI from "utils/proxy/use-widget-api";
+import { buildPerformanceModel, DASH } from "widgets/uoperformance/performance-model.mjs";
 
 const NS = "uorakutensales";
 
@@ -1033,6 +1033,24 @@ function ModuleHeader({ id, index, title, note, badge, children }) {
   );
 }
 
+function SnapshotNotice({ error, messageKey, t }) {
+  const sourceLabels = {
+    sales: t(`${NS}.platformRakuten`),
+    monthly: `${t(`${NS}.platformRakuten`)} / ${t(`${NS}.thisMonth`)}`,
+    amazonSales: t(`${NS}.platformAmazon`),
+    aupaySales: t(`${NS}.platformAupay`),
+    temuSales: t(`${NS}.platformTemu`),
+  };
+  return (
+    <div
+      role="alert"
+      className="rounded-lg bg-amber-100/70 px-3 py-2 text-xs text-amber-900 dark:bg-amber-900/30 dark:text-amber-200"
+    >
+      {t(`${NS}.${messageKey}`)} {error.sources.map((source) => sourceLabels[source] || source).join("・")}
+    </div>
+  );
+}
+
 export default function Component({ service }) {
   const { t } = useTranslation();
   const { widget } = service;
@@ -1048,9 +1066,21 @@ export default function Component({ service }) {
     setAnalysisOpen(readAnalysisOpen());
   }, []);
 
-  const { data: sales, error: salesError, mutate: mutateSales } = useWidgetAPI(widget, "sales", { refreshInterval });
-  // uo-ec-manager owns the refresh schedule; each board just re-reads its own
-  // snapshot on the single configured interval.
+  const {
+    data: snapshot,
+    error: snapshotError,
+    mutate: mutateSnapshot,
+    isValidating,
+  } = useSalesSnapshot(widget, { refreshInterval });
+  const {
+    sales,
+    monthly: monthlyData,
+    amazonSales: amazonSalesData,
+    aupaySales: aupaySalesData,
+    temuSales: temuSalesData,
+  } = snapshot || {};
+  // Core sales snapshots publish together. Context/analysis reads remain
+  // independent and do not delay the daily sales board.
   const { data: history, mutate: mutateHistory } = useWidgetAPI(widget, "history", { refreshInterval });
   const { data: logos } = useWidgetAPI(widget, "logos", { refreshInterval });
   const { data: rankingData, mutate: mutateRanking } = useWidgetAPI(widget, "ranking", { refreshInterval });
@@ -1061,7 +1091,6 @@ export default function Component({ service }) {
     refreshInterval,
   });
   const { data: devicesData, mutate: mutateDevices } = useWidgetAPI(widget, "devices", { refreshInterval });
-  const { data: monthlyData, mutate: mutateMonthly } = useWidgetAPI(widget, "monthly", { refreshInterval });
   // the device month boards are read in the same round as the monthly sales
   const { data: devicesMonthlyData, mutate: mutateDevicesMonthly } = useWidgetAPI(widget, "devicesMonthly", {
     refreshInterval,
@@ -1072,19 +1101,12 @@ export default function Component({ service }) {
   const { data: performanceData, mutate: mutatePerformance } = useWidgetAPI(widget, "performance", {
     refreshInterval,
   });
-  // Amazon's shops, read on the same interval; an older server answers 404,
-  // which simply leaves the board 楽天-only
-  const { data: amazonSalesData, mutate: mutateAmazonSales } = useWidgetAPI(widget, "amazonSales", {
-    refreshInterval,
-  });
   const { data: amazonHistoryData, mutate: mutateAmazonHistory } = useWidgetAPI(widget, "amazonHistory", {
     refreshInterval,
   });
   const { data: amazonRankingData, mutate: mutateAmazonRanking } = useWidgetAPI(widget, "amazonRanking", {
     refreshInterval,
   });
-  const { data: aupaySalesData, mutate: mutateAupaySales } = useWidgetAPI(widget, "aupaySales", { refreshInterval });
-  const { data: temuSalesData, mutate: mutateTemuSales } = useWidgetAPI(widget, "temuSales", { refreshInterval });
   // the market reference changes once a day: never read it more than hourly
   const { data: marketData, mutate: mutateMarket } = useWidgetAPI(widget, "market", {
     refreshInterval: Math.max(refreshInterval, MARKET_REFRESH_INTERVAL),
@@ -1178,38 +1200,39 @@ export default function Component({ service }) {
     (e) => {
       e.preventDefault();
       e.stopPropagation();
-      mutateSales();
+      void mutateSnapshot();
       mutateHistory();
       mutateRanking();
       mutateDevices();
-      mutateMonthly();
       mutateDevicesMonthly();
       mutateMarket();
       mutatePerformance();
-      mutateAmazonSales();
       mutateAmazonHistory();
       mutateAmazonRanking();
-      mutateAupaySales();
-      mutateTemuSales();
     },
     [
-      mutateSales,
+      mutateSnapshot,
       mutateHistory,
       mutateRanking,
       mutateDevices,
-      mutateMonthly,
       mutateDevicesMonthly,
       mutateMarket,
       mutatePerformance,
-      mutateAmazonSales,
       mutateAmazonHistory,
       mutateAmazonRanking,
-      mutateAupaySales,
-      mutateTemuSales,
     ],
   );
 
-  if (salesError) return <Container service={service} error={salesError} />;
+  if (!model && snapshotError) {
+    return (
+      <Container service={service}>
+        <div className="flex w-full flex-col gap-2 p-2">
+          <SnapshotNotice error={snapshotError} messageKey="snapshotLoadFailed" t={t} />
+          <RefreshButton onRefresh={handleRefresh} t={t} />
+        </div>
+      </Container>
+    );
+  }
   if (!model) {
     return (
       <Container service={service}>
@@ -1293,10 +1316,24 @@ export default function Component({ service }) {
                 {model.updatedAtJST || "-"}
               </span>
             </span>
-            <FreshnessPill freshness={freshness} t={t} />
+            {isValidating ? (
+              <span role="status" className="text-xs text-theme-600 dark:text-theme-300">
+                {t(`${NS}.snapshotRefreshing`)}
+              </span>
+            ) : !snapshotError ? (
+              <FreshnessPill freshness={freshness} t={t} />
+            ) : null}
             <RefreshButton onRefresh={handleRefresh} t={t} />
           </div>
         </div>
+
+        {snapshotError ? (
+          <SnapshotNotice
+            error={snapshotError}
+            messageKey={snapshot === snapshotError.partial ? "snapshotUnavailable" : "snapshotRefreshFailed"}
+            t={t}
+          />
+        ) : null}
 
         {/* 1 毎日のチェック — one basis, one metric switch */}
         <ModuleHeader
