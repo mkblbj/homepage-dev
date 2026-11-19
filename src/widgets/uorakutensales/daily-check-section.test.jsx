@@ -383,12 +383,21 @@ describe("widgets/uorakutensales/daily-check-section", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("the yen month card gives each platform last month's total as a figure of its own", () => {
+  it("the yen month card gives each platform last month's total beside its line", () => {
     const counts = { current: 9, previous: 9, pace: 1, prevPace: 1, paceDeltaPct: 0, vsPrevPct: 100 };
-    const yen = (previous) => ({ sales: { current: 900, previous, pace: 30, prevPace: 32, paceDeltaPct: -6 } });
+    const yen = (previous) => ({
+      sales: { current: 900, previous, pace: 30, prevPace: 32, paceDeltaPct: -6 },
+      units: counts,
+      orders: counts,
+    });
     const monthly = {
+      multi: true,
       current: { month: "2026-11", completedDays: 2, hasLiveDay: true, progressPct: 7 },
-      metrics: { sales: null, units: counts, orders: counts },
+      metrics: {
+        sales: { current: 1800, previous: 27313296, pace: 60, prevPace: 32, paceDeltaPct: -6, vsPrevPct: null },
+        units: counts,
+        orders: counts,
+      },
       platforms: [
         { platform: "rakuten", metrics: yen(27313296) },
         { platform: "aupay", metrics: yen(null) },
@@ -396,11 +405,10 @@ describe("widgets/uorakutensales/daily-check-section", () => {
     };
     render(<MonthCard monthly={monthly} metric="sales" t={t} />);
 
-    expect(screen.getByText(`¥2731.3${NS}.manUnit`)).toBeInTheDocument();
     // a platform with no last month says so instead of leaving a gap
-    expect(screen.getAllByTestId("last-month").map((el) => el.textContent)).toEqual([
-      `${NS}.lastMonth¥2731.3${NS}.manUnit`,
-      `${NS}.lastMonth—`,
+    expect(screen.getAllByTestId("platform-last-month").map((el) => el.textContent)).toEqual([
+      `${NS}.lastMonth ¥2731.3${NS}.manUnit`,
+      `${NS}.lastMonth —`,
     ]);
   });
 
@@ -694,7 +702,6 @@ describe("widgets/uorakutensales/daily-check-section", () => {
     // each platform keeps a line with its own yen
     expect(screen.getByText("楽天")).toBeInTheDocument();
     expect(screen.getByText(/¥7897/)).toBeInTheDocument();
-    expect(screen.queryByText(`${NS}.salesNotSummed`)).not.toBeInTheDocument();
   });
 
   it("the today card adds 売上 across platforms into one figure, with each platform's line below", () => {
@@ -703,7 +710,6 @@ describe("widgets/uorakutensales/daily-check-section", () => {
     expect(screen.getByText("¥332682")).toBeInTheDocument();
     expect(screen.getByText(/¥324785/)).toBeInTheDocument();
     expect(screen.getByText(/¥7897/)).toBeInTheDocument();
-    expect(screen.queryByText(`${NS}.salesNotSummed`)).not.toBeInTheDocument();
     expect(screen.queryByText(`${NS}.salesExcludes`)).not.toBeInTheDocument();
   });
 
@@ -750,23 +756,73 @@ describe("widgets/uorakutensales/daily-check-section", () => {
     expect(screen.getByText("week excludes au PAY")).toBeInTheDocument();
   });
 
-  it("the month card lists each platform's 売上 when the company has none", () => {
-    const metric = { current: 900, previous: 1000, pace: 30, prevPace: 32, paceDeltaPct: -6, vsPrevPct: 90 };
-    const monthly = {
-      multi: true,
-      current: { month: "2026-10", completedDays: 29, hasLiveDay: true, progressPct: 93, coverage: null },
-      metrics: { sales: null, units: metric, orders: metric },
-      platforms: [
-        { platform: "rakuten", metrics: { sales: { ...metric, current: 26333000 } } },
-        { platform: "amazon", metrics: { sales: { ...metric, current: 472523, paceDeltaPct: 12 } } },
-      ],
-    };
-    render(<MonthCard monthly={monthly} metric="sales" t={tl} />);
+  const monthMetric = { current: 900, previous: 1000, pace: 30, prevPace: 32, paceDeltaPct: -6, vsPrevPct: 90 };
+  const multiMonth = {
+    multi: true,
+    current: { month: "2026-10", completedDays: 29, hasLiveDay: true, progressPct: 93, coverage: null },
+    metrics: {
+      sales: { ...monthMetric, current: 26805523 },
+      units: { ...monthMetric, current: 2290 },
+      orders: { ...monthMetric, current: 2140 },
+    },
+    salesExcludes: [],
+    platforms: [
+      {
+        platform: "rakuten",
+        metrics: {
+          sales: { ...monthMetric, current: 26333000 },
+          units: { ...monthMetric, current: 2200 },
+          orders: { ...monthMetric, current: 2100 },
+        },
+      },
+      {
+        platform: "amazon",
+        metrics: {
+          sales: { ...monthMetric, current: 472523, paceDeltaPct: 12 },
+          units: { ...monthMetric, current: 90 },
+          orders: { ...monthMetric, current: 40, paceDeltaPct: -3 },
+        },
+      },
+    ],
+  };
 
-    expect(screen.getByText("楽天")).toBeInTheDocument();
-    expect(screen.getByText("Amazon")).toBeInTheDocument();
-    expect(screen.getByText("+12.0%")).toBeInTheDocument();
-    expect(screen.getByText(`${NS}.salesNotSummed`)).toBeInTheDocument();
+  it("the month card adds 売上 across platforms and lists each platform's figures below", () => {
+    render(<MonthCard monthly={multiMonth} metric="sales" t={tl} />);
+
+    // the company's month in 万
+    expect(screen.getByText(/^¥2680\.?\d*/)).toBeInTheDocument();
+    const lines = screen.getByTestId("month-platforms");
+    expect(within(lines).getByText("楽天")).toBeInTheDocument();
+    expect(within(lines).getByText("Amazon")).toBeInTheDocument();
+    // each platform: its 売上, then its 個数 and 件数
+    expect(within(lines).getByText(/90.*unitsShort · 40.*ordersUnit/)).toBeInTheDocument();
+    expect(within(lines).getByText("+12.0%")).toBeInTheDocument();
+    expect(screen.queryByText(/salesExcludes/)).not.toBeInTheDocument();
+  });
+
+  it("the month card shows each platform's 個数 and 件数 in the count views too", () => {
+    render(<MonthCard monthly={multiMonth} metric="orders" t={tl} />);
+
+    const lines = screen.getByTestId("month-platforms");
+    // the picked 件数 leads, then 売上 and 個数; the comparison is the picked figure's
+    expect(within(lines).getByText(/^40.*ordersUnit · ¥/)).toBeInTheDocument();
+    expect(within(lines).getByText("−3.0%")).toBeInTheDocument();
+  });
+
+  it("the month card names a platform its 売上 total leaves out", () => {
+    const tn = (key, opts) =>
+      key === `${NS}.salesExcludes`
+        ? `yen excludes ${opts.names}`
+        : key === `${NS}.platformTemu`
+          ? "TEMU"
+          : tl(key, opts);
+    render(<MonthCard monthly={{ ...multiMonth, salesExcludes: ["temu"] }} metric="sales" t={tn} />);
+    expect(screen.getByText("yen excludes TEMU")).toBeInTheDocument();
+  });
+
+  it("the month card of 楽天 alone has no platform lines", () => {
+    render(<MonthCard monthly={{ ...multiMonth, multi: false }} metric="orders" t={tl} />);
+    expect(screen.queryByTestId("month-platforms")).not.toBeInTheDocument();
   });
 
   it("the today card shows no 7-day ratio without history", () => {

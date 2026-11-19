@@ -300,8 +300,40 @@ function LastMonthFigure({ metric, value, t }) {
   );
 }
 
-// `monthly` is buildMonthView's. Across platforms the 売上 metric is null: each
-// platform's yen get a line of their own instead of one company figure.
+// One line per platform under the company's month, like the today card's: the
+// picked figure first, then the other two; then the picked figure's last month
+// (a dash where the platform has none) and its pace against it. The pace column
+// sits under the card's own 先月比（日平均）, so it is only named to screen readers.
+function MonthPlatformLines({ platforms, metric, t }) {
+  const order = [metric, ...METRICS.filter((m) => m !== metric)];
+  return (
+    <div
+      data-testid="month-platforms"
+      className="mt-1 grid grid-cols-[auto_1fr_auto_auto] items-baseline gap-x-3 gap-y-1 text-sm tabular-nums"
+    >
+      {platforms.map(({ platform, metrics }) => (
+        <Fragment key={platform}>
+          <span className="font-bold text-theme-800 dark:text-theme-100">
+            <PlatformName platform={platform} label={platformLabel(platform, t)} />
+          </span>
+          <span className="text-theme-700 dark:text-theme-200">
+            {order.map((m) => shortText(m, metrics[m]?.current, t)).join(" · ")}
+          </span>
+          <span data-testid="platform-last-month" className={`whitespace-nowrap text-xs font-semibold ${LAST_MONTH}`}>
+            {t(`${NS}.lastMonth`)} {shortText(metric, metrics[metric]?.previous, t)}
+          </span>
+          <span className="whitespace-nowrap text-right text-xs">
+            <span className="sr-only">{t(`${NS}.prevPaceDelta`)} </span>
+            <Delta value={metrics[metric]?.paceDeltaPct} className="font-extrabold" />
+          </span>
+        </Fragment>
+      ))}
+    </div>
+  );
+}
+
+// `monthly` is buildMonthView's: one platform, or the company's month across
+// platforms with each platform's own line below it.
 export function MonthCard({ monthly, metric, cardCls = "", t }) {
   if (!monthly) return null;
   const m = monthly.metrics[metric];
@@ -311,6 +343,8 @@ export function MonthCard({ monthly, metric, cardCls = "", t }) {
   // adds up fewer shops than the list holds — e.g. one without the order API
   const coverage = cur.coverage && cur.coverage.covered < cur.coverage.total ? cur.coverage : null;
   const excluded = platformNames(monthly.prevExcludes, t);
+  // a platform without yen (TEMU) is counted but stays out of the 売上 total
+  const yenExcluded = metric === "sales" ? platformNames(monthly.salesExcludes, t) : "";
   return (
     <section className={`flex min-w-0 flex-col gap-2 p-5 ${cardCls}`}>
       <span className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
@@ -358,40 +392,12 @@ export function MonthCard({ monthly, metric, cardCls = "", t }) {
             </>
           ) : null}
           {excluded ? <span className={`text-xs ${MUTED}`}>{t(`${NS}.prevExcludes`, { names: excluded })}</span> : null}
+          {yenExcluded ? (
+            <span className={`text-xs ${MUTED}`}>{t(`${NS}.salesExcludes`, { names: yenExcluded })}</span>
+          ) : null}
         </>
-      ) : (
-        <>
-          {monthly.platforms.map(({ platform, metrics }) => {
-            const pm = metrics[metric];
-            return (
-              <span key={platform} className="flex flex-col gap-0.5">
-                <span className="flex flex-wrap items-baseline gap-x-3">
-                  <span className="w-20 shrink-0 text-sm font-bold text-theme-800 dark:text-theme-100">
-                    <PlatformName platform={platform} label={platformLabel(platform, t)} />
-                  </span>
-                  <span className="text-[26px] font-extrabold leading-tight tabular-nums text-theme-900 dark:text-theme-50">
-                    {shortText(metric, pm.current, t)}
-                  </span>
-                  <LastMonthFigure metric={metric} value={pm.previous} t={t} />
-                </span>
-                {/* the comparison shares this line on every platform, so they all line up */}
-                <span className="flex flex-wrap items-baseline justify-between gap-x-3 pl-[92px] text-xs">
-                  <span className="tabular-nums text-theme-700 dark:text-theme-200">
-                    {t(`${NS}.dailyAvgVsPrev`, {
-                      pace: shortText(metric, pm.pace, t),
-                      prev: shortText(metric, pm.prevPace, t),
-                    })}
-                  </span>
-                  <span className={MUTED}>
-                    {t(`${NS}.prevPaceDelta`)} <Delta value={pm.paceDeltaPct} className="ml-1 text-sm font-extrabold" />
-                  </span>
-                </span>
-              </span>
-            );
-          })}
-          <span className={`text-xs ${MUTED}`}>{t(`${NS}.salesNotSummed`)}</span>
-        </>
-      )}
+      ) : null}
+      {monthly.multi ? <MonthPlatformLines platforms={monthly.platforms} metric={metric} t={t} /> : null}
     </section>
   );
 }

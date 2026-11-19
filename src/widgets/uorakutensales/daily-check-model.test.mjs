@@ -428,7 +428,7 @@ test("the footer has a line per platform and a company line that adds counts and
   assert.deepEqual(amazon.today, { sales: 700, units: 3, orders: 2 });
   // today's yen add up too, each platform's on its own basis; the month's stay apart
   assert.deepEqual(company.today, { sales: 760, units: 9, orders: 8 });
-  assert.equal(company.month.sales, null);
+  assert.equal(company.month.sales, 3660 + 1800);
   assert.equal(company.month.orders, 10 + 20);
   // visits are 楽天's alone
   assert.equal(rakuten.visits, 300);
@@ -547,11 +547,22 @@ test("the today view still counts 楽天 when Amazon could not be read today", (
   assert.deepEqual(view.values, { sales: 60, units: 6, orders: 6 });
 });
 
-test("the month view adds counts and lists each platform's yen", () => {
+test("the month view adds counts and yen across platforms and keeps each platform's figures", () => {
   const { monthly } = fixture();
   const view = buildMonthView(monthly, [amazonOf()]);
   assert.equal(view.multi, true);
-  assert.equal(view.metrics.sales, null);
+  // 楽天 ¥3,660 + Amazon ¥1,800, against last month's 楽天 and Amazon yen
+  assert.equal(view.metrics.sales.current, 3660 + 1800);
+  assert.equal(view.metrics.sales.previous, monthly.metrics.sales.previous + 1500);
+  assert.deepEqual(view.salesExcludes, []);
+  // every platform keeps all three figures for its own line
+  assert.deepEqual(
+    view.platforms.map((p) => [p.platform, p.metrics.units.current, p.metrics.orders.current]),
+    [
+      ["rakuten", monthly.metrics.units.current, monthly.metrics.orders.current],
+      ["amazon", 30, 20],
+    ],
+  );
   assert.equal(view.metrics.orders.current, 30);
   assert.deepEqual(
     view.platforms.map((p) => [p.platform, p.metrics.sales.current]),
@@ -648,10 +659,12 @@ test("the footer closes with a line per platform and the company adds all their 
     t.totals.map((r) => r.key),
     ["total:rakuten", "total:amazon", "total:aupay", "total:company"],
   );
-  // 楽天 6 + Amazon 2 + au PAY 4 orders today; no yen across platforms
+  // 楽天 6 + Amazon 2 + au PAY 4 orders today, and their yen
   assert.deepEqual(t.total.today, { sales: 1460, units: 14, orders: 12 });
   assert.equal(t.total.month.orders, 10 + 20 + 40);
-  assert.equal(t.total.month.sales, null);
+  assert.equal(t.total.month.sales, 3660 + 1800 + 2900);
+  // au PAY serves no last month here, so the yen comparison leaves it out like the counts'
+  assert.equal(t.total.previous.sales, buildShopTable({ ...fixture(), others: [amazonOf()] }).total.previous.sales);
   assert.deepEqual(t.weekExcludes, ["aupay"]);
   assert.deepEqual(t.prevExcludes, ["aupay"]);
 });
@@ -835,6 +848,9 @@ test("the today and month cards count TEMU and give it a yen line of dashes", ()
   const month = buildMonthView(monthly, [aupayOf(), temuOf()]);
   const withoutTemu = buildMonthView(monthly, [aupayOf()]);
   assert.equal(month.metrics.orders.current, withoutTemu.metrics.orders.current + 25);
+  // TEMU's month has no yen: the yen total is the others', and the card names TEMU
+  assert.deepEqual(month.metrics.sales, withoutTemu.metrics.sales);
+  assert.deepEqual(month.salesExcludes, ["temu"]);
   // TEMU served last month, so it joins the comparison
   assert.equal(month.metrics.orders.previous, withoutTemu.metrics.orders.previous + 30);
   assert.equal(month.platforms.find((p) => p.platform === "temu").metrics.sales.current, null);
