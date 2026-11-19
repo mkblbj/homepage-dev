@@ -22,6 +22,7 @@ vi.mock("utils/proxy/http", () => ({
   httpProxy,
 }));
 
+import { clearMercariRankingCache } from "./mercari-ranking.mjs";
 import uoRakutenSalesProxyHandler from "./proxy";
 
 function request(endpoint, query) {
@@ -42,6 +43,61 @@ describe("widgets/uorakutensales/proxy", () => {
     vi.clearAllMocks();
     getServiceWidget.mockResolvedValue({ type: "uorakutensales", url: "http://127.0.0.1:3912" });
     httpProxy.mockResolvedValue([200, "application/json", Buffer.from(JSON.stringify(marketDeviceModels()))]);
+  });
+
+  // the Mercari boards are worked out here from the server's orders
+  function mercariServer({ orders = [], status = 404 } = {}) {
+    clearMercariRankingCache();
+    const reply = (body, code = 200) => [code, "application/json", Buffer.from(JSON.stringify(body))];
+    httpProxy.mockImplementation(async (url) => {
+      const { pathname } = new URL(url);
+      if (status !== 200 && pathname === "/api/mercari/status") return reply({ error: "Not Found" }, status);
+      if (pathname === "/api/mercari/status")
+        return reply({ ok: true, shops: [{ configId: "c1", shopName: "3911", enabled: true }] });
+      if (pathname === "/api/mercari/orders") {
+        return reply({ ok: true, status: "ready", sourceUpdatedAt: "s1", nextPage: null, items: orders });
+      }
+      return reply({ ok: true, status: "ready", sourceUpdatedAt: "s1", nextPage: null, items: [] });
+    });
+  }
+
+  it("answers today's Mercari boards alone, and the month boards alone", async () => {
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo" }).format(new Date());
+    const orders = [
+      {
+        id: "o1",
+        date: today,
+        includedInSales: true,
+        items: [{ productId: "P", name: "[P] x", unitPrice: 500, netQuantity: 2 }],
+      },
+    ];
+    mercariServer({ orders, status: 200 });
+
+    const res = createMockRes();
+    await uoRakutenSalesProxyHandler(request("mercariRanking"), res);
+    expect(res.statusCode).toBe(200);
+    expect(Object.keys(res.body).sort()).toEqual(["enabled", "ok", "today"]);
+    expect(res.body.today.shops[0].rankings.sales[0]).toMatchObject({ sku: "[P] x", salesAmount: 1000, unitsSold: 2 });
+    // only GETs to the server's own Mercari reads
+    httpProxy.mock.calls.forEach(([url, params]) => {
+      expect(String(url)).toMatch(/^http:\/\/127\.0\.0\.1:3912\/api\/mercari\/(status|orders|products)/);
+      expect(params.method).toBe("GET");
+    });
+
+    const month = createMockRes();
+    await uoRakutenSalesProxyHandler(request("mercariRankingMonthly"), month);
+    expect(month.statusCode).toBe(200);
+    expect(Object.keys(month.body).sort()).toEqual(["currentMonth", "enabled", "ok", "previousMonth"]);
+    expect(month.body.currentMonth.shops[0].itemCount).toBe(1);
+  });
+
+  it("passes a server without Mercari on as 404, not as a fault", async () => {
+    mercariServer({ status: 404 });
+    const res = createMockRes();
+
+    await uoRakutenSalesProxyHandler(request("mercariRanking"), res);
+
+    expect(res.statusCode).toBe(404);
   });
 
   it("picks the requested model's evidence out of the market reference", async () => {

@@ -9,6 +9,7 @@
 // platform fees, without shipping. They are shown beside the other platforms'
 // and never added to them.
 
+import { shopBoardsOf } from "./amazon-model.mjs";
 import { buildConfigShops, configKey } from "./aupay-model.mjs";
 
 export function mercariKey(row) {
@@ -18,4 +19,11 @@ export function mercariKey(row) {
 // Null when the snapshot is missing or no shop is enabled.
 export function buildMercari(sales) {
   return buildConfigShops("mercari", sales);
+}
+
+// Each Mercari shop's best sellers for one period (the proxy's mercariRanking
+// for today, mercariRankingMonthly for this and last month), as shop boards
+// beside 楽天's. Like Amazon, Mercari has no company-wide board.
+export function buildMercariBoards(period) {
+  return shopBoardsOf(period, "mercari", mercariKey);
 }

@@ -1,7 +1,9 @@
+import { readMercariRankings } from "./mercari-ranking.mjs";
 import {
   buildSalesProxyRequest,
   deviceEvidenceQuery,
   marketEvidenceModel,
+  normalizeSalesServiceUrl,
   shapeProxyResponse,
 } from "./proxy-config.mjs";
 
@@ -34,7 +36,39 @@ const EXPECTED_METHOD_BY_ENDPOINT = {
   aupaySales: "GET",
   temuSales: "GET",
   mercariSales: "GET",
+  // worked out here from Mercari's orders: today's boards, and the month boards
+  mercariRanking: "GET",
+  mercariRankingMonthly: "GET",
 };
+
+const JSON_GET = { method: "GET", headers: { Accept: "application/json" } };
+
+// one upstream GET for the Mercari boards; anything but JSON is a failed read
+async function fetchJson(url) {
+  const [status, , data] = await httpProxy(url, JSON_GET);
+  const body = parseResponseData(data);
+  if (status >= 400 || !body || typeof body !== "object") {
+    const error = new Error(`Mercari read failed: HTTP ${status}`);
+    error.status = status;
+    throw error;
+  }
+  return body;
+}
+
+async function mercariRanking(endpoint, baseUrl, res) {
+  try {
+    const boards = await readMercariRankings(fetchJson, normalizeSalesServiceUrl(baseUrl));
+    const periods =
+      endpoint === "mercariRanking"
+        ? { today: boards.today }
+        : { currentMonth: boards.currentMonth, previousMonth: boards.previousMonth };
+    return res.status(200).json({ ok: true, enabled: boards.enabled, ...periods });
+  } catch (e) {
+    logger.debug("Mercari boards unavailable: %s", e.message);
+    // an older server without Mercari answers 404: no boards, not a fault
+    return res.status(e.status === 404 ? 404 : 502).json({ error: { message: "Mercari boards unavailable" } });
+  }
+}
 
 function parseResponseData(data) {
   if (Buffer.isBuffer(data)) {
@@ -92,6 +126,10 @@ export default async function uoRakutenSalesProxyHandler(req, res) {
   if (!widget) {
     logger.debug("Invalid or missing widget for service '%s' in group '%s'", service, group);
     return res.status(400).json({ error: "Invalid proxy service type" });
+  }
+
+  if (endpoint === "mercariRanking" || endpoint === "mercariRankingMonthly") {
+    return mercariRanking(endpoint, widget.url, res);
   }
 
   try {

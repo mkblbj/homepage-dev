@@ -245,15 +245,17 @@ function normalizeRankingDim(block) {
 // Build the item-ranking view model from GET /api/item-rankings.
 // The payload carries three independently ranked dimensions (sales / units /
 // orderCount); each is normalized separately so the UI can switch between them.
-// `amazonBoards` (amazon-model's buildAmazonBoards) adds each Amazon shop's
-// board beside 楽天's shop boards; the company board stays 楽天's alone.
-export function buildRanking(ranking, amazonBoards = null) {
+// `otherBoards` (amazon-model's buildAmazonBoards, mercari-model's
+// buildMercariBoards) add each of their shops' boards beside 楽天's shop boards;
+// the company board stays 楽天's alone.
+export function buildRanking(ranking, ...otherBoards) {
   if (!ranking) return null;
 
+  const others = otherBoards.filter(Boolean);
   const dims = {};
   RANKING_DIMS.forEach((dim) => {
     const built = normalizeRankingDim(ranking?.rankings?.[dim]);
-    if (built) dims[dim] = amazonBoards?.[dim] ? { ...built, shops: [...built.shops, ...amazonBoards[dim]] } : built;
+    if (built) dims[dim] = { ...built, shops: [...built.shops, ...others.flatMap((boards) => boards[dim] ?? [])] };
   });
 
   const available = RANKING_DIMS.filter((d) => dims[d]);
@@ -267,7 +269,8 @@ export function buildRanking(ranking, amazonBoards = null) {
     dims,
     // dimensions actually present, in UI order — the toggle renders from this
     available,
-    hasAmazon: Boolean(amazonBoards),
+    // other platforms' shops are on offer, so every chip says whose shop it is
+    multiPlatform: others.length > 0,
   };
 }
 

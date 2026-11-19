@@ -416,7 +416,7 @@ test("Amazon shops take their place among 楽天's by this month's sales", () =>
   assert.equal(t.rows[0].platform, "rakuten");
 });
 
-test("the footer has a line per platform and a company line that adds only counts", () => {
+test("the footer has a line per platform and a company line that adds counts and today's yen", () => {
   const f = fixture();
   const t = buildShopTable({ ...f, others: [amazonOf()] });
   assert.deepEqual(
@@ -426,9 +426,9 @@ test("the footer has a line per platform and a company line that adds only count
   const [rakuten, amazon, company] = t.totals;
   assert.deepEqual(rakuten.today, { sales: 60, units: 6, orders: 6 });
   assert.deepEqual(amazon.today, { sales: 700, units: 3, orders: 2 });
-  // the company's yen stay empty: the platforms measure them differently
-  assert.deepEqual(company.today, { sales: null, units: 9, orders: 8 });
-  assert.equal(company.month.sales, null);
+  // today's yen add up too, each platform's on its own basis; the month's stay apart
+  assert.deepEqual(company.today, { sales: 760, units: 9, orders: 8 });
+  assert.equal(company.month.sales, 3660 + 1800);
   assert.equal(company.month.orders, 10 + 20);
   // visits are 楽天's alone
   assert.equal(rakuten.visits, 300);
@@ -463,15 +463,15 @@ test("the 楽天 total carries the company's days, alone or beside other platfor
   assert.deepEqual([beside.days[0].sales, beside.days[0].orders], [200, 2]);
 });
 
-test("Amazon rows and its total carry their days; the company total adds counts only", () => {
+test("Amazon rows and its total carry their days; the company total adds them up", () => {
   const t = buildShopTable({ ...fixture(), others: [amazonOf()] });
   const az = t.rows.find((r) => r.platform === "amazon");
   assert.deepEqual([az.days.length, az.days[0].sales, az.days[0].orders], [7, 100, 1]);
   const [, amazon, company] = t.totals;
   assert.deepEqual([amazon.days.length, amazon.days[0].sales], [7, 100]);
-  // 楽天's 2 orders and Amazon's 1 each day; the yen are never added across platforms
+  // 楽天's 2 orders and ¥200 and Amazon's 1 and ¥100 each day
   assert.equal(company.days.length, 7);
-  assert.deepEqual([company.days[0].sales, company.days[0].orders, company.days[0].units], [null, 3, 3]);
+  assert.deepEqual([company.days[0].sales, company.days[0].orders, company.days[0].units], [300, 3, 3]);
 });
 
 test("a platform with no daily of its own adds up its shops' days, and has none while a shop lacks them", () => {
@@ -481,8 +481,8 @@ test("a platform with no daily of its own adds up its shops' days, and has none 
   const temuTotal = temu.totals.find((r) => r.key === "total:temu");
   assert.equal(temuTotal.days.length, 7);
   assert.deepEqual([temuTotal.days[0].sales, temuTotal.days[0].orders, temuTotal.days[0].units], [null, 2, 3]);
-  // TEMU serves no week, so the company's days stay 楽天's counts
-  assert.deepEqual([temu.total.days[0].sales, temu.total.days[0].orders], [null, 2]);
+  // TEMU serves no week, so the company's days stay 楽天's
+  assert.deepEqual([temu.total.days[0].sales, temu.total.days[0].orders], [200, 2]);
 
   const both = buildShopTable({ ...fixture(), others: [aupayOf({ historyOf: ["1", "2"] })] });
   const aupay = both.totals.find((r) => r.key === "total:aupay");
@@ -493,11 +493,12 @@ test("a platform with no daily of its own adds up its shops' days, and has none 
   assert.equal(one.totals.find((r) => r.key === "total:aupay").days, null);
 });
 
-test("the today view adds counts across platforms and keeps each platform's yen apart", () => {
+test("the today view adds counts and yen across platforms and keeps each platform's line", () => {
   const { model } = fixture();
   const view = buildTodayView(model, [amazonOf()]);
   assert.equal(view.multi, true);
-  assert.deepEqual(view.values, { sales: null, units: 9, orders: 8 });
+  assert.deepEqual(view.values, { sales: 760, units: 9, orders: 8 });
+  assert.deepEqual(view.salesExcludes, []);
   assert.deepEqual(
     view.platforms.map((p) => [p.platform, p.values.sales]),
     [
@@ -509,27 +510,59 @@ test("the today view adds counts across platforms and keeps each platform's yen 
   // the week: 楽天's 2 orders a day plus Amazon's 1, matched by date
   assert.equal(view.days.length, 7);
   assert.equal(view.days[0].orders, 3);
-  assert.equal(view.days[0].sales, null);
-  // 売上 bars stay 楽天's
-  assert.equal(view.salesDays, model.days);
+  assert.equal(view.days[0].sales, 300);
+  // the 売上 bars are the company's too
+  assert.equal(view.salesDays, view.days);
   const orders = todayVsAverage(view, "orders");
   assert.equal(orders.value, 8);
   assert.equal(orders.avg, 3);
-  assert.deepEqual(todayVsAverage(view, "sales"), { value: null, avg: null, pct: null });
+  assert.deepEqual(todayVsAverage(view, "sales"), { value: 760, avg: 300, pct: (760 / 300) * 100 });
+});
+
+test("the yen total leaves out a platform without yen and names it", () => {
+  const { model } = fixture();
+  const view = buildTodayView(model, [amazonOf(), temuOf()]);
+  // TEMU's 2 orders count; its yen are unknown, so the total is 楽天's and Amazon's
+  assert.deepEqual(view.values, { sales: 760, units: 11, orders: 10 });
+  assert.deepEqual(view.salesExcludes, ["temu"]);
+  // TEMU has no week either, so the comparison is unchanged
+  assert.equal(todayVsAverage(view, "sales").pct, (760 / 300) * 100);
+});
+
+test("a platform with a week but no yen today leaves the yen comparison unknown", () => {
+  const { model } = fixture();
+  const noYen = amazonOf({ todayTotals: { salesAmount: null, unitsSold: 3, orderCount: 2 } });
+  const view = buildTodayView(model, [noYen]);
+  assert.equal(view.values.sales, 60);
+  assert.deepEqual(view.salesExcludes, ["amazon"]);
+  // 楽天's yen alone against 楽天's and Amazon's week would read low: no ratio instead
+  assert.equal(todayVsAverage(view, "sales").pct, null);
+  assert.equal(todayVsAverage(view, "orders").pct, (8 / 3) * 100);
 });
 
 test("the today view still counts 楽天 when Amazon could not be read today", () => {
   const { model } = fixture();
   const stale = amazonOf({ todayTotals: null });
   const view = buildTodayView(model, [stale]);
-  assert.deepEqual(view.values, { sales: null, units: 6, orders: 6 });
+  assert.deepEqual(view.values, { sales: 60, units: 6, orders: 6 });
 });
 
-test("the month view adds counts and lists each platform's yen", () => {
+test("the month view adds counts and yen across platforms and keeps each platform's figures", () => {
   const { monthly } = fixture();
   const view = buildMonthView(monthly, [amazonOf()]);
   assert.equal(view.multi, true);
-  assert.equal(view.metrics.sales, null);
+  // 楽天 ¥3,660 + Amazon ¥1,800, against last month's 楽天 and Amazon yen
+  assert.equal(view.metrics.sales.current, 3660 + 1800);
+  assert.equal(view.metrics.sales.previous, monthly.metrics.sales.previous + 1500);
+  assert.deepEqual(view.salesExcludes, []);
+  // every platform keeps all three figures for its own line
+  assert.deepEqual(
+    view.platforms.map((p) => [p.platform, p.metrics.units.current, p.metrics.orders.current]),
+    [
+      ["rakuten", monthly.metrics.units.current, monthly.metrics.orders.current],
+      ["amazon", 30, 20],
+    ],
+  );
   assert.equal(view.metrics.orders.current, 30);
   assert.deepEqual(
     view.platforms.map((p) => [p.platform, p.metrics.sales.current]),
@@ -626,10 +659,12 @@ test("the footer closes with a line per platform and the company adds all their 
     t.totals.map((r) => r.key),
     ["total:rakuten", "total:amazon", "total:aupay", "total:company"],
   );
-  // 楽天 6 + Amazon 2 + au PAY 4 orders today; no yen across platforms
-  assert.deepEqual(t.total.today, { sales: null, units: 14, orders: 12 });
+  // 楽天 6 + Amazon 2 + au PAY 4 orders today, and their yen
+  assert.deepEqual(t.total.today, { sales: 1460, units: 14, orders: 12 });
   assert.equal(t.total.month.orders, 10 + 20 + 40);
-  assert.equal(t.total.month.sales, null);
+  assert.equal(t.total.month.sales, 3660 + 1800 + 2900);
+  // au PAY serves no last month here, so the yen comparison leaves it out like the counts'
+  assert.equal(t.total.previous.sales, buildShopTable({ ...fixture(), others: [amazonOf()] }).total.previous.sales);
   assert.deepEqual(t.weekExcludes, ["aupay"]);
   assert.deepEqual(t.prevExcludes, ["aupay"]);
 });
@@ -655,7 +690,7 @@ test("the today view counts au PAY but sets only the platforms with a week again
       ["aupay", 700],
     ],
   );
-  assert.deepEqual(view.values, { sales: null, units: 14, orders: 12 });
+  assert.deepEqual(view.values, { sales: 1460, units: 14, orders: 12 });
   assert.deepEqual(view.coverage, { covered: 6, total: 6 });
   assert.deepEqual(view.weekExcludes, ["aupay"]);
   // 楽天 6 + Amazon 2 against 楽天 2 + Amazon 1 a day; au PAY's 4 stay out
@@ -775,8 +810,8 @@ test("TEMU's shop shows its counts while its yen stay a dash", () => {
   assert.notEqual(temu.monthDelta.orders, null);
   const total = t.totals.find((r) => r.key === "total:temu");
   assert.deepEqual(total.today, { sales: null, units: 2, orders: 2 });
-  // 楽天 6 + Amazon 2 + au PAY 4 + TEMU 2 orders today
-  assert.deepEqual(t.total.today, { sales: null, units: 16, orders: 14 });
+  // 楽天 6 + Amazon 2 + au PAY 4 + TEMU 2 orders today; TEMU adds no yen
+  assert.deepEqual(t.total.today, { sales: 60 + 700 + 700, units: 16, orders: 14 });
   assert.equal(t.total.month.orders, 10 + 20 + 40 + 25);
   assert.deepEqual(t.weekExcludes, ["aupay", "temu"]);
   assert.deepEqual(t.prevExcludes, ["aupay"]);
@@ -813,6 +848,9 @@ test("the today and month cards count TEMU and give it a yen line of dashes", ()
   const month = buildMonthView(monthly, [aupayOf(), temuOf()]);
   const withoutTemu = buildMonthView(monthly, [aupayOf()]);
   assert.equal(month.metrics.orders.current, withoutTemu.metrics.orders.current + 25);
+  // TEMU's month has no yen: the yen total is the others', and the card names TEMU
+  assert.deepEqual(month.metrics.sales, withoutTemu.metrics.sales);
+  assert.deepEqual(month.salesExcludes, ["temu"]);
   // TEMU served last month, so it joins the comparison
   assert.equal(month.metrics.orders.previous, withoutTemu.metrics.orders.previous + 30);
   assert.equal(month.platforms.find((p) => p.platform === "temu").metrics.sales.current, null);

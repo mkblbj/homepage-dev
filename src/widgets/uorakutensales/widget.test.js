@@ -27,6 +27,8 @@ const READ_ONLY = [
   "aupaySales",
   "temuSales",
   "mercariSales",
+  "mercariRanking",
+  "mercariRankingMonthly",
 ];
 
 describe("uorakutensales widget config", () => {

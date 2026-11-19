@@ -3,9 +3,10 @@
 // visits. Unknown stays null all the way to the screen — a missing board is
 // never drawn as zero.
 //
-// Order and unit counts add up across platforms; yen never do. Each platform
-// counts its amounts its own way, so 売上 stays per platform and the company row
-// leaves it empty. Comparisons need the same shops on both sides: a platform
+// Order and unit counts add up across platforms, and so do the yen (the user
+// asked for one figure, 2026-11-19), each platform's on its own basis; a
+// platform without yen (TEMU) stays out of them and is named. Each platform
+// still keeps its own line. Comparisons need the same shops on both sides: a platform
 // without a week or a last month (au PAY, TEMU without one) counts in the company's figures but
 // stays out of its 7-day and last-month comparisons.
 
@@ -49,16 +50,25 @@ function isZero(values) {
 
 const known = (v) => v !== null && v !== undefined;
 
-// Counts of several platforms added up: a platform the server could not read
-// at all adds nothing (the coverage says so), and the yen slot stays empty.
-function addCounts(list) {
+// Several platforms added up: one the server could not read at all adds nothing
+// (the coverage says so). Yen add up over the platforms whose yen were read, each
+// on its own basis; one with counts but no yen (TEMU until its amount scope is
+// granted) stays out of the yen. `strict` is for a comparison: there a platform
+// without yen leaves the yen unknown, so both sides cover the same shops.
+function addPlatforms(list, { strict = false } = {}) {
   const present = list.filter(Boolean);
   if (!present.length) return null;
   const sum = (key) => {
     const values = present.map((v) => v[key]).filter(known);
     return values.length ? values.reduce((a, b) => a + b, 0) : null;
   };
-  return triple(null, sum("units"), sum("orders"));
+  const yenMissing = present.some((v) => !known(v.sales));
+  return triple(strict && yenMissing ? null : sum("sales"), sum("units"), sum("orders"));
+}
+
+// the platforms counted today whose yen are unknown: the yen total leaves them out
+function yenExcludes(others) {
+  return others.filter((o) => isKnown(o.company.today) && !known(o.company.today.sales)).map((o) => o.platform);
 }
 
 function addCoverage(a, b) {
@@ -162,7 +172,7 @@ export function visitsFromFreshShops(performance) {
   };
 }
 
-// One company month metric (counts only). This month's total and daily pace add up
+// One company month metric. This month's total and daily pace add up
 // every platform. Last month and the comparisons add up only `comparable`, the
 // platforms that serve a last month, so both sides cover the same shops. Each
 // side's pace already leaves its own today out, so the paces add up; a platform
@@ -194,7 +204,9 @@ function combineMonth(parts, comparable) {
 // month and this one was read; otherwise it is left out, and the page says so.
 const hasPrevious = (other) => other.provides.previous && other.company.previous !== null;
 
-// The company's unit and order metrics: 楽天 plus each platform with a month to add.
+// The company's month metrics: 楽天 plus each platform with a month to add. The
+// yen add up over the platforms whose yen were read, and compare only where last
+// month's were read too; a platform without yen (TEMU) is left out and named.
 function companyMonth(rakutenMetrics, others) {
   const present = others.filter((o) => o.company.metrics);
   const comparable = present.filter(hasPrevious);
@@ -205,7 +217,21 @@ function companyMonth(rakutenMetrics, others) {
           [rakutenMetrics[key], ...comparable.map((o) => o.company.metrics[key])],
         )
       : null;
-  return { units: dim("units"), orders: dim("orders"), present };
+  const yenOf = (o) => known(o.company.metrics.sales.current);
+  const yenBefore = (o) => yenOf(o) && known(o.company.metrics.sales.previous);
+  return {
+    // a platform without last month's yen adds its month but stays out of the comparison
+    sales: rakutenMetrics
+      ? combineMonth(
+          [rakutenMetrics.sales, ...present.filter(yenOf).map((o) => o.company.metrics.sales)],
+          [rakutenMetrics.sales, ...comparable.filter(yenBefore).map((o) => o.company.metrics.sales)],
+        )
+      : null,
+    units: dim("units"),
+    orders: dim("orders"),
+    present,
+    yenExcludes: present.filter((o) => !yenOf(o)).map((o) => o.platform),
+  };
 }
 
 // A shop's last finished days: au PAY's and TEMU's come with their own history,
@@ -231,8 +257,9 @@ function platformDays(shops) {
   return first.map((day, i) => ({ ...day, sales: add(i, "sales"), units: add(i, "units"), orders: add(i, "orders") }));
 }
 
-// The company's finished days across platforms, as counts: only the platforms
-// that serve a week, and only the days every one of their histories holds.
+// The company's finished days across platforms: only the platforms that serve a
+// week, and only the days every one of their histories holds. A day's yen add up
+// only where every platform has them.
 function companyDays(model, others) {
   const withWeek = others.filter((o) => o.provides.week);
   const histories = withWeek.filter((o) => o.company.daily.length);
@@ -244,7 +271,8 @@ function companyDays(model, others) {
       const matches = histories.map((o) => o.company.daily.find((day) => day.date === d.date));
       if (matches.some((day) => !day)) return null;
       const add = (key) => matches.reduce((total, day) => total + (day[key] ?? 0), d[key]);
-      return { ...d, sales: null, units: add("units"), orders: add("orders") };
+      const yen = known(d.sales) && matches.every((day) => known(day.sales));
+      return { ...d, sales: yen ? add("sales") : null, units: add("units"), orders: add("orders") };
     })
     .filter(Boolean);
 }
@@ -368,25 +396,25 @@ export function buildShopTable({ model, monthly, performance, others = [] }) {
       visitDelta: null,
     };
   });
-  const { units, orders } = companyMonth(m, others);
+  const { sales, units, orders } = companyMonth(m, others);
   const withWeek = otherTotals.filter((_, i) => others[i].provides.week);
   const company = {
     key: "total:company",
     name: null,
     platform: null,
-    today: addCounts([rakuten.today, ...otherTotals.map((o) => o.today)]),
+    today: addPlatforms([rakuten.today, ...otherTotals.map((o) => o.today)]),
     // Today's figure against the week: only the platforms that serve a week, on
     // both sides, and only when each of those counted today has one.
-    weekToday: addCounts([rakuten.today, ...withWeek.map((o) => o.today)]),
+    weekToday: addPlatforms([rakuten.today, ...withWeek.map((o) => o.today)], { strict: true }),
     avg:
       rakuten.avg && withWeek.every((o) => o.avg || !o.today)
-        ? addCounts([rakuten.avg, ...withWeek.map((o) => o.avg)])
+        ? addPlatforms([rakuten.avg, ...withWeek.map((o) => o.avg)], { strict: true })
         : null,
     days: hasHistory ? daysOrNull(companyDays(model, others)) : null,
     cvr: null,
-    month: units && orders ? triple(null, units.current, orders.current) : null,
-    monthDelta: units && orders ? triple(null, units.paceDeltaPct, orders.paceDeltaPct) : null,
-    previous: units && orders ? triple(null, units.previous, orders.previous) : null,
+    month: units && orders ? triple(sales?.current ?? null, units.current, orders.current) : null,
+    monthDelta: units && orders ? triple(sales?.paceDeltaPct ?? null, units.paceDeltaPct, orders.paceDeltaPct) : null,
+    previous: units && orders ? triple(sales?.previous ?? null, units.previous, orders.previous) : null,
     // visits are 楽天's alone and sit on its own line
     visits: null,
     visitDelta: null,
@@ -402,8 +430,8 @@ export function buildShopTable({ model, monthly, performance, others = [] }) {
   };
 }
 
-// Today across platforms, for the today card. With other platforms present the
-// company figures are counts only; each platform keeps its own line with its yen.
+// Today across platforms, for the today card: the company's figures add up every
+// platform, yen too, and each platform keeps its own line.
 export function buildTodayView(model, others = []) {
   const rakuten = {
     platform: "rakuten",
@@ -435,6 +463,7 @@ export function buildTodayView(model, others = []) {
 
   const rakutenValues = model.rtTotal === null ? null : rakuten.values;
   const withWeek = others.filter((o) => o.provides.week);
+  const days = companyDays(model, others);
   return {
     multi: true,
     platforms: [
@@ -449,17 +478,18 @@ export function buildTodayView(model, others = []) {
         };
       }),
     ],
-    values: addCounts([rakutenValues, ...others.map((o) => o.company.today)]) ?? triple(null, null, null),
+    values: addPlatforms([rakutenValues, ...others.map((o) => o.company.today)]) ?? triple(null, null, null),
     // what stands against the week: only the platforms that serve one, on both sides
-    weekValues: addCounts([rakutenValues, ...withWeek.map((o) => o.company.today)]),
+    weekValues: addPlatforms([rakutenValues, ...withWeek.map((o) => o.company.today)], { strict: true }),
     avg:
       rakutenAvg && withWeek.every((o) => o.company.avg || !o.company.today)
-        ? addCounts([rakutenAvg, ...withWeek.map((o) => o.company.avg)])
+        ? addPlatforms([rakutenAvg, ...withWeek.map((o) => o.company.avg)], { strict: true })
         : null,
     weekExcludes: others.filter((o) => !o.provides.week).map((o) => o.platform),
-    days: companyDays(model, others),
-    // 売上 bars stay 楽天's: no other platform's yen are added to them
-    salesDays: model.days,
+    // the platforms the yen total leaves out, for want of yen
+    salesExcludes: yenExcludes(others),
+    days,
+    salesDays: days,
     coverage: others.reduce((coverage, o) => addCoverage(coverage, o.company.coverage.today), model.coverage),
     time: model.time,
     mix: [
@@ -471,11 +501,11 @@ export function buildTodayView(model, others = []) {
   };
 }
 
-// The month across platforms, for the month card: company counts, and each
-// platform's own figures for the yen.
+// The month across platforms, for the month card: the company's figures add up
+// every platform, yen too, and each platform keeps its own line.
 export function buildMonthView(monthly, others = []) {
   if (!monthly) return null;
-  const { units, orders, present } = companyMonth(monthly.metrics, others);
+  const { sales, units, orders, present, yenExcludes } = companyMonth(monthly.metrics, others);
   if (!present.length)
     return { ...monthly, multi: false, platforms: [{ platform: "rakuten", metrics: monthly.metrics }] };
   return {
@@ -488,13 +518,15 @@ export function buildMonthView(monthly, others = []) {
         monthly.current.coverage,
       ),
     },
-    metrics: { sales: null, units, orders },
+    metrics: { sales, units, orders },
     platforms: [
       { platform: "rakuten", metrics: monthly.metrics },
       ...present.map((o) => ({ platform: o.platform, metrics: o.company.metrics })),
     ],
     // the platforms with no last month, left out of the comparison
     prevExcludes: present.filter((o) => !hasPrevious(o)).map((o) => o.platform),
+    // the platforms the yen total leaves out, for want of yen
+    salesExcludes: yenExcludes,
   };
 }
 

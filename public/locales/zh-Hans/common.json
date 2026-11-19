@@ -1640,7 +1640,7 @@
         "platformAmazon": "Amazon",
         "platformTotal": "{{platform}} 合计",
         "companyTotal": "全公司合计",
-        "salesNotSummed": "各平台销售额口径不同，不合计",
+        "salesExcludes": "{{names}} 暂无金额，不计入销售额合计",
         "boardLoading": "加载中…",
         "peaksCoverageAmazon": "Amazon 自 {{date}} 起",
         "lastDays": "近{{count}}日",

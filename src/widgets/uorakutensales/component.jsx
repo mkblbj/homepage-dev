@@ -21,6 +21,9 @@
  *   "aupaySales"    → GET /api/aupay/sales           au PAY today, this month, last month and shop history
  *   "temuSales"     → GET /api/temu/sales            TEMU's one shop, the same periods and history
  *   "mercariSales"  → GET /api/mercari/sales         Mercari Shops, in au PAY's shape
+ *   "mercariRanking" / "mercariRankingMonthly" → Mercari's item boards, worked out in the
+ *                     proxy from its orders (mercari-ranking.mjs); the month boards only
+ *                     while 今月 or 先月 is picked
  *
  * Amazon's, au PAY's, TEMU's and Mercari's shops sit beside 楽天's as peers. Counts add up
  * across platforms; yen never do, since each platform measures its amounts its own way.
@@ -61,7 +64,7 @@ import { buildMarketEvidence, buildMarketReference, MARKET_REFRESH_INTERVAL } fr
 import { buildDeviceSales } from "./device-sales-model.mjs";
 import DeviceSalesSection from "./device-sales-section";
 import { CustomerMixCard, ShopVisitsTable } from "./insight-section";
-import { buildMercari } from "./mercari-model.mjs";
+import { buildMercari, buildMercariBoards } from "./mercari-model.mjs";
 import { PlatformMark, PlatformName, PlatformSuffix, ScopeName } from "./platform-mark";
 import {
   ACCENT,
@@ -625,8 +628,8 @@ function RankingBoards({ ranking, period, onPeriod, dim, cardCls, t }) {
   const board = ranking.dims[activeDim];
 
   const open = step > 0;
-  // Amazon boards carry a platform-qualified key, so a shop name shared across
-  // platforms never picks the wrong board
+  // other platforms' boards carry a platform-qualified key, so a shop name shared
+  // across platforms (3911) never picks the wrong board
   const keyOf = (s) => s.key ?? s.shopName;
   const active = open && shop !== "__all__" ? board.shops.find((s) => keyOf(s) === shop) : null;
   // a shop chip can outlive its data across refreshes → fall back to the overall board
@@ -644,11 +647,11 @@ function RankingBoards({ ranking, period, onPeriod, dim, cardCls, t }) {
     covered !== null && covered < board.shopCount
       ? t(`${NS}.shopsAggregatedPartial`, { covered, total: board.shopCount })
       : t(`${NS}.shopsAggregated`, { count: board.shopCount });
-  // with Amazon's shop boards on offer, the company board says it is 楽天's
+  // with other platforms' shop boards on offer, the company board says it is 楽天's
   const rakutenLabel = t(`${NS}.platformRakuten`);
   const meta = isAll ? (
     <>
-      {ranking.hasAmazon ? (
+      {ranking.multiPlatform ? (
         <>
           <PlatformName platform="rakuten" label={rakutenLabel} size={12} /> ·{" "}
         </>
@@ -658,9 +661,9 @@ function RankingBoards({ ranking, period, onPeriod, dim, cardCls, t }) {
   ) : (
     t(`${NS}.itemsCount`, { count: active?.itemCount ?? 0 })
   );
-  // beside Amazon's boards every chip carries its platform's mark
+  // beside other platforms' boards every chip carries its platform's mark
   const shopChip = (platform, label) =>
-    ranking.hasAmazon ? (
+    ranking.multiPlatform ? (
       <span className="inline-flex items-center gap-1">
         <PlatformMark platform={platform} size={12} />
         {label}
@@ -1094,6 +1097,12 @@ export default function Component({ service }) {
   const { data: amazonRankingMonthlyData } = useWidgetAPI(widget, monthBoards ? "amazonRankingMonthly" : "", {
     refreshInterval,
   });
+  const { data: mercariRankingData, mutate: mutateMercariRanking } = useWidgetAPI(widget, "mercariRanking", {
+    refreshInterval,
+  });
+  const { data: mercariRankingMonthlyData } = useWidgetAPI(widget, monthBoards ? "mercariRankingMonthly" : "", {
+    refreshInterval,
+  });
   const { data: devicesData, mutate: mutateDevices } = useWidgetAPI(widget, "devices", { refreshInterval });
   // the device month boards are read in the same round as the monthly sales
   const { data: devicesMonthlyData, mutate: mutateDevicesMonthly } = useWidgetAPI(widget, "devicesMonthly", {
@@ -1138,15 +1147,21 @@ export default function Component({ service }) {
   // the platforms beside 楽天 that answered, in the order the board names them
   const others = useMemo(() => [amazon, aupay, temu, mercari].filter(Boolean), [amazon, aupay, temu, mercari]);
   const rankingToday = useMemo(
-    () => buildRanking(rankingData, buildAmazonBoards(amazonRankingData)),
-    [rankingData, amazonRankingData],
+    () =>
+      buildRanking(
+        rankingData,
+        buildAmazonBoards(amazonRankingData),
+        buildMercariBoards(mercariRankingData?.error ? null : mercariRankingData?.today),
+      ),
+    [rankingData, amazonRankingData, mercariRankingData],
   );
   const rankingMonth = useMemo(() => {
     if (!rankingMonthlyData || rankingMonthlyData.error) return null;
     const key = rankingPeriod === "previous" ? "previousMonth" : "currentMonth";
     const amazonMonth = amazonRankingMonthlyData?.error ? null : amazonRankingMonthlyData?.[key];
-    return buildRanking(rankingMonthlyData[key], buildAmazonBoards(amazonMonth));
-  }, [rankingMonthlyData, amazonRankingMonthlyData, rankingPeriod]);
+    const mercariMonth = mercariRankingMonthlyData?.error ? null : mercariRankingMonthlyData?.[key];
+    return buildRanking(rankingMonthlyData[key], buildAmazonBoards(amazonMonth), buildMercariBoards(mercariMonth));
+  }, [rankingMonthlyData, amazonRankingMonthlyData, mercariRankingMonthlyData, rankingPeriod]);
   const ranking = rankingPeriod === "today" ? rankingToday : rankingMonth;
   const peaks = useMemo(
     () =>
@@ -1215,6 +1230,7 @@ export default function Component({ service }) {
       mutatePerformance();
       mutateAmazonHistory();
       mutateAmazonRanking();
+      mutateMercariRanking();
     },
     [
       mutateSnapshot,
@@ -1226,6 +1242,7 @@ export default function Component({ service }) {
       mutatePerformance,
       mutateAmazonHistory,
       mutateAmazonRanking,
+      mutateMercariRanking,
     ],
   );
 
