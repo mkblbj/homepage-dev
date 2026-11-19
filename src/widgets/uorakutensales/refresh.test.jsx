@@ -26,6 +26,7 @@ const snapshots = {
   monthly: { ok: true, currentMonth: { month: "2026-11", totals: { salesYen: 80000, orderCount: 800, unitsSold: 800 }, shops: [] } },
   amazonSales: platform(12, { shopName: "Amazon-test", accountId: "test", marketplaceId: "JP" }),
   aupaySales: platform(7, { shopName: "auPAY-test", configId: "test" }),
+  mercariSales: platform(5, { shopName: "Mercari-test", configId: "test" }),
   temuSales: {
     ok: true, shopName: "TEMU-test", currency: "JPY", enabled: true,
     today: { key: "2026-11-17", status: "ready", totals: { ...totals(3), salesAmount: null }, sourceUpdatedAt: stamp },
@@ -52,29 +53,30 @@ function harness() {
 afterEach(() => { vi.unstubAllGlobals(); });
 
 describe("sales-board atomic rendering", () => {
-  it("never shows 160/172/179 while other sales sources are pending; publishes all 182 orders together", async () => {
+  it("never shows 160/172/179/182 while other sales sources are pending; publishes all 187 orders together", async () => {
     const h = harness();
-    for (const endpoint of ["sales", "amazonSales", "aupaySales", "temuSales"]) {
+    for (const endpoint of ["sales", "amazonSales", "aupaySales", "temuSales", "mercariSales"]) {
       await h.resolve(endpoint);
       expect(screen.queryByText("uorakutensales.todayLabel")).not.toBeInTheDocument();
       expect(screen.queryByRole("row", { name: /^Rakuten-test/ })).not.toBeInTheDocument();
     }
     await h.resolve("monthly");
-    expect(h.figure()).toBe("182uorakutensales.ordersUnit");
+    expect(h.figure()).toBe("187uorakutensales.ordersUnit");
+    expect(screen.getByRole("row", { name: /^Mercari-test/ })).toBeInTheDocument();
     expect(screen.getByRole("row", { name: /^TEMU-test/ })).toBeInTheDocument();
     expect(screen.getByRole("row", { name: /^auPAY-test/ })).toBeInTheDocument();
   });
 
-  it("keeps 182 throughout a staggered manual refresh and replaces it only when the batch is complete", async () => {
+  it("keeps 187 throughout a staggered manual refresh and replaces it only when the batch is complete", async () => {
     const h = harness();
     await h.ready();
     h.refresh();
     await h.resolve("sales", { ...rakuten, totals: { ...rakuten.totals, orderCount: 180 } });
-    expect(h.figure()).toBe("182uorakutensales.ordersUnit");
-    for (const endpoint of ["monthly", "amazonSales", "aupaySales"]) await h.resolve(endpoint);
-    expect(h.figure()).toBe("182uorakutensales.ordersUnit");
+    expect(h.figure()).toBe("187uorakutensales.ordersUnit");
+    for (const endpoint of ["monthly", "amazonSales", "aupaySales", "mercariSales"]) await h.resolve(endpoint);
+    expect(h.figure()).toBe("187uorakutensales.ordersUnit");
     await h.resolve("temuSales");
-    expect(h.figure()).toBe("202uorakutensales.ordersUnit");
+    expect(h.figure()).toBe("207uorakutensales.ordersUnit");
   });
 
   it("retains the complete old total on failed refresh, names the failed platform and recovers", async () => {
@@ -82,33 +84,33 @@ describe("sales-board atomic rendering", () => {
     await h.ready();
     h.refresh();
     await h.resolve("sales", { ...rakuten, totals: { ...rakuten.totals, orderCount: 180 } });
-    for (const endpoint of ["monthly", "amazonSales", "aupaySales"]) await h.resolve(endpoint);
+    for (const endpoint of ["monthly", "amazonSales", "aupaySales", "mercariSales"]) await h.resolve(endpoint);
     await h.resolve("temuSales", { error: "offline" }, 503);
-    expect(h.figure()).toBe("182uorakutensales.ordersUnit");
+    expect(h.figure()).toBe("187uorakutensales.ordersUnit");
     expect(screen.getByRole("alert")).toHaveTextContent("uorakutensales.snapshotRefreshFailed");
     expect(screen.getByRole("alert")).toHaveTextContent("uorakutensales.platformTemu");
     h.refresh();
     await h.ready();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(h.figure()).toBe("182uorakutensales.ordersUnit");
+    expect(h.figure()).toBe("187uorakutensales.ordersUnit");
   });
 
   it("shows an initial error and working retry instead of an incomplete total", async () => {
     const h = harness();
-    for (const endpoint of ["sales", "monthly", "amazonSales", "aupaySales"]) await h.resolve(endpoint);
+    for (const endpoint of ["sales", "monthly", "amazonSales", "aupaySales", "mercariSales"]) await h.resolve(endpoint);
     await h.resolve("temuSales", { error: "offline" }, 503);
     expect(screen.queryByText("uorakutensales.todayLabel")).not.toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent("uorakutensales.snapshotLoadFailed");
     h.refresh();
     await h.ready();
-    expect(h.figure()).toBe("182uorakutensales.ordersUnit");
+    expect(h.figure()).toBe("187uorakutensales.ordersUnit");
   });
 
   it("marks legacy optional endpoints as unavailable rather than silently claiming complete coverage", async () => {
     const h = harness();
-    for (const endpoint of ["sales", "monthly", "amazonSales", "aupaySales"]) await h.resolve(endpoint);
+    for (const endpoint of ["sales", "monthly", "amazonSales", "aupaySales", "mercariSales"]) await h.resolve(endpoint);
     await h.resolve("temuSales", { error: "not found" }, 404);
-    expect(h.figure()).toBe("179uorakutensales.ordersUnit");
+    expect(h.figure()).toBe("184uorakutensales.ordersUnit");
     expect(screen.getByRole("alert")).toHaveTextContent("uorakutensales.snapshotUnavailable");
     expect(screen.getByRole("alert")).toHaveTextContent("uorakutensales.platformTemu");
   });
@@ -122,7 +124,7 @@ describe("sales-board atomic rendering", () => {
     await h.resolve("sales", { ...rakuten, totals: { ...rakuten.totals, salesYen: 20000 } });
     expect(within(h.card()).getByText("¥16000")).toBeInTheDocument();
     expect(within(h.card()).queryByText("¥20000")).not.toBeInTheDocument();
-    for (const endpoint of ["monthly", "amazonSales", "aupaySales", "temuSales"]) await h.resolve(endpoint);
+    for (const endpoint of ["monthly", "amazonSales", "aupaySales", "temuSales", "mercariSales"]) await h.resolve(endpoint);
     expect(within(h.card()).getByText("¥20000")).toBeInTheDocument();
   });
 });

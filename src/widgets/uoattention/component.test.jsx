@@ -226,6 +226,54 @@ describe("widgets/uoattention/component", () => {
     expect(screen.getByText("uoattention.byShop").parentElement).toHaveTextContent("uoattention.covered");
   });
 
+  it("adds Mercari's source, its share of the inquiries and its shop card once it is on the snapshot", () => {
+    const base = snapshot();
+    mockData(
+      snapshot({
+        summary: { ...base.summary, allPlatformUnansweredInquiryCount: 2 },
+        sources: { ...base.sources, mercariInquiries: okSource },
+        mercariInquiries: {
+          ok: true,
+          enabled: true,
+          summary: { unansweredInquiryCount: 1, inProgressInquiryCount: 45 },
+          shops: [
+            {
+              configId: "cfg-1",
+              shopName: "3911",
+              enabled: true,
+              status: "ready",
+              unansweredInquiryCount: 1,
+              inProgressInquiryCount: 45,
+              overdueInquiryCount: null,
+              lastError: null,
+            },
+          ],
+        },
+      }),
+    );
+    render();
+
+    expect(screen.getByText("uoattention.sourceMercari")).toBeInTheDocument();
+    expect(screen.getByText(/uoattention\.mercariShare/)).toBeInTheDocument();
+    // 楽天's 3911 and Mercari's 3911 each get a card; only Mercari's is tagged
+    const cards = shopCards().filter((card) => within(card).getByTestId("shop-name").textContent === "3911");
+    expect(cards).toHaveLength(2);
+    const mercari = cards.find((card) => within(card).queryByText("uoattention.platformMercari"));
+    expect(within(mercari).getByText("uoattention.inquiriesShort")).toBeInTheDocument();
+    expect(within(mercari).getByText("uoattention.inquiriesHandling")).toBeInTheDocument();
+    expect(within(mercari).getByText("45")).toBeInTheDocument();
+    // Mercari has no overdue measure: the card never shows one, not even as a dash
+    expect(within(mercari).queryByText(/uoattention\.overdue/)).not.toBeInTheDocument();
+  });
+
+  it("shows no Mercari source chip while the snapshot has none", () => {
+    mockData(snapshot());
+    render();
+
+    expect(screen.queryByText("uoattention.sourceMercari")).not.toBeInTheDocument();
+    expect(screen.queryByText(/uoattention\.mercariShare/)).not.toBeInTheDocument();
+  });
+
   it("lists only the counts a shop actually has on its card", () => {
     mockData(snapshot());
     render();

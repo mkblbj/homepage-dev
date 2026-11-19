@@ -1,20 +1,22 @@
 // A platform's own mark beside its shops and its name, so a board that mixes
 // platforms reads at a glance. 楽天's and Amazon's glyphs are inline SVG from
 // react-icons, each on its brand's tile colour like its app icon, which keeps them
-// legible on light and dark themes alike. react-icons has no au PAY or TEMU glyph,
-// so theirs are their own app icons, inlined as small images (platform-logos).
+// legible on light and dark themes alike. react-icons has no au PAY, TEMU or Mercari
+// glyph, so theirs are their own app icons, inlined as small images (platform-logos).
 // Nothing is fetched. A faint ring keeps a dark tile apart from a dark page and
 // au PAY's white one apart from a light page.
 import { FaAmazon } from "react-icons/fa6";
 import { SiRakuten } from "react-icons/si";
 
-import { AUPAY_LOGO, TEMU_LOGO } from "./platform-logos.mjs";
+import { AUPAY_LOGO, MERCARI_LOGO, TEMU_LOGO } from "./platform-logos.mjs";
 
 const MARKS = {
   rakuten: { Icon: SiRakuten, tile: "#BF0000", glyph: "#FFFFFF" },
   amazon: { Icon: FaAmazon, tile: "#232F3E", glyph: "#FF9900" },
   aupay: { logo: AUPAY_LOGO, tile: "#FFFFFF" },
   temu: { logo: TEMU_LOGO, tile: "#FB7701" },
+  // its icon is a red cube on a clear ground: a white tile, like au PAY's
+  mercari: { logo: MERCARI_LOGO, tile: "#FFFFFF" },
 };
 
 // The mark is decorative: wherever it stands, the platform's name is written

@@ -36,6 +36,8 @@ const ENDPOINT_PATHS = {
   aupaySales: "/api/aupay/sales",
   // TEMU's one shop: today, this month and last month, counts only until its amount scope is granted
   temuSales: "/api/temu/sales",
+  // Mercari Shops' shops: today, this month, last month and the last seven days, like au PAY's
+  mercariSales: "/api/mercari/sales",
 };
 
 export function normalizeSalesServiceUrl(baseUrl = DEFAULT_SALES_SERVICE_URL) {

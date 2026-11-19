@@ -1,6 +1,13 @@
 // Pure data shaping for the 運営対応 widget. Every rule here comes from the
 // /api/attention contract: null means UNKNOWN and must never become 0, and the
 // company status is decided server-side — this module only reshapes it.
+//
+// Mercari Shops' inquiries ride along on the same snapshot (section 14 of the
+// backend doc): per shop, the unanswered ones and those the seller is already
+// handling, nothing else. The headline inquiry count is every platform's, which
+// the server adds up from the fresh shops only.
+
+import { MERCARI_LOGO } from "../uorakutensales/platform-logos.mjs";
 
 export const DASH = "—";
 
@@ -29,13 +36,43 @@ function toStars(byRating) {
 const SEVERITY = { critical: 0, attention: 1, unknown: 2, normal: 3 };
 
 // Only a shop the Server calls normal, with every count a known 0 and no error, has nothing
-// to show. An unknown count is not a zero, so it keeps the shop on the board.
+// to show. An unknown count is not a zero, so it keeps the shop on the board. A Mercari
+// shop has only its inquiries to count.
 function isQuiet(shop) {
-  return (
-    shop.status === "normal" &&
-    !shop.lastError &&
-    [shop.pending, shop.inquiry, shop.overdue, shop.reviews].every((count) => count === 0)
-  );
+  const counts =
+    shop.platform === "mercari"
+      ? [shop.inquiry, shop.handling]
+      : [shop.pending, shop.inquiry, shop.overdue, shop.reviews];
+  return shop.status === "normal" && !shop.lastError && counts.every((count) => count === 0);
+}
+
+// A Mercari shop's counts are null unless the server read them fresh, so only then is it
+// normal or not. Overdue is 楽天's measure alone: Mercari leaves it null, and so does the card.
+// The key keeps it apart from the 楽天 shop of the same name (3911 is both).
+function mercariShopsOf(mercari) {
+  if (!mercari || mercari.enabled === false) return [];
+  return (mercari.shops || [])
+    .filter((shop) => shop.enabled !== false)
+    .map((shop) => {
+      const inquiry = toNullableNumber(shop.unansweredInquiryCount);
+      let status = "unknown";
+      if (shop.status === "ready" && !isNil(inquiry)) status = inquiry > 0 ? "attention" : "normal";
+      return {
+        key: `mercari:${shop.configId ?? shop.shopName}`,
+        platform: "mercari",
+        name: shop.shopName,
+        logoUrl: MERCARI_LOGO,
+        status,
+        pending: null,
+        inquiry,
+        handling: toNullableNumber(shop.inProgressInquiryCount),
+        overdue: null,
+        reviews: null,
+        total: inquiry,
+        stars: [],
+        lastError: shop.lastError || null,
+      };
+    });
 }
 
 function bySeverity(a, b) {
@@ -65,6 +102,8 @@ export function buildAttentionModel(data, logos) {
     const reviews = toNullableNumber(shop.unrepliedReviewCount);
 
     return {
+      key: `rakuten:${shop.shopName}`,
+      platform: "rakuten",
       name: shop.shopName,
       logoUrl: logoByName.get(shop.shopName) || null,
       status: shop.status || "unknown",
@@ -78,6 +117,15 @@ export function buildAttentionModel(data, logos) {
       lastError: shop.lastError || null,
     };
   });
+  const mercari = data.mercariInquiries && data.mercariInquiries.enabled !== false ? data.mercariInquiries : null;
+  const mercariShops = mercariShopsOf(mercari);
+  const allShops = [...shops, ...mercariShops];
+  // every platform's unanswered inquiries once Mercari is on the snapshot, 楽天's before
+  const inquiry = toNullableNumber(
+    Object.hasOwn(summary, "allPlatformUnansweredInquiryCount")
+      ? summary.allPlatformUnansweredInquiryCount
+      : summary.unansweredInquiryCount,
+  );
 
   return {
     generatedAtJST: data.generatedAtJST || "",
@@ -86,8 +134,16 @@ export function buildAttentionModel(data, logos) {
     shopCount: Number(data.shopCount || shops.length),
     coveredShopCount: shops.filter((shop) => !isNil(shop.reviews)).length,
     pending: toNullableNumber(summary.pendingOrderCount),
-    inquiry: toNullableNumber(summary.unansweredInquiryCount),
+    inquiry,
+    // overdue stays 楽天's: Mercari has no such measure
     overdue: toNullableNumber(summary.overdueInquiryCount),
+    // Mercari's share of the inquiries, and those its sellers are already handling
+    mercari: mercari
+      ? {
+          inquiry: toNullableNumber(mercari.summary?.unansweredInquiryCount),
+          handling: toNullableNumber(mercari.summary?.inProgressInquiryCount),
+        }
+      : null,
     reviews: reviewTotal,
     // The Server counts every unreplied review from its full paginated fetch but only ships
     // the newest 20 as detail rows, so the feed can hold fewer items than the headline says.
@@ -97,13 +153,13 @@ export function buildAttentionModel(data, logos) {
     productReviews: toNullableNumber(summary.productReviewCount),
     shopReviews: toNullableNumber(summary.shopReviewCount),
     ratings: [1, 2, 3].map((star) => ({ star, n: toNullableNumber(byRating[star]) })),
-    total: sumNullable([summary.pendingOrderCount, summary.unansweredInquiryCount, summary.unrepliedReviewCount]),
+    total: sumNullable([summary.pendingOrderCount, inquiry, summary.unrepliedReviewCount]),
     // An unknown review count must not be folded into the headline number.
     totalPartial: isNil(summary.unrepliedReviewCount),
-    shops,
+    shops: allShops,
     // The per-shop board: shops with something to handle, most severe first; the rest fold away.
-    activeShops: shops.filter((shop) => !isQuiet(shop)).sort(bySeverity),
-    quietShops: shops.filter(isQuiet),
+    activeShops: allShops.filter((shop) => !isQuiet(shop)).sort(bySeverity),
+    quietShops: allShops.filter(isQuiet),
     // Capped at 20 by the Server, newest first. reviewUrl and itemName are deliberately
     // dropped: RMS requires a login so the feed stays link-free, and the management number
     // identifies the item far more compactly than its full title.

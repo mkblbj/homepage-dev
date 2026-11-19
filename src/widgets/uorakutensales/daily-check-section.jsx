@@ -17,6 +17,7 @@ const PLATFORM_KEY = {
   amazon: "platformAmazon",
   aupay: "platformAupay",
   temu: "platformTemu",
+  mercari: "platformMercari",
 };
 
 const TONE_CLASS = {

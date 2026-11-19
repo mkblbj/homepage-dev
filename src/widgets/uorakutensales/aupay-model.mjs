@@ -19,17 +19,29 @@ import {
 import { daysInMonth, monthMetrics } from "./sales-model.mjs";
 
 // configId is opaque but stable; a shop's name can match a 楽天 shop's (3911 does)
+export function configKey(platform, row) {
+  return `${platform}:${row?.configId ?? ""}`;
+}
+
 export function aupayKey(row) {
-  return `aupay:${row?.configId ?? ""}`;
+  return configKey("aupay", row);
 }
 
 // Null when the snapshot is missing or no shop is enabled.
 export function buildAupay(sales) {
+  return buildConfigShops("aupay", sales);
+}
+
+// au PAY's snapshot shape: each period lists every enabled shop by its configId,
+// with the platform's totals beside them. Mercari Shops answers in the same shape
+// (mercari-model), so the platform is a parameter.
+export function buildConfigShops(platform, sales) {
   if (!sales || sales.error || !sales.today) return null;
-  const today = rowsByKey(sales.today, aupayKey);
-  const month = rowsByKey(sales.month, aupayKey);
-  const previous = rowsByKey(sales.previousMonth, aupayKey);
-  const history = rowsByKey(sales.history, aupayKey);
+  const keyOf = (row) => configKey(platform, row);
+  const today = rowsByKey(sales.today, keyOf);
+  const month = rowsByKey(sales.month, keyOf);
+  const previous = rowsByKey(sales.previousMonth, keyOf);
+  const history = rowsByKey(sales.history, keyOf);
   const keys = [...new Set([...today.keys(), ...month.keys(), ...previous.keys()])];
   if (!keys.length) return null;
 
@@ -41,7 +53,7 @@ export function buildAupay(sales) {
     return {
       key,
       name: row.shopName,
-      platform: "aupay",
+      platform,
       currency: row.currency,
       today: t,
       month: m,
@@ -72,7 +84,7 @@ export function buildAupay(sales) {
   const anyMonth = [...month.values()].find((row) => row.month);
   const anyPrevious = [...previous.values()].find((row) => row.month);
   return {
-    platform: "aupay",
+    platform,
     // The 7-day history is scoped to the shop cards.
     provides: { week: false, previous: Boolean(sales.previousMonth) },
     shops,
@@ -98,7 +110,7 @@ export function buildAupay(sales) {
   };
 }
 
-// au PAY and TEMU have no records to show: their shops still get their place on the list of
+// au PAY, TEMU and Mercari have no records to show: their shops still get their place on the list of
 // shop bests, as an unknown after everyone with a figure.
 export function withUnrecordedShops(peaks, shops) {
   if (!peaks || !shops?.length) return peaks;

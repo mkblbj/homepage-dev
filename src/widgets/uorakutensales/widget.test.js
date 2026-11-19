@@ -26,6 +26,7 @@ const READ_ONLY = [
   "amazonPeaks",
   "aupaySales",
   "temuSales",
+  "mercariSales",
 ];
 
 describe("uorakutensales widget config", () => {

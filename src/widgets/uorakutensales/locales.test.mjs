@@ -228,6 +228,7 @@ const REQUIRED_KEYS = [
   "platformAmazon",
   "platformAupay",
   "platformTemu",
+  "platformMercari",
   "platformCount",
   "weekExcludes",
   "prevExcludes",

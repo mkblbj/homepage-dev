@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import useSalesSnapshot, { fetchSalesSnapshot } from "./use-sales-snapshot";
 
-const endpoints = ["sales", "monthly", "amazonSales", "aupaySales", "temuSales"];
+const endpoints = ["sales", "monthly", "amazonSales", "aupaySales", "temuSales", "mercariSales"];
 const urls = endpoints.map((endpoint) => `/api/services/proxy?endpoint=${endpoint}`);
 const widget = { service_group: "EC", service_name: "sales", index: 0 };
 const response = (data, status = 200) => ({ ok: status < 400, status, json: async () => data });
@@ -36,16 +36,17 @@ async function settle(pending, count = 160, failure = null) {
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe("atomic sales snapshots", () => {
-  it("does not publish until all five sources settle, then publishes once", async () => {
+  it("does not publish until all six sources settle, then publishes once", async () => {
     const pending = deferredNetwork();
     const { result } = renderSnapshot();
     for (const endpoint of endpoints.slice(0, -1)) {
       await act(async () => pending.get(endpoint).resolve(response(payload(endpoint))));
       expect(result.current.data).toBeUndefined();
     }
-    await act(async () => pending.get("temuSales").resolve(response(payload("temuSales"))));
+    await act(async () => pending.get("mercariSales").resolve(response(payload("mercariSales"))));
     expect(result.current.data.sales.totals.orderCount).toBe(160);
     expect(result.current.data.temuSales.today.totals.orderCount).toBe(160);
+    expect(result.current.data.mercariSales.today.totals.orderCount).toBe(160);
   });
 
   it("retains the whole old snapshot during a staggered refresh and publishes the new batch together", async () => {
@@ -157,7 +158,7 @@ describe("atomic sales snapshots", () => {
       window.dispatchEvent(new Event("focus"));
       await vi.advanceTimersByTimeAsync(1);
     });
-    expect(fetch).toHaveBeenCalledTimes(10);
+    expect(fetch).toHaveBeenCalledTimes(12);
     await act(async () => pending.get("sales").resolve(response(payload("sales", 200))));
     expect(result.current.data.sales.totals.orderCount).toBe(160);
     await settle(pending, 200);
