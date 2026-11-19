@@ -538,7 +538,7 @@ describe("widgets/uorakutensales/daily-check-section", () => {
     totals: [
       { ...shopRow(null), key: "total:rakuten", platform: "rakuten", today: { sales: 4800, units: 56, orders: 48 } },
       { ...shopRow(null), key: "total:amazon", platform: "amazon", visits: null },
-      { ...shopRow(null), key: "total:company", platform: null, today: { sales: null, units: 70, orders: 60 } },
+      { ...shopRow(null), key: "total:company", platform: null, today: { sales: 6000, units: 70, orders: 60 } },
     ],
   };
   multiTable.total = multiTable.totals[2];
@@ -577,15 +577,14 @@ describe("widgets/uorakutensales/daily-check-section", () => {
     expect(within(screen.getByRole("row", { name: /^uoworld/ })).getByText("20.0%")).toBeInTheDocument();
   });
 
-  it("in 売上 each shop's share is of its own platform, and the company has no yen", () => {
+  it("in 売上 each shop's share is of the company's yen, like a count's", () => {
     render(<ShopTable table={multiTable} metric="sales" shopColors={{}} t={tl} />);
 
-    // 楽天 A: ¥1,200 of 楽天's ¥4,800; uoworld: ¥1,200 of Amazon's ¥1,200
-    expect(within(screen.getByRole("row", { name: /^A(?!mazon)/ })).getByText("25.0%")).toBeInTheDocument();
-    expect(within(screen.getByRole("row", { name: /^uoworld/ })).getByText("100.0%")).toBeInTheDocument();
-    // the company's share cell (after 今日) is a dash
+    // 楽天 A and Amazon uoworld: ¥1,200 each of the company's ¥6,000
+    expect(within(screen.getByRole("row", { name: /^A(?!mazon)/ })).getByText("20.0%")).toBeInTheDocument();
+    expect(within(screen.getByRole("row", { name: /^uoworld/ })).getByText("20.0%")).toBeInTheDocument();
     const company = screen.getByRole("row", { name: /^全社 計/ });
-    expect(within(company).getAllByRole("cell")[1]).toHaveTextContent(/^—$/);
+    expect(within(company).getByText("100.0%")).toBeInTheDocument();
   });
 
   it("every shop's 売上 stands against its own week, on either platform", () => {
@@ -678,8 +677,9 @@ describe("widgets/uorakutensales/daily-check-section", () => {
       { platform: "rakuten", values: { sales: 324785, units: 276, orders: 261 }, aov: 1244, time: "13:40" },
       { platform: "amazon", values: { sales: 7897, units: 9, orders: 6 }, aov: 1316, time: "13:55" },
     ],
-    values: { sales: null, units: 285, orders: 267 },
+    values: { sales: 332682, units: 285, orders: 267 },
     avg: null,
+    salesExcludes: [],
     days: [],
     salesDays: [],
     coverage: { covered: 9, total: 10 },
@@ -697,12 +697,32 @@ describe("widgets/uorakutensales/daily-check-section", () => {
     expect(screen.queryByText(`${NS}.salesNotSummed`)).not.toBeInTheDocument();
   });
 
-  it("the today card shows each platform's 売上 instead of one total", () => {
+  it("the today card adds 売上 across platforms into one figure, with each platform's line below", () => {
     render(<TodayCard view={multiView} metric="sales" shopColors={{}} t={tl} />);
 
-    expect(screen.getByText("¥324785")).toBeInTheDocument();
-    expect(screen.getByText("¥7897")).toBeInTheDocument();
-    expect(screen.getByText(`${NS}.salesNotSummed`)).toBeInTheDocument();
+    expect(screen.getByText("¥332682")).toBeInTheDocument();
+    expect(screen.getByText(/¥324785/)).toBeInTheDocument();
+    expect(screen.getByText(/¥7897/)).toBeInTheDocument();
+    expect(screen.queryByText(`${NS}.salesNotSummed`)).not.toBeInTheDocument();
+    expect(screen.queryByText(`${NS}.salesExcludes`)).not.toBeInTheDocument();
+  });
+
+  it("the today card names a platform its 売上 total leaves out", () => {
+    const tn = (key, opts) =>
+      key === `${NS}.salesExcludes`
+        ? `yen excludes ${opts.names}`
+        : key === `${NS}.platformTemu`
+          ? "TEMU"
+          : tl(key, opts);
+    const view = { ...multiView, salesExcludes: ["temu"] };
+    render(<TodayCard view={view} metric="sales" shopColors={{}} t={tn} />);
+    expect(screen.getByText("yen excludes TEMU")).toBeInTheDocument();
+  });
+
+  it("the today card names no yen exclusion while it shows counts", () => {
+    const view = { ...multiView, salesExcludes: ["temu"] };
+    render(<TodayCard view={view} metric="orders" shopColors={{}} t={tl} />);
+    expect(screen.queryByText(/salesExcludes/)).not.toBeInTheDocument();
   });
 
   it("the today card says which platform stays out of the week", () => {

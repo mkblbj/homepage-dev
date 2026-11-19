@@ -117,9 +117,8 @@ export function barLabel(metric, value, t) {
   return `${value >= 100000 ? Math.round(value / 10000) : man(value)}${t(`${NS}.manUnit`)}`;
 }
 
-// The last finished days, then today when today has one figure to stand beside
-// them. `platform` names whose days they are when that is not the whole company.
-function WeekBars({ days, metric, value, avg, platform = null, t }) {
+// The last finished days, then today when today has one figure to stand beside them.
+function WeekBars({ days, metric, value, avg, t }) {
   const withToday = value !== null;
   const series = days.map((d) => ({ key: d.date, md: d.md, wd: d.wd, v: d[metric] || 0 }));
   const peak = Math.max(1, withToday ? value : 0, ...series.map((d) => d.v));
@@ -129,11 +128,6 @@ function WeekBars({ days, metric, value, avg, platform = null, t }) {
     <div className="flex min-w-0 flex-col gap-2">
       <div className="flex items-baseline justify-between gap-2 text-xs">
         <span className={`font-bold ${MUTED}`}>
-          {platform ? (
-            <>
-              <PlatformName platform={platform} label={platformLabel(platform, t)} /> ·{" "}
-            </>
-          ) : null}
           {withToday ? t(`${NS}.lastDaysAndToday`, { count }) : t(`${NS}.lastDays`, { count })}
         </span>
         {avg ? <span className={MUTED}>{t(`${NS}.avgLine`)}</span> : null}
@@ -211,14 +205,14 @@ function PlatformLines({ platforms, metric, t }) {
 // `view` is buildTodayView's: one platform, or several side by side
 export function TodayCard({ view, metric, shopColors, cardCls = "", t }) {
   const { value, avg, pct } = todayVsAverage(view, metric);
-  // 売上 across platforms is never one figure: each platform keeps its own
-  const split = view.multi && metric === "sales";
-  const mix = split ? [] : view.mix.filter((r) => r.values[metric] > 0);
+  const mix = view.mix.filter((r) => r.values[metric] > 0);
   // today's total adds up fewer shops than the list holds — e.g. one without the order API
   const coverage = view.coverage && view.coverage.covered < view.coverage.total ? view.coverage : null;
   const days = metric === "sales" ? view.salesDays : view.days;
   // today is every shop; a platform with no week is only missing from the past
-  const excluded = !split && pct !== null ? platformNames(view.weekExcludes, t) : "";
+  const excluded = pct !== null ? platformNames(view.weekExcludes, t) : "";
+  // a platform without yen (TEMU) is counted but stays out of the 売上 total
+  const yenExcluded = metric === "sales" ? platformNames(view.salesExcludes, t) : "";
   return (
     <section className={`flex min-w-0 flex-wrap justify-between gap-6 p-5 ${cardCls}`}>
       <div className="flex min-w-[260px] flex-1 flex-col gap-3">
@@ -232,24 +226,12 @@ export function TodayCard({ view, metric, shopColors, cardCls = "", t }) {
             </span>
           ) : null}
         </span>
-        {split ? (
-          <span className="flex flex-col gap-1.5">
-            {view.platforms.map((p) => (
-              <span key={p.platform} className="flex items-baseline gap-3">
-                <span className="w-20 shrink-0 text-sm font-bold text-theme-800 dark:text-theme-100">
-                  <PlatformName platform={p.platform} label={platformLabel(p.platform, t)} />
-                </span>
-                <span className={`text-[36px] font-extrabold leading-none tracking-tight tabular-nums ${ACCENT_TEXT}`}>
-                  {valueText("sales", p.values.sales, t)}
-                </span>
-              </span>
-            ))}
-          </span>
-        ) : (
-          <span className={`text-[52px] font-extrabold leading-none tracking-tight tabular-nums ${ACCENT_TEXT}`}>
-            {valueText(metric, value, t)}
-          </span>
-        )}
+        <span className={`text-[52px] font-extrabold leading-none tracking-tight tabular-nums ${ACCENT_TEXT}`}>
+          {valueText(metric, value, t)}
+        </span>
+        {yenExcluded ? (
+          <span className={`text-xs ${MUTED}`}>{t(`${NS}.salesExcludes`, { names: yenExcluded })}</span>
+        ) : null}
         {view.multi ? (
           <PlatformLines platforms={view.platforms} metric={metric} t={t} />
         ) : (
@@ -294,12 +276,10 @@ export function TodayCard({ view, metric, shopColors, cardCls = "", t }) {
             ) : null}
           </div>
         ) : null}
-        {split ? <span className={`mt-1 text-xs ${MUTED}`}>{t(`${NS}.salesNotSummed`)}</span> : null}
       </div>
       {days.length ? (
         <div className="min-w-[280px] flex-1 @5xl:max-w-[400px]">
-          {/* 売上 across platforms: the bars are 楽天's yen alone */}
-          <WeekBars days={days} metric={metric} value={value} avg={avg} platform={split ? "rakuten" : null} t={t} />
+          <WeekBars days={days} metric={metric} value={value} avg={avg} t={t} />
         </div>
       ) : null}
     </section>
@@ -952,9 +932,6 @@ export function ShopTable({
   const totals = table.totals ?? [table.total];
   const multi = totals.length > 1;
   const companyToday = table.total.today?.[metric] ?? null;
-  // a share of the company for counts; 売上 only shares within its own platform
-  const shareBaseOf = (platform) =>
-    multi && metric === "sales" ? (totals.find((r) => r.platform === platform)?.today?.sales ?? null) : companyToday;
   const footerLabel = (row) => {
     if (!multi) return t(`${NS}.total`);
     return row.platform ? (
@@ -1056,7 +1033,7 @@ export function ShopTable({
                 key={row.key ?? row.name}
                 row={row}
                 metric={metric}
-                shareBase={shareBaseOf(row.platform)}
+                shareBase={companyToday}
                 maxToday={maxToday}
                 trendDays={trendDays}
                 color={colorOf(row.name)}
@@ -1083,7 +1060,7 @@ export function ShopTable({
                 key={row.key ?? "total"}
                 row={row}
                 metric={metric}
-                shareBase={row.platform ? shareBaseOf(row.platform) : companyToday}
+                shareBase={companyToday}
                 maxToday={maxToday}
                 trendDays={trendDays}
                 t={t}

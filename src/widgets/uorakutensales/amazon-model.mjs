@@ -315,6 +315,12 @@ function normalizeAmazonItem(item, shopName) {
 // Per dimension, one board per Amazon shop, ready to sit beside 楽天's shop
 // boards. Amazon has no company-wide board: its shops are only ranked apart.
 export function buildAmazonBoards(ranking) {
+  return shopBoardsOf(ranking, "amazon", amazonKey);
+}
+
+// Item rankings in Amazon's shape, one board per shop and dimension. Mercari's,
+// which the proxy works out from its orders, come in the same shape.
+export function shopBoardsOf(ranking, platform, keyOf) {
   if (!ranking || ranking.error) return null;
   const shops = (ranking.shops || []).filter((s) => s.enabled !== false && s.status !== "disabled");
   if (!shops.length) return null;
@@ -322,9 +328,9 @@ export function buildAmazonBoards(ranking) {
     RANKING_DIMS.map((dim) => [
       dim,
       shops.map((s) => ({
-        key: amazonKey(s),
+        key: keyOf(s),
         shopName: s.shopName,
-        platform: "amazon",
+        platform,
         itemCount: numberOrNull(s.itemCount) ?? 0,
         ok: s.status === "ready" || s.status === "partial",
         stale: s.status === "stale",

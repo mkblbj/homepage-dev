@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildMercari, mercariKey } from "./mercari-model.mjs";
+import { buildMercari, buildMercariBoards, mercariKey } from "./mercari-model.mjs";
+import { buildRanking } from "./sales-model.mjs";
 
 const SOURCE = "2026-11-19T06:28:18.514Z"; // 15:28:18 JST
 const CONFIG = "09ac59f3-a7b7-415f-b8a8-2af9f1ac9967";
@@ -132,4 +133,74 @@ test("a stale Mercari shop stays on the board but out of today's totals", () => 
   assert.equal(m.shops[0].counted, false);
   assert.deepEqual(m.company.missing, ["3911"]);
   assert.equal(m.company.today, null);
+});
+
+// the proxy's mercariRanking answer for today
+const boardsPeriod = {
+  key: "2026-11-19",
+  shops: [
+    {
+      configId: CONFIG,
+      shopName: "3911",
+      enabled: true,
+      status: "ready",
+      itemCount: 1,
+      rankings: Object.fromEntries(
+        ["orderCount", "sales", "units"].map((dim) => [
+          dim,
+          [
+            {
+              rank: 1,
+              sku: "[2F203]  アンチグレア フィルム Galaxy A25",
+              itemUrl: "https://jp.mercari.com/shops/product/zoGE",
+              imageUrl: "https://assets.mercari-shops-static.com/a.jpg",
+              salesAmount: 748,
+              currency: "JPY",
+              unitsSold: 1,
+              orderCount: 1,
+            },
+          ],
+        ]),
+      ),
+    },
+  ],
+};
+
+test("buildMercariBoards gives each shop a board per dimension, keyed apart from 楽天's 3911", () => {
+  const boards = buildMercariBoards(boardsPeriod);
+  const [board] = boards.sales;
+  assert.equal(board.key, `mercari:${CONFIG}`);
+  assert.equal(board.platform, "mercari");
+  assert.equal(board.shopName, "3911");
+  assert.equal(board.ok, true);
+  assert.deepEqual(
+    [board.items[0].mno, board.items[0].salesYen, board.items[0].unitsSold, board.items[0].url],
+    ["[2F203]  アンチグレア フィルム Galaxy A25", 748, 1, "https://jp.mercari.com/shops/product/zoGE"],
+  );
+  assert.equal(buildMercariBoards(null), null);
+  assert.equal(buildMercariBoards({ error: "x" }), null);
+  assert.equal(buildMercariBoards({ key: "2026-11-19", shops: [] }), null);
+});
+
+test("the best sellers take Mercari's shop boards beside 楽天's", () => {
+  const rakuten = {
+    sourceDateJST: "2026-11-19",
+    rankings: {
+      sales: {
+        shopCount: 1,
+        overall: { items: [{ rank: 1, itemManagementNumber: "r-1", salesYen: 900, unitsSold: 1, orderCount: 1 }] },
+        shops: [{ shopName: "3911", itemCount: 1, items: [] }],
+      },
+    },
+  };
+  const plain = buildRanking(rakuten);
+  assert.equal(plain.multiPlatform, false);
+  const ranking = buildRanking(rakuten, null, buildMercariBoards(boardsPeriod));
+  assert.equal(ranking.multiPlatform, true);
+  assert.deepEqual(
+    ranking.dims.sales.shops.map((s) => s.key ?? s.shopName),
+    ["3911", `mercari:${CONFIG}`],
+  );
+  // the company board stays 楽天's
+  assert.equal(ranking.dims.sales.overall.length, 1);
 });

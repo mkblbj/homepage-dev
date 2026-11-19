@@ -237,6 +237,7 @@ const REQUIRED_KEYS = [
   "platformTotal",
   "companyTotal",
   "salesNotSummed",
+  "salesExcludes",
   "boardLoading",
   "peaksCoverageAmazon",
 ];

@@ -115,16 +115,19 @@ describe("sales-board atomic rendering", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("uorakutensales.platformTemu");
   });
 
-  it("does not replace individual platform amounts in sales mode before all sources arrive", async () => {
+  it("does not replace the amounts in sales mode before all sources arrive", async () => {
     const h = harness();
     await h.ready();
     fireEvent.click(screen.getByRole("button", { name: "uorakutensales.sortSales" }));
-    expect(within(h.card()).getByText("¥16000")).toBeInTheDocument();
+    // 楽天 ¥16000 + Amazon ¥1200 + au PAY ¥700 + Mercari ¥500; TEMU has no yen
+    expect(h.figure()).toBe("¥18400");
+    expect(within(h.card()).getByText(/¥16000/)).toBeInTheDocument();
     h.refresh();
     await h.resolve("sales", { ...rakuten, totals: { ...rakuten.totals, salesYen: 20000 } });
-    expect(within(h.card()).getByText("¥16000")).toBeInTheDocument();
-    expect(within(h.card()).queryByText("¥20000")).not.toBeInTheDocument();
+    expect(h.figure()).toBe("¥18400");
+    expect(within(h.card()).queryByText(/¥20000/)).not.toBeInTheDocument();
     for (const endpoint of ["monthly", "amazonSales", "aupaySales", "temuSales", "mercariSales"]) await h.resolve(endpoint);
-    expect(within(h.card()).getByText("¥20000")).toBeInTheDocument();
+    expect(h.figure()).toBe("¥22400");
+    expect(within(h.card()).getByText(/¥20000/)).toBeInTheDocument();
   });
 });
