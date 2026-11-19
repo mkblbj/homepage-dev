@@ -3,7 +3,7 @@ import useSWR from "swr";
 
 import { formatProxyUrl } from "utils/proxy/api-helpers";
 
-const ENDPOINTS = ["sales", "monthly", "amazonSales", "aupaySales", "temuSales"];
+const ENDPOINTS = ["sales", "monthly", "amazonSales", "aupaySales", "temuSales", "mercariSales"];
 const REQUEST_TIMEOUT = 10000;
 
 async function readSource(url, endpoint) {

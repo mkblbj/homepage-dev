@@ -20,9 +20,10 @@
  *   "amazonPeaks"   → GET /api/amazon/history/peaks  each Amazon shop's best day
  *   "aupaySales"    → GET /api/aupay/sales           au PAY today, this month, last month and shop history
  *   "temuSales"     → GET /api/temu/sales            TEMU's one shop, the same periods and history
+ *   "mercariSales"  → GET /api/mercari/sales         Mercari Shops, in au PAY's shape
  *
- * Amazon's, au PAY's and TEMU's shops sit beside 楽天's as peers. Counts add up across platforms;
- * yen never do, since each platform measures its amounts its own way.
+ * Amazon's, au PAY's, TEMU's and Mercari's shops sit beside 楽天's as peers. Counts add up
+ * across platforms; yen never do, since each platform measures its amounts its own way.
  *
  * No endpoint carries a conversion rate any more: the order API has no visitors,
  * so the 7-day history reports it as null and the page shows a dash.
@@ -60,6 +61,7 @@ import { buildMarketEvidence, buildMarketReference, MARKET_REFRESH_INTERVAL } fr
 import { buildDeviceSales } from "./device-sales-model.mjs";
 import DeviceSalesSection from "./device-sales-section";
 import { CustomerMixCard, ShopVisitsTable } from "./insight-section";
+import { buildMercari } from "./mercari-model.mjs";
 import { PlatformMark, PlatformName, PlatformSuffix, ScopeName } from "./platform-mark";
 import {
   ACCENT,
@@ -1040,6 +1042,7 @@ function SnapshotNotice({ error, messageKey, t }) {
     amazonSales: t(`${NS}.platformAmazon`),
     aupaySales: t(`${NS}.platformAupay`),
     temuSales: t(`${NS}.platformTemu`),
+    mercariSales: t(`${NS}.platformMercari`),
   };
   return (
     <div
@@ -1078,6 +1081,7 @@ export default function Component({ service }) {
     amazonSales: amazonSalesData,
     aupaySales: aupaySalesData,
     temuSales: temuSalesData,
+    mercariSales: mercariSalesData,
   } = snapshot || {};
   // Core sales snapshots publish together. Context/analysis reads remain
   // independent and do not delay the daily sales board.
@@ -1130,8 +1134,9 @@ export default function Component({ service }) {
   const amazon = useMemo(() => buildAmazon(amazonSalesData, amazonHistoryData), [amazonSalesData, amazonHistoryData]);
   const aupay = useMemo(() => buildAupay(aupaySalesData), [aupaySalesData]);
   const temu = useMemo(() => buildTemu(temuSalesData), [temuSalesData]);
+  const mercari = useMemo(() => buildMercari(mercariSalesData), [mercariSalesData]);
   // the platforms beside 楽天 that answered, in the order the board names them
-  const others = useMemo(() => [amazon, aupay, temu].filter(Boolean), [amazon, aupay, temu]);
+  const others = useMemo(() => [amazon, aupay, temu, mercari].filter(Boolean), [amazon, aupay, temu, mercari]);
   const rankingToday = useMemo(
     () => buildRanking(rankingData, buildAmazonBoards(amazonRankingData)),
     [rankingData, amazonRankingData],
@@ -1148,8 +1153,9 @@ export default function Component({ service }) {
       withUnrecordedShops(withAmazonPeaks(buildPeaks(peaksData), amazonPeaksData), [
         ...(aupay?.shops || []),
         ...(temu?.shops || []),
+        ...(mercari?.shops || []),
       ]),
-    [peaksData, amazonPeaksData, aupay, temu],
+    [peaksData, amazonPeaksData, aupay, temu, mercari],
   );
   const devices = useMemo(() => buildDeviceSales(devicesData, devicesMonthlyData), [devicesData, devicesMonthlyData]);
   const market = useMemo(() => buildMarketReference(marketData), [marketData]);

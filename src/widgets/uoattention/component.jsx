@@ -13,6 +13,9 @@
  *   - reviewUrl is intentionally NOT linked: operators are logged into RMS anyway and
  *     each shop replies there, so the feed is read-only context.
  *   - no buyer-identifying fields exist in the payload and none are displayed.
+ *   - Mercari Shops' inquiries ride along (mercariInquiries): its shops get a card of their
+ *     own beside 楽天's, the headline counts every platform's unanswered inquiries, and
+ *     overdue stays 楽天's alone.
  */
 import Container from "components/services/widget/container";
 import { useTranslation } from "next-i18next/pages";
@@ -219,15 +222,34 @@ function KpiCard({ label, hint, value, sub, subAlert }) {
   );
 }
 
+// A shop off 楽天 says which platform it is on: 3911 is a 楽天 shop and a Mercari shop.
+function PlatformTag({ platform, t }) {
+  if (platform !== "mercari") return null;
+  return (
+    <span className="inline-flex shrink-0 rounded-md border border-theme-300/50 px-1 text-[9.5px] font-bold text-theme-600 dark:border-white/15 dark:text-theme-300">
+      {t(`${NS}.platformMercari`)}
+    </span>
+  );
+}
+
 // A shop with something to handle. Only the counts it actually has are listed; an unknown
-// count stays on the card as "—", since it is not a zero.
+// count stays on the card as "—", since it is not a zero. A Mercari shop counts only its
+// inquiries: the unanswered ones and those its seller is already handling.
 function ShopCard({ shop, t }) {
   const tone = toneOf(shop.status);
-  const counts = [
-    { key: "pending", label: t(`${NS}.pendingOrders`), value: shop.pending },
-    { key: "inquiry", label: t(`${NS}.inquiriesShort`), value: shop.inquiry },
-    { key: "reviews", label: t(`${NS}.reviews`), value: shop.reviews },
-  ].filter((count) => count.value !== 0);
+  const mercari = shop.platform === "mercari";
+  const counts = (
+    mercari
+      ? [
+          { key: "inquiry", label: t(`${NS}.inquiriesShort`), value: shop.inquiry },
+          { key: "handling", label: t(`${NS}.inquiriesHandling`), value: shop.handling },
+        ]
+      : [
+          { key: "pending", label: t(`${NS}.pendingOrders`), value: shop.pending },
+          { key: "inquiry", label: t(`${NS}.inquiriesShort`), value: shop.inquiry },
+          { key: "reviews", label: t(`${NS}.reviews`), value: shop.reviews },
+        ]
+  ).filter((count) => count.value !== 0);
 
   return (
     <div
@@ -240,6 +262,7 @@ function ShopCard({ shop, t }) {
         <span data-testid="shop-name" className="truncate text-[13px] font-bold text-theme-900 dark:text-theme-50">
           {shop.name}
         </span>
+        <PlatformTag platform={shop.platform} t={t} />
         <span className={`inline-flex shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold ${tone.pill}`}>
           {statusLabel(t, shop.status)}
         </span>
@@ -261,7 +284,7 @@ function ShopCard({ shop, t }) {
               <span className="font-bold tabular-nums text-theme-900 dark:text-theme-50">
                 {fmtNullable(t, count.value)}
               </span>
-              {count.key === "inquiry" && (isNil(shop.overdue) || shop.overdue > 0) ? (
+              {count.key === "inquiry" && !mercari && (isNil(shop.overdue) || shop.overdue > 0) ? (
                 <span
                   className={`font-bold ${isNil(shop.overdue) ? "text-theme-500 dark:text-theme-400" : ACCENT_TEXT}`}
                 >
@@ -317,11 +340,12 @@ function QuietShops({ shops, t }) {
       <span className="text-[10.5px] font-medium text-theme-500 dark:text-theme-400">{t(`${NS}.quietNote`)}</span>
       {shops.map((shop) => (
         <span
-          key={shop.name}
+          key={shop.key}
           className="inline-flex items-center gap-1 rounded-md border border-theme-300/40 bg-theme-100/40 px-1.5 py-0.5 text-[11px] font-semibold text-theme-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-theme-200"
         >
           <ShopLogo name={shop.name} url={shop.logoUrl} size={13} />
           {shop.name}
+          <PlatformTag platform={shop.platform} t={t} />
         </span>
       ))}
     </div>
@@ -442,6 +466,9 @@ export default function Component({ service }) {
         <div className="flex flex-wrap gap-2 px-0.5">
           <SourceChip name={t(`${NS}.sourceMainMenu`)} source={model.sources.mainMenu} t={t} />
           <SourceChip name={t(`${NS}.sourceReviews`)} source={model.sources.reviews} t={t} />
+          {model.sources.mercariInquiries ? (
+            <SourceChip name={t(`${NS}.sourceMercari`)} source={model.sources.mercariInquiries} t={t} />
+          ) : null}
         </div>
 
         {/* hero + KPI */}
@@ -496,7 +523,9 @@ export default function Component({ service }) {
             <KpiCard
               label={t(`${NS}.inquiries`)}
               value={fmtNullable(t, model.inquiry)}
-              sub={`${t(`${NS}.overdue`)} ${fmtNullable(t, model.overdue)} ${t(`${NS}.unit`)}`}
+              sub={`${t(`${NS}.overdue`)} ${fmtNullable(t, model.overdue)} ${t(`${NS}.unit`)}${
+                model.mercari ? ` · ${t(`${NS}.mercariShare`, { count: fmtNullable(t, model.mercari.inquiry) })}` : ""
+              }`}
               subAlert={model.overdue > 0}
             />
             <KpiCard
@@ -529,7 +558,7 @@ export default function Component({ service }) {
               {model.activeShops.length > 0 ? (
                 <div className="grid grid-cols-1 gap-2.5 @md:grid-cols-2 @4xl:grid-cols-3 @6xl:grid-cols-4">
                   {model.activeShops.map((shop) => (
-                    <ShopCard key={shop.name} shop={shop} t={t} />
+                    <ShopCard key={shop.key} shop={shop} t={t} />
                   ))}
                 </div>
               ) : null}

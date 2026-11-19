@@ -86,7 +86,7 @@ describe("widgets/uorakutensales/component", () => {
     // grouped HTTP/SWR timing and failures are covered by refresh.test.jsx.
     useSalesSnapshot.mockImplementation((widget) => {
       const readFixture = useWidgetAPI.getMockImplementation();
-      const sources = Object.fromEntries(["sales", "monthly", "amazonSales", "aupaySales", "temuSales"].map((endpoint) =>
+      const sources = Object.fromEntries(["sales", "monthly", "amazonSales", "aupaySales", "temuSales", "mercariSales"].map((endpoint) =>
         [endpoint, readFixture?.(widget, endpoint)?.data],
       ));
       return { data: sources.sales ? sources : undefined, mutate: mutateSnapshot };

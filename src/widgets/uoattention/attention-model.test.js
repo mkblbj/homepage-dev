@@ -350,3 +350,127 @@ describe("widgets/uoattention/attention-model", () => {
     expect(isNil(0)).toBe(false);
   });
 });
+
+// /api/attention since Mercari Shops joined (2026-11-19): its inquiries ride along
+const MERCARI_CONFIG = "09ac59f3-a7b7-415f-b8a8-2af9f1ac9967";
+
+function mercariShop(overrides = {}) {
+  return {
+    platform: "mercari",
+    configId: MERCARI_CONFIG,
+    shopId: "DKnSGBVY6VP22ckTF3h444",
+    shopName: "3911",
+    enabled: true,
+    status: "ready",
+    sourceUpdatedAt: "2026-11-19T06:28:18.698Z",
+    lastError: null,
+    unansweredInquiryCount: 1,
+    inProgressInquiryCount: 45,
+    overdueInquiryCount: null,
+    ...overrides,
+  };
+}
+
+const mercariSource = {
+  ok: true,
+  stale: false,
+  updatedAtJST: "2026-11-19 15:28:18 JST",
+  lastAttemptAtJST: "2026-11-19 15:28:18 JST",
+  coveredShopCount: 1,
+  lastError: null,
+};
+
+function withMercari(shops = [mercariShop()], summary = { unansweredInquiryCount: 1, inProgressInquiryCount: 45 }) {
+  return {
+    ...snapshot,
+    summary: {
+      ...snapshot.summary,
+      allPlatformUnansweredInquiryCount:
+        snapshot.summary.unansweredInquiryCount + (summary.unansweredInquiryCount ?? 0),
+    },
+    sources: { ...snapshot.sources, mercariInquiries: mercariSource },
+    mercariInquiries: {
+      ok: true,
+      enabled: true,
+      partial: false,
+      source: "mercari-shops-inquiries",
+      summary,
+      freshness: mercariSource,
+      shops,
+    },
+  };
+}
+
+describe("widgets/uoattention/attention-model Mercari inquiries", () => {
+  it("counts every platform's unanswered inquiries in the headline, overdue staying 楽天's", () => {
+    const model = buildAttentionModel(withMercari());
+
+    expect(model.inquiry).toBe(2);
+    expect(model.overdue).toBe(0);
+    expect(model.total).toBe(20);
+    expect(model.mercari).toEqual({ inquiry: 1, handling: 45 });
+    expect(model.sources.mercariInquiries).toEqual(mercariSource);
+  });
+
+  it("keeps the 楽天-only figures when the snapshot has no Mercari", () => {
+    const model = buildAttentionModel(snapshot);
+
+    expect(model.inquiry).toBe(1);
+    expect(model.mercari).toBeNull();
+    expect(model.shops.every((shop) => shop.platform === "rakuten")).toBe(true);
+  });
+
+  it("gives the Mercari shop its own entry beside the 楽天 shop of the same name", () => {
+    const model = buildAttentionModel(withMercari(), { shops: [{ shopName: "3911", logoUrl: "https://x/3911.png" }] });
+    const both = model.shops.filter((shop) => shop.name === "3911");
+
+    expect(both.map((shop) => shop.platform)).toEqual(["rakuten", "mercari"]);
+    expect(new Set(both.map((shop) => shop.key)).size).toBe(2);
+    const mercari = both[1];
+    expect(mercari.key).toBe(`mercari:${MERCARI_CONFIG}`);
+    // the platform's own icon, never the 楽天 shop's logo
+    expect(mercari.logoUrl).toMatch(/^data:image\/png;base64,/);
+    expect(mercari).toMatchObject({ status: "attention", inquiry: 1, handling: 45, total: 1, overdue: null });
+    // 楽天's coverage and shop count are unchanged
+    expect(model.shopCount).toBe(7);
+    expect(model.coveredShopCount).toBe(buildAttentionModel(snapshot).coveredShopCount);
+  });
+
+  it("keeps a Mercari shop with inquiries in progress on the board, folds it once there are none", () => {
+    const handling = buildAttentionModel(withMercari([mercariShop({ unansweredInquiryCount: 0 })]));
+    const shop = handling.shops.find((s) => s.platform === "mercari");
+    expect(shop.status).toBe("normal");
+    expect(handling.activeShops).toContain(shop);
+
+    const clear = buildAttentionModel(
+      withMercari([mercariShop({ unansweredInquiryCount: 0, inProgressInquiryCount: 0 })]),
+    );
+    expect(clear.quietShops.map((s) => s.key)).toContain(`mercari:${MERCARI_CONFIG}`);
+  });
+
+  it("reads a Mercari shop the server could not read fresh as unknown, not zero", () => {
+    const stale = mercariShop({
+      status: "stale",
+      unansweredInquiryCount: null,
+      inProgressInquiryCount: null,
+      lastError: "MERCARI_INQUIRIES_FAILED",
+    });
+    const model = buildAttentionModel(
+      withMercari([stale], { unansweredInquiryCount: null, inProgressInquiryCount: null }),
+    );
+    const shop = model.shops.find((s) => s.platform === "mercari");
+
+    expect(shop).toMatchObject({ status: "unknown", inquiry: null, handling: null, total: null });
+    expect(model.activeShops).toContain(shop);
+    expect(model.mercari).toEqual({ inquiry: null, handling: null });
+  });
+
+  it("leaves out a disabled Mercari source and disabled shops", () => {
+    const disabled = withMercari();
+    expect(
+      buildAttentionModel({ ...disabled, mercariInquiries: { ...disabled.mercariInquiries, enabled: false } }).mercari,
+    ).toBeNull();
+    const model = buildAttentionModel(withMercari([mercariShop({ enabled: false })]));
+    expect(model.shops.some((shop) => shop.platform === "mercari")).toBe(false);
+  });
+});

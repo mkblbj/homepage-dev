@@ -33,6 +33,7 @@ const EXPECTED_METHOD_BY_ENDPOINT = {
   amazonPeaks: "GET",
   aupaySales: "GET",
   temuSales: "GET",
+  mercariSales: "GET",
 };
 
 function parseResponseData(data) {
