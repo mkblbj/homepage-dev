@@ -40,13 +40,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { buildAmazon, buildAmazonBoards, withAmazonPeaks } from "./amazon-model.mjs";
 import { buildAupay, withUnrecordedShops } from "./aupay-model.mjs";
-import {
-  buildMonthView,
-  buildShopTable,
-  buildTodayView,
-  RANKING_DIM_BY_METRIC,
-  visitsFromFreshShops,
-} from "./daily-check-model.mjs";
+import { buildMonthView, buildShopTable, buildTodayView, visitsFromFreshShops } from "./daily-check-model.mjs";
 import {
   historyNotes,
   MetricSwitch,
@@ -75,10 +69,12 @@ import {
   buildShopColors,
   computeFreshness,
   DEFAULT_PEAK_DIM,
+  DEFAULT_RANKING_DIM,
   DEFAULT_REFRESH_INTERVAL,
   FALLBACK_SHOP_COLOR,
   man,
   PEAK_DIMS,
+  RANKING_DIMS,
   RANKING_STEPS,
 } from "./sales-model.mjs";
 import { buildTemu } from "./temu-model.mjs";
@@ -564,9 +560,9 @@ function RankRow({ item, showShop, dim, t }) {
 
 const DIM_LABEL = { orderCount: "sortOrders", sales: "sortSales", units: "sortUnits" };
 
-// The metric comes from the daily check's switch. Six rows until opened; the
-// shop chips only appear once the reader asks for more, and closing the board
-// goes back to every shop.
+// The board keeps its own 件数 / 個数 / 売上 switch, apart from the daily check's.
+// Six rows until opened; the shop chips only appear once the reader asks for
+// more, and closing the board goes back to every shop.
 const RANKING_PERIODS = [
   ["today", "todayLabel"],
   ["month", "thisMonth"],
@@ -602,23 +598,73 @@ function PeriodSwitch({ period, onPeriod, t }) {
   );
 }
 
+// which figure the board is ranked by; only the dimensions the board carries
+function RankingDimSwitch({ dims, dim, onDim, t }) {
+  return (
+    <div
+      role="group"
+      aria-label={`${t(`${NS}.bestSellers`)} ${t(`${NS}.metric`)}`}
+      className="flex shrink-0 gap-0.5 rounded-lg border border-theme-300/60 bg-theme-100/50 p-0.5 dark:border-theme-600/60 dark:bg-theme-900/30"
+    >
+      {dims.map((key) => (
+        <button
+          key={key}
+          type="button"
+          aria-pressed={dim === key}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onDim(key);
+          }}
+          className={`rounded-md px-2.5 py-0.5 text-xs font-bold transition-colors ${
+            dim === key
+              ? "bg-theme-700 text-white dark:bg-theme-100 dark:text-theme-900"
+              : "text-theme-600 hover:bg-theme-200/60 dark:text-theme-300 dark:hover:bg-theme-700/60"
+          }`}
+        >
+          {t(`${NS}.${DIM_LABEL[key]}`)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // `ranking` is null while a month's boards are still being read
-function RankingSection({ ranking, period = "today", onPeriod = () => {}, dim, cardCls, t }) {
+function RankingSection({
+  ranking,
+  period = "today",
+  onPeriod = () => {},
+  dim = DEFAULT_RANKING_DIM,
+  onDim = () => {},
+  cardCls,
+  t,
+}) {
   if (!ranking) {
     return (
       <section className={`flex flex-col gap-3 p-5 ${cardCls}`}>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <span className="text-base font-extrabold text-theme-900 dark:text-theme-50">{t(`${NS}.bestSellers`)}</span>
           <PeriodSwitch period={period} onPeriod={onPeriod} t={t} />
+          <RankingDimSwitch dims={RANKING_DIMS} dim={dim} onDim={onDim} t={t} />
         </div>
         <span className="py-4 text-center text-xs text-theme-500 dark:text-theme-400">{t(`${NS}.boardLoading`)}</span>
       </section>
     );
   }
-  return <RankingBoards ranking={ranking} period={period} onPeriod={onPeriod} dim={dim} cardCls={cardCls} t={t} />;
+  return (
+    <RankingBoards
+      ranking={ranking}
+      period={period}
+      onPeriod={onPeriod}
+      dim={dim}
+      onDim={onDim}
+      cardCls={cardCls}
+      t={t}
+    />
+  );
 }
 
-function RankingBoards({ ranking, period, onPeriod, dim, cardCls, t }) {
+function RankingBoards({ ranking, period, onPeriod, dim, onDim, cardCls, t }) {
   const [shop, setShop] = useState("__all__");
   // index into RANKING_STEPS — progressive reveal (6 → 20 → 50 → 100)
   const [step, setStep] = useState(0);
@@ -701,8 +747,9 @@ function RankingBoards({ ranking, period, onPeriod, dim, cardCls, t }) {
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <span className="text-base font-extrabold text-theme-900 dark:text-theme-50">{t(`${NS}.bestSellers`)}</span>
         <PeriodSwitch period={period} onPeriod={onPeriod} t={t} />
+        <RankingDimSwitch dims={ranking.available} dim={activeDim} onDim={onDim} t={t} />
         <span className="text-xs tabular-nums text-theme-600 dark:text-theme-300">
-          {ranking.sourceDate} · {meta} · {t(`${NS}.rankedBy`, { metric: t(`${NS}.${DIM_LABEL[activeDim]}`) })}
+          {ranking.sourceDate} · {meta}
         </span>
         {ranking.partial || board.failedShopCount > 0 ? (
           <span className="rounded border border-amber-400/40 bg-amber-500/10 px-1.5 py-px text-xs font-bold text-amber-600 dark:text-amber-300">
@@ -1062,8 +1109,10 @@ export default function Component({ service }) {
   const { widget } = service;
   const refreshInterval = Math.max(1000, Number(widget.refreshInterval) || DEFAULT_REFRESH_INTERVAL);
   const [chartMode, setChartMode] = useState("line");
-  // the daily check's metric: today, the month, the shop table and the best sellers — 件数 first
+  // the daily check's metric: today, the month and the shop table — 件数 first
   const [metric, setMetric] = useState("orders");
+  // the best sellers sort on their own — 個数 first
+  const [rankingDim, setRankingDim] = useState(DEFAULT_RANKING_DIM);
   // the best sellers' period: today, this month or last month
   const [rankingPeriod, setRankingPeriod] = useState("today");
   // read after mount so the server render and the first client render agree
@@ -1392,7 +1441,8 @@ export default function Component({ service }) {
             ranking={ranking}
             period={rankingPeriod}
             onPeriod={setRankingPeriod}
-            dim={RANKING_DIM_BY_METRIC[metric]}
+            dim={rankingDim}
+            onDim={setRankingDim}
             cardCls={cardCls}
             t={t}
           />

@@ -384,8 +384,15 @@ describe("widgets/uorakutensales/component", () => {
     expect(table.querySelector('img[src="https://example.test/shop-a.png"]')).toBeInTheDocument();
   });
 
-  it("opens the daily check on 件数, best sellers included", () => {
-    const rankingData = ranking("overall-item", [{ shopName: "shop-a", mno: "shop-a-item" }]);
+  it("opens the daily check on 件数 and the best sellers on 個数, each on its own switch", () => {
+    const rankingData = {
+      sourceDateJST: "2026-07-28",
+      rankings: {
+        sales: rankingBoard("by-sales", [{ shopName: "shop-a", mno: "a" }]),
+        units: rankingBoard("by-units", [{ shopName: "shop-a", mno: "a" }]),
+        orderCount: rankingBoard("by-orders", [{ shopName: "shop-a", mno: "a" }]),
+      },
+    };
     useWidgetAPI.mockImplementation((_widget, endpoint) => {
       if (endpoint === "sales") return { data: sales, error: undefined, mutate: vi.fn() };
       if (endpoint === "ranking") return { data: rankingData, error: undefined, mutate: vi.fn() };
@@ -394,8 +401,27 @@ describe("widgets/uorakutensales/component", () => {
 
     renderWithProviders(<Component service={service} />, { settings: { hideErrors: false } });
 
-    expect(screen.getByRole("button", { name: "uorakutensales.sortOrders" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "uorakutensales.sortSales" })).toHaveAttribute("aria-pressed", "false");
+    const daily = within(screen.getByRole("group", { name: "uorakutensales.metric" }));
+    const best = within(screen.getByRole("group", { name: "uorakutensales.bestSellers uorakutensales.metric" }));
+    expect(daily.getByRole("button", { name: "uorakutensales.sortOrders" })).toHaveAttribute("aria-pressed", "true");
+    expect(best.getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "uorakutensales.sortOrders",
+      "uorakutensales.sortUnits",
+      "uorakutensales.sortSales",
+    ]);
+    expect(best.getByRole("button", { name: "uorakutensales.sortUnits" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("by-units")).toBeInTheDocument();
+
+    // the best sellers' switch re-ranks the board and leaves the daily check alone
+    fireEvent.click(best.getByRole("button", { name: "uorakutensales.sortSales" }));
+    expect(screen.getByText("by-sales")).toBeInTheDocument();
+    expect(screen.queryByText("by-units")).not.toBeInTheDocument();
+    expect(daily.getByRole("button", { name: "uorakutensales.sortOrders" })).toHaveAttribute("aria-pressed", "true");
+
+    // and the daily check's switch no longer moves the best sellers
+    fireEvent.click(daily.getByRole("button", { name: "uorakutensales.sortUnits" }));
+    expect(screen.getByText("by-sales")).toBeInTheDocument();
+    expect(best.getByRole("button", { name: "uorakutensales.sortSales" })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("reads the month boards only once 今月 is picked on the best sellers", () => {

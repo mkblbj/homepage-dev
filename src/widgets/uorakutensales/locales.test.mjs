@@ -209,7 +209,6 @@ const REQUIRED_KEYS = [
   "idleHide",
   "idleNote",
   "showLessTop",
-  "rankedBy",
   "activeShops",
   "shopVisits",
   "idleLeftOut",
@@ -284,7 +283,6 @@ test("daily check placeholders are preserved across locales", () => {
     assert.match(ns.idleShow, /\{\{count\}\}/, `${locale}.idleShow needs {{count}}`);
     assert.match(ns.idleShow, /\{\{names\}\}/, `${locale}.idleShow needs {{names}}`);
     assert.match(ns.showLessTop, /\{\{count\}\}/, `${locale}.showLessTop needs {{count}}`);
-    assert.match(ns.rankedBy, /\{\{metric\}\}/, `${locale}.rankedBy needs {{metric}}`);
     assert.match(ns.activeShops, /\{\{count\}\}/, `${locale}.activeShops needs {{count}}`);
     assert.match(ns.idleLeftOut, /\{\{names\}\}/, `${locale}.idleLeftOut needs {{names}}`);
   }

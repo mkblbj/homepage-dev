@@ -465,9 +465,9 @@ test("buildRanking exposes the three dimensions in UI order", () => {
   const r = buildRanking(rankingPayload);
   assert.equal(r.sourceDate, "2026-07-29");
   assert.equal(r.partial, false);
-  // orderCount leads: it is the default dimension
-  assert.deepEqual(r.available, ["orderCount", "sales", "units"]);
-  assert.equal(r.available[0], DEFAULT_RANKING_DIM);
+  // the switch reads 件数・個数・売上 and opens on 個数
+  assert.deepEqual(r.available, ["orderCount", "units", "sales"]);
+  assert.equal(DEFAULT_RANKING_DIM, "units");
   assert.deepEqual(Object.keys(r.dims).sort(), ["orderCount", "sales", "units"]);
 });
 
