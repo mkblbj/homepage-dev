@@ -12,9 +12,6 @@
 
 export const METRICS = Object.freeze(["sales", "units", "orders"]);
 
-// the item boards key their dimensions by the API's own names
-export const RANKING_DIM_BY_METRIC = Object.freeze({ sales: "sales", units: "units", orders: "orderCount" });
-
 // a change only earns a colour once it passes ±20% — the same thresholds the
 // performance snapshot uses for 増加 / 低下
 const TONE_THRESHOLD = 20;

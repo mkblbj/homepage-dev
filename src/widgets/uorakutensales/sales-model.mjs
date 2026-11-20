@@ -25,9 +25,10 @@ export const RANKING_TOP_COUNT = RANKING_STEPS[0];
 // the API returns at most 100 items per board — that is also our ceiling
 export const RANKING_MAX_COUNT = RANKING_STEPS[RANKING_STEPS.length - 1];
 
-// ranking dimensions, in the order the UI offers them (default first)
-export const RANKING_DIMS = Object.freeze(["orderCount", "sales", "units"]);
-export const DEFAULT_RANKING_DIM = RANKING_DIMS[0];
+// ranking dimensions, in the order the board's switch offers them: 件数・個数・売上
+export const RANKING_DIMS = Object.freeze(["orderCount", "units", "sales"]);
+// the best sellers open on 個数
+export const DEFAULT_RANKING_DIM = "units";
 
 // 楽天アクセント(緋). data-viz uses blue; neutrals use theme-* tokens in the component.
 export const ACCENT = "#C6362B";

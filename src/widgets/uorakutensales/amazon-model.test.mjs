@@ -164,7 +164,7 @@ test("buildAmazonBoards gives each shop a board per dimension in the 楽天 item
     ],
   };
   const boards = buildAmazonBoards(ranking);
-  assert.deepEqual(Object.keys(boards), ["orderCount", "sales", "units"]);
+  assert.deepEqual(Object.keys(boards), ["orderCount", "units", "sales"]);
   const [board] = boards.sales;
   assert.equal(board.key, amazonKey(ranking.shops[0]));
   assert.equal(board.platform, "amazon");

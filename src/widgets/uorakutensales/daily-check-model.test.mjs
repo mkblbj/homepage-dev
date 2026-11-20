@@ -10,7 +10,6 @@ import {
   buildShopTable,
   buildTodayView,
   deltaTone,
-  RANKING_DIM_BY_METRIC,
   todayVsAverage,
   visitsFromFreshShops,
 } from "./daily-check-model.mjs";
@@ -353,10 +352,6 @@ test("todayVsAverage has no ratio without history", () => {
     avg: null,
     pct: null,
   });
-});
-
-test("each module metric maps onto the ranking board it sorts by", () => {
-  assert.deepEqual(RANKING_DIM_BY_METRIC, { sales: "sales", units: "units", orders: "orderCount" });
 });
 
 // one Amazon shop beside the 楽天 fixture: same JST day, same month
